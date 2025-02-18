@@ -97,6 +97,8 @@ class btRigidBody : public btCollisionObject
 
 	int m_rigidbodyFlags;
 
+	btScalar m_addedMass;
+
 
 public:
 	int m_debugBodyId;
@@ -275,6 +277,9 @@ public:
 	void setDamping(btScalar lin_damping, btVector3 ang_damping);
 	void setDamping(btScalar lin_damping, btScalar ang_damping);
 
+	void setAddedMass(btScalar addedMass);
+
+	
 	btScalar getLinearDamping() const
 	{
 		return m_linearDamping;
@@ -348,7 +353,10 @@ public:
 
 	const btVector3& updateAcceleration()
 	{
-		m_lastAcceleration = m_totalForce * m_inverseMass;
+		float mass = 1 / m_inverseMass;
+		float newInverseMass = 1 / (mass + m_addedMass);
+
+		m_lastAcceleration = m_totalForce * newInverseMass;
 		return m_lastAcceleration;
 	}
 

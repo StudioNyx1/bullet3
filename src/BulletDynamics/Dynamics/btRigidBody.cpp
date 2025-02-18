@@ -56,6 +56,8 @@ void btRigidBody::setupRigidBody(const btRigidBody::btRigidBodyConstructionInfo&
 	m_lastTotalTorque.setValue(btScalar(0.0), btScalar(0.0), btScalar(0.0));
 	setDamping(constructionInfo.m_linearDamping, constructionInfo.m_angularDamping);
 
+	m_addedMass = 0.0f;
+
 	m_linearSleepingThreshold = constructionInfo.m_linearSleepingThreshold;
 	m_angularSleepingThreshold = constructionInfo.m_angularSleepingThreshold;
 	m_optionalMotionState = constructionInfo.m_motionState;
@@ -180,6 +182,11 @@ void btRigidBody::setDamping(btScalar lin_damping, btScalar ang_damping)
 
 
 #endif
+}
+
+void btRigidBody::setAddedMass(btScalar addedMass)
+{
+	m_addedMass = addedMass;
 }
 
 ///applyDamping damps the velocity, using the given m_linearDamping and m_angularDamping
