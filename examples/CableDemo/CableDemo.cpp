@@ -548,14 +548,18 @@ public:
 	void printTension()
 	{
 		auto softWorld = getSoftDynamicsWorld()->getCollisionObjectArray();
-		btCable* cable = (btCable *)getSoftDynamicsWorld()->getSoftBodyArray().at(0);
-		for (int i = 0; i < cable->m_anchors.size(); i++)
-		{
-			if (cable->m_anchors.at(i).m_body->getInvMass() == 0) continue;
-			cout << " Tension on Anchor " << i << " - Node " << cable->m_anchors.at(i).m_node->index
-				 << " = " << cable->getTensionAt(i).length() << " - Mass " << 1.0 / cable->m_anchors.at(i).m_body->getInvMass() << endl;
-		}
 
+		for (int i = 0; i < getSoftDynamicsWorld()->getSoftBodyArray().size(); ++i)
+		{
+			btCable* cable = (btCable*)getSoftDynamicsWorld()->getSoftBodyArray().at(i);
+			for (int i = 0; i < cable->m_anchors.size(); i++)
+			{
+				if (cable->m_anchors.at(i).m_body->getInvMass() == 0) continue;
+				cout << " Tension on Anchor " << i << " - Node " << cable->m_anchors.at(i).m_node->index
+					 << " = " << cable->getTensionAt(i).length() << " - Mass " << 1.0 / cable->m_anchors.at(i).m_body->getInvMass() << endl;
+			}
+
+		}
 	}
 	void stepSimulation(float deltaTime) override
 	{
@@ -732,11 +736,12 @@ public:
 		{
 			const btScalar t = i / (btScalar)(resolution - 1);
 			positionNodes[i] = lerp(posWorldAnchorBodyB, posWorldAnchorBodyA, t);
-			massNodes[i] = 0.000241;
+			massNodes[i] = 1;
 		}
 
 		// Cable's creation
 		btCable* cable = new btCable(&m_softBodyWorldInfo, getSoftDynamicsWorld(), resolution,0, positionNodes, massNodes);
+		cable->setTotalMass(totalMass);
 		
 		cable->setUseCollision(false);
 		if (bodyB != nullptr)
@@ -928,7 +933,7 @@ static void Init_Weigths(CableDemo* pdemo)
 		btVector3 anchorPositionKinematic = positionKinematic - btVector3(0, -0.5, 0);
 		btVector3 anchorPositionPhysic = positionPhysic + btVector3(0, 0.5, 0);
 
-		btCable*  cable =pdemo->createCable(resolution, iteration,25, anchorPositionKinematic, anchorPositionPhysic, physic, kinematic);
+		btCable*  cable =pdemo->createCable(resolution, iteration,200, anchorPositionKinematic, anchorPositionPhysic, physic, kinematic);
 		cable->setCollisionParameters(1, 1, 0);
 
 		cable->m_anchors[0].BodyMassRatio = 1;
@@ -1094,6 +1099,56 @@ static void Init_CableBending(CableDemo* pdemo)
 	cable->setCableRadius(0.005);
 	cable->setCollisionMargin(0.01);
 	cable->setBendingStiffness(0.4);
+}
+
+static void Init_TwoCablesOneCube(CableDemo* pdemo)
+{
+	// Shape
+	btCollisionShape* boxShape = new btBoxShape(btVector3(0.5, 0.5, 0.5));
+	btCollisionShape* sphereShape = new btSphereShape(0.1);
+
+	// Mass
+	btScalar massPhysic(10);
+	btScalar massKinematic(0);
+
+	// Rotation
+	btQuaternion rotationPhysic(0, 0, 0, 1);
+	btQuaternion rotationKinematic(0, 0, 0, 1);
+
+	// Position
+	btVector3 positionPhysic(0, 0, 0);
+	btVector3 anchorMidPosition(0, 0.5, 0);
+	btVector3 anchorLeftPosition(2 * sqrt(2.0) / 2, 0.5 + 2 * sqrt(2.0) / 2, 0);
+	btVector3 anchorRightPosition(2 * -sqrt(2.0) / 2, 0.5 + 2 * sqrt(2.0) / 2, 0);
+
+	// Transform
+	btTransform transformPhysics;
+	transformPhysics.setIdentity();
+	transformPhysics.setRotation(rotationPhysic);
+	transformPhysics.setOrigin(positionPhysic);
+	btTransform transformLeftKinematic;
+	transformLeftKinematic.setIdentity();
+	transformLeftKinematic.setRotation(rotationKinematic);
+	transformLeftKinematic.setOrigin(anchorLeftPosition);
+	btTransform transformRightKinematic;
+	transformRightKinematic.setIdentity();
+	transformRightKinematic.setRotation(rotationKinematic);
+	transformRightKinematic.setOrigin(anchorRightPosition);
+
+	// Create rigidbodies
+	btRigidBody* physic = pdemo->createRigidBody(massPhysic, transformPhysics, boxShape);
+	btRigidBody* leftKinematic = pdemo->createRigidBody(massKinematic, transformLeftKinematic, sphereShape);
+	btRigidBody* rightKinematic = pdemo->createRigidBody(massKinematic, transformRightKinematic, sphereShape);
+
+	// Resolution's cable
+	int resolution = 20;
+	int iteration = 200;
+
+	// 1rst cable
+	btCable* rightCable = pdemo->createCable(resolution, iteration, 20, anchorRightPosition, anchorMidPosition, physic, rightKinematic);
+	rightCable->setUseLRA(true);
+	btCable* leftCable = pdemo->createCable(resolution, iteration, 20, anchorLeftPosition, anchorMidPosition, physic, leftKinematic);
+	leftCable->setUseLRA(true);
 }
 
 static void Init_CableForceDown(CableDemo* pdemo)
@@ -2519,7 +2574,8 @@ void (*demofncs[])(CableDemo*) =
 		Init_Growth,
 		Init_TestCableCollisionMt,
 		Init_CableHydro,
-		Init_CableBending
+		Init_CableBending,
+		Init_TwoCablesOneCube
 };
 
 ////////////////////////////////////
