@@ -2000,7 +2000,7 @@ void btCable::Shrinks(float dt)
 	}
 
 	// if we had to delete a node
-	while (distance < 0)
+	while (distance < abs(dt * WantedSpeed))
 	{
 		btVector3 nodePos = m_nodes.at(nodesSize - 1).m_x;
 		btVector3 nodeVel = m_nodes.at(nodesSize - 1).m_v;
