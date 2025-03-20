@@ -517,7 +517,7 @@ void btDiscreteDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
 		btPersistentManifold* manifold = m_dispatcher1->getManifoldByIndexInternal(i);
 		if(manifold->m_hasCollided)
 		{
-			if(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterGroup == 3 || manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterGroup == 3) {
+			if(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterGroup == 4 || manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterGroup == 4) {
 				btPersistentManifold* newManifold = new btPersistentManifold;
 				*newManifold = *manifold;
 				newManifold->CopyContactsFromManifold(manifold);
@@ -553,7 +553,7 @@ void btDiscreteDynamicsWorld::collisionWorldStep() {
 		btPersistentManifold* manifold = m_dispatcher1->getManifoldByIndexInternal(i);
 		if(manifold->m_hasCollided)
 		{
-			if(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterGroup == 3 || manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterGroup == 3) {
+			if(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterGroup == 4 || manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterGroup == 4) {
 				btPersistentManifold* newManifold = new btPersistentManifold;
 				*newManifold = *manifold;
 				newManifold->CopyContactsFromManifold(manifold);
