@@ -153,6 +153,7 @@ private:
 	bool useGravity = true;
 	bool useCollision = true;
 	btScalar m_linearMass=1.0;
+	btScalar m_maxTension = -1.0;
 
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
@@ -384,6 +385,7 @@ public:
 	void updateCurveResponse(btScalar* dataX, btScalar* dataY, int size);
 
 	void synchNodesInfos();
+	void setMaxTension(btScalar maxTension);
 
 #pragma endregion
 };

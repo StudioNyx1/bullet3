@@ -2085,10 +2085,18 @@ bool btCable::anchorConstraint()
 
 		const btVector3 impulse = a.m_c0 * vr * a.m_influence;
 		const btVector3 impulseMassBalance = a.m_c0_massBalance * vr * a.m_influence;
-		const btVector3 finalImpulse = lerp(impulse, impulseMassBalance, ratio);
+		btVector3 finalImpulse = lerp(impulse, impulseMassBalance, ratio);
+		btScalar currentTension = a.tension.length();
+		a.tension += finalImpulse / dt;
+		btScalar finalTension = a.tension.length();
+		if (m_maxTension >= 0 && finalTension >= m_maxTension)
+		{
+			a.tension = a.tension.normalized() * m_maxTension;
+			finalImpulse *= (a.tension.length() - currentTension) / (finalTension - currentTension);	
+		}
 
 		a.m_body->applyImpulse(-finalImpulse, a.m_c1);
-		a.tension += finalImpulse / dt;
+
 		n.m_x = wa;
 	}
 	return impact;
@@ -2376,4 +2384,9 @@ void btCable::synchNodesInfos()
 		m_nodeData[i].velocity_y = m_nodes[i].m_v.getY();
 		m_nodeData[i].velocity_z = m_nodes[i].m_v.getZ();
 	}
+}
+
+void btCable::setMaxTension(btScalar maxTension) 
+{
+	m_maxTension = maxTension;
 }
