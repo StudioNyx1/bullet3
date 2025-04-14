@@ -112,7 +112,10 @@ private:
 	clock_t current_ticks, delta_ticks;
 	clock_t m_fps = 0;
 
-	btVector3 m_cameraStartPosition;
+	btVector3 m_cameraPosition;
+	btScalar m_cameraDistance;
+	btScalar m_cameraPitch;
+	btScalar m_cameraYaw;
 
 	using Clock = std::chrono::high_resolution_clock;
 
@@ -129,16 +132,20 @@ public:
 	virtual void resetCamera()
 	{
 		//@todo depends on current_demo?
-		float dist = 5;
-		float pitch = 0;
-		float yaw = 180;
-		float targetPos[3] = {(float)m_cameraStartPosition.x(), (float)m_cameraStartPosition.y(), (float)m_cameraStartPosition.z()};
-		m_guiHelper->resetCamera(dist, yaw, pitch, targetPos[0], targetPos[1], targetPos[2]);
+		float targetPos[3] = {(float)m_cameraPosition.x(), (float)m_cameraPosition.y(), (float)m_cameraPosition.z()};
+		m_guiHelper->resetCamera(m_cameraDistance, m_cameraPitch, m_cameraYaw, targetPos[0], targetPos[1], targetPos[2]);
 	}
 
 	void SetCameraPosition(btVector3 cameraPosition)
 	{
-		m_cameraStartPosition = cameraPosition;
+		m_cameraPosition = cameraPosition;
+	}
+
+	void SetCameraRotation(btScalar distance, btScalar pitch, btScalar yaw)
+	{
+		m_cameraDistance = distance;
+		m_cameraPitch = pitch;
+		m_cameraYaw = yaw;
 	}
 
 	CableDemo(struct GUIHelperInterface* helper): CommonRigidBodyBase(helper),
@@ -150,7 +157,10 @@ public:
 		m_moveBody = false;
 		m_printFPS = false;
 		m_printTens = false;
-		m_cameraStartPosition = btVector3(0, 3, 0);
+		m_cameraPosition = btVector3(0, 3, 0);
+		m_cameraDistance = 5;
+		m_cameraPitch = 0;
+		m_cameraYaw = 180;
 
 		m_waterCurrent = btVector3(1, 0, 0);
 	} 
@@ -1561,7 +1571,6 @@ static void Init_TestCableCollisionMt(CableDemo* pdemo)
 	cable4->setCollisionMargin(0.005);
 }
 
-
 static void initLock(CableDemo* pdemo)
 {
 	btAlignedObjectArray<btRigidBody*> sphere =  btAlignedObjectArray<btRigidBody*>();
@@ -2383,7 +2392,6 @@ static void Init_TestCollisionOn1Node (CableDemo* pdemo)
 	pdemo->SetCameraPosition(btVector3(0, -3, 0));
 }
 
-
 static void Init_TestClaw(CableDemo* pdemo)
 {
 	// Shape
@@ -2550,6 +2558,83 @@ static void Init_Growth(CableDemo* pdemo)
 	cable->setCollisionParameters(1, 1, 0);
 }
 
+static void Init_DetachA18(CableDemo* pdemo)
+{
+	/// Create A18:
+	// Shapes
+	btCollisionShape* a18Shape = new btBoxShape(btVector3(0.4, 0.4, 2));
+	btCollisionShape* clawShape = new btCylinderShapeX(btVector3(0.75, 0.15, 0.15));
+	// Positions
+	btVector3 a18Position = btVector3(0, 0, 0);
+	btVector3 clawPosition = btVector3(0, 1, 2.30);
+	// Transform
+	btTransform a18Transform = btTransform();
+	a18Transform.setIdentity();
+	a18Transform.setOrigin(a18Position);
+	a18Transform.setRotation(btQuaternion(btVector3(1,0,0),75));
+	btTransform clawTransform = btTransform();
+	clawTransform.setIdentity();
+	clawTransform.setOrigin(clawPosition);
+	// Rigid bodies
+	btRigidBody* a18Body = pdemo->createRigidBody(704, a18Transform, a18Shape);
+	a18Body->setGravity(btVector3(0, 0, -9.81));
+	a18Body->setLinearVelocity(btVector3(0, 0, -30));
+	btRigidBody* clawBody = pdemo->createRigidBody(0, clawTransform, clawShape);
+	clawBody->setCollisionFlags(clawBody->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+	clawBody->m_redirectionTarget = a18Body;
+	clawBody->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 0, 2.30));
+	a18Body->m_kinematicChildren.push_back(clawBody);
+
+
+	/// Create Inspector125 + Lest:
+	// Shapes
+	btCollisionShape* inspector125Shape = new btBoxShape(btVector3(1, 1, 5));
+	btCollisionShape* lestShape = new btCylinderShape(btVector3(0.1, 0.1, 1));
+	// Positions
+	btVector3 inspector125Position = btVector3(0, 3, 7.5);
+	btVector3 lestPosition = btVector3(0, -0.5, 3);
+	// Transform
+	btTransform inspector125Transform = btTransform();
+	inspector125Transform.setIdentity();
+	inspector125Transform.setOrigin(inspector125Position);
+	btTransform lestTransform = btTransform();
+	lestTransform.setIdentity();
+	lestTransform.setOrigin(lestPosition);
+	// Rigid bodies
+	btRigidBody* inspector125Body = pdemo->createRigidBody(0, inspector125Transform, inspector125Shape);
+	btRigidBody* lestBody = pdemo->createRigidBody(0, lestTransform, lestShape);
+
+	/// Create Cable:
+	// Resolution's cable
+	int resolution = 50;
+	int iterations = 100;
+	btScalar margin = 0.01;
+	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
+	waypointPos.push_back(lestPosition + btVector3(0, 0.085, 0));              // Start
+	waypointPos.push_back(lestPosition + btVector3(0, 1, -0.95));              // Bot A18
+    waypointPos.push_back(lestPosition + btVector3(0, 1.9, -1.4));             // Top A18
+	waypointPos.push_back(inspector125Position + btVector3(0, -0.95, -4.95));  // End
+	btCable* cable = pdemo->createCableWaypoint(resolution, iterations, 1, waypointPos, lestBody, inspector125Body, true, true);
+	cable->setUseCollision(true);
+	cable->getCollisionShape()->setMargin(0);
+	cable->setCollisionMargin(margin);
+	cable->setUseLRA(true);
+	cable->setCollisionParameters(1, 1, 0);
+
+	// cable->setCollisionParameters(3, 3, 0);
+	// cable->setCollisionViscosity(20);
+	// double dataX[5] = {0, 0.001, 0.01, 0.5, 1};
+	// double dataY[5] = {0, 1, 100000, 5000000, 10000000};
+	// cable->updateCurveResponse(dataX, dataY, 5);
+	// cable->setCollisionMode(1);
+
+	/// Setup Scene:
+	// Camera
+	pdemo->SetCameraPosition(btVector3(-2.5, 0, 2.5));
+	pdemo->SetCameraRotation(5,90,0);
+	inspector125Body->setLinearVelocity(btVector3(0, 0, 2));
+}
+
 void (*demofncs[])(CableDemo*) =
 {
 		Init_CableForceDown,
@@ -2575,7 +2660,8 @@ void (*demofncs[])(CableDemo*) =
 		Init_TestCableCollisionMt,
 		Init_CableHydro,
 		Init_CableBending,
-		Init_TwoCablesOneCube
+		Init_TwoCablesOneCube,
+		Init_DetachA18
 };
 
 ////////////////////////////////////
