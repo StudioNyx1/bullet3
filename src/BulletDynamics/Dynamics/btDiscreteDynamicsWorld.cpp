@@ -264,6 +264,37 @@ void btDiscreteDynamicsWorld::saveKinematicState(btScalar timeStep)
 	}
 }
 
+void btDiscreteDynamicsWorld::saveKinematicVelocity(btScalar timeStep)
+{
+	///would like to iterate over m_nonStaticRigidBodies, but unfortunately old API allows
+	///to switch status _after_ adding kinematic objects to the world
+	///fix it for Bullet 3.x release
+	for (int i = 0; i < m_collisionObjects.size(); i++)
+	{
+		btCollisionObject* colObj = m_collisionObjects[i];
+		btRigidBody* body = btRigidBody::upcast(colObj);
+		if (body && body->isKinematicObject())
+		{
+			//to calculate velocities next frame
+			body->saveKinematicVelocity(timeStep);
+		}
+	}
+}
+
+void btDiscreteDynamicsWorld::syncKinematicState(btScalar timeStep)
+{
+	for (int i = 0; i < m_collisionObjects.size(); i++)
+	{
+		btCollisionObject* colObj = m_collisionObjects[i];
+		btRigidBody* body = btRigidBody::upcast(colObj);
+		if (body && body->isKinematicObject())
+		{
+			//to calculate velocities next frame
+			body->syncKinematicState(timeStep);
+		}
+	}
+}
+
 void btDiscreteDynamicsWorld::debugDrawWorld()
 {
 	BT_PROFILE("debugDrawWorld");
@@ -428,7 +459,7 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 		//clamp the number of substeps, to prevent simulation grinding spiralling down to a halt
 		m_clampedSimulationSteps = (m_subIteration > maxSubSteps) ? maxSubSteps : m_subIteration;
 
-		// Update the kinematic objects first (may have been moved by animation)
+		// Save Kinematics' positions and Calculate their velocities (may have been moved by animation)
 		saveKinematicState(fixedTimeStep * m_clampedSimulationSteps);
 
 		applyGravity();
@@ -450,12 +481,17 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 		m_indexSubIteration = 0;
 		for (int i = 0; i < m_clampedSimulationSteps; i++)
 		{
-			saveKinematicState(fixedTimeStep);
+			// Update constraints (rigid & soft)
 			internalSingleStepSimulation(fixedTimeStep);
+
+			// Update Rigids' positions
 			synchronizeMotionStates();
+
 			m_indexSubIteration++;
 		}
 
+		// Update Kinematics' position
+		syncKinematicState(fixedTimeStep);
 	}
 	else
 	{
@@ -504,8 +540,9 @@ void btDiscreteDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
 	///CallbackTriggers();
 
 	///integrate transforms
-
 	integrateTransforms(timeStep);
+
+	saveKinematicVelocity(timeStep);
 
 	///update vehicle simulation
 	updateActions(timeStep);
@@ -1117,7 +1154,7 @@ void btDiscreteDynamicsWorld::integrateTransformsInternal(btRigidBody** bodies, 
 
 			body->proceedToTransform(predictedTrans);
 
-			body->updateKinematicChildren();
+			body->updateKinematicChildren(timeStep);
 		}
 	}
 }

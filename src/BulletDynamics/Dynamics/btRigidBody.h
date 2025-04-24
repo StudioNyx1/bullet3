@@ -239,7 +239,7 @@ public:
 		m_upperLimitDistanceImpact = upperLimit;
 	}
 
-	void updateKinematicChildren();
+	void updateKinematicChildren(btScalar timeStep);
 
 	void proceedToTransform(const btTransform& newTrans);
 
@@ -262,6 +262,10 @@ public:
 	void predictIntegratedTransform(btScalar step, btTransform& predictedTransform);
 
 	void saveKinematicState(btScalar step);
+
+	void saveKinematicVelocity(btScalar step);
+
+	void syncKinematicState(btScalar step);
 
 	void applyGravity();
     

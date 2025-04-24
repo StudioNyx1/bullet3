@@ -51,6 +51,7 @@ btCollisionObject
 {
 protected:
 	btTransform m_worldTransform;
+	btTransform m_startStepWorldTransform;
 
 	///m_interpolationWorldTransform is used for CCD and interpolation
 	///it can be either previous or future (predicted) transform
