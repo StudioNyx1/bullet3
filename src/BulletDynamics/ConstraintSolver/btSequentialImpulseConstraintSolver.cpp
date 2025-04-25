@@ -693,6 +693,7 @@ int btSequentialImpulseConstraintSolver::getOrInitSolverBody(btCollisionObject& 
 #if BT_THREADSAFE
 	int solverBodyId = -1;
 	const bool isRigidBodyType = btRigidBody::upcast(&body) != NULL;
+	const bool isSoftBodyType = body.getInternalType() == btCollisionObject::CO_SOFT_BODY;
 	const bool isStaticOrKinematic = body.isStaticOrKinematicObject();
 	const bool isKinematic = body.isKinematicObject();
 	if (isRigidBodyType && !isStaticOrKinematic)
@@ -733,6 +734,10 @@ int btSequentialImpulseConstraintSolver::getOrInitSolverBody(btCollisionObject& 
 			initSolverBody(&solverBody, &body, timeStep);
 			m_kinematicBodyUniqueIdToSolverBodyTable[uniqueId] = solverBodyId;
 		}
+	}
+	else if (isSoftBodyType)
+	{
+		return -(int)btCollisionObject::CO_SOFT_BODY;
 	}
 	else
 	{
@@ -1020,6 +1025,10 @@ void btSequentialImpulseConstraintSolver::convertContact(btPersistentManifold* m
 
 	int solverBodyIdA = getOrInitSolverBody(*colObj0, infoGlobal.m_timeStep);
 	int solverBodyIdB = getOrInitSolverBody(*colObj1, infoGlobal.m_timeStep);
+
+    ///avoid collision response between a soft and rigid body 
+	if (solverBodyIdA == -8 || solverBodyIdB == -8)
+		return;
 
 	//	btRigidBody* bodyA = btRigidBody::upcast(colObj0);
 	//	btRigidBody* bodyB = btRigidBody::upcast(colObj1);

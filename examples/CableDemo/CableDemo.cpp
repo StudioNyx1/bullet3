@@ -26,6 +26,8 @@
 #include "BulletSoftBody/btSoftBody.h"
 #include "BulletCable/btCable.h"
 
+#include "BulletCollision/GImpact/btGImpactShape.h"
+
 #include "BulletDynamics/MLCPSolvers/btDantzigSolver.h"
 #include "BulletDynamics/MLCPSolvers/btSolveProjectedGaussSeidel.h"
 #include "BulletDynamics/MLCPSolvers/btMLCPSolver.h"
@@ -34,6 +36,10 @@
 #include <iostream>
 #include <chrono>
 #include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
+#include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
+
+// #include "BunnyMesh.h"
+
 
 class btBroadphaseInterface;
 class btCollisionShape;
@@ -54,9 +60,8 @@ class btSoftRigidDynamicsWorld;
 class CableDemo : public CommonRigidBodyBase
 {
 public:
-	int substepSolver = 4;
+	int substepSolver = 1;
 	btAlignedObjectArray<btSoftSoftCollisionAlgorithm*> m_SoftSoftCollisionAlgorithms;
-
 	btAlignedObjectArray<btSoftRididCollisionAlgorithm*> m_SoftRigidCollisionAlgorithms;
 
 	btSoftBodyWorldInfo m_softBodyWorldInfo;
@@ -2050,17 +2055,10 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 
 static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
 {
-	// Resolution's cable
-	int resolution = 150;
-	int iterations = 100;
-	btScalar margin = 0.01;
-
-	// Shape
-	btCollisionShape* cubeShape = new btBoxShape(btVector3(1, 1, 1));
-
-	/* Loading object */
 	//load our obj mesh
-	const char* fileName = "sphere8.obj";
+	const char* fileName = "duck.obj";
+
+	//const char* fileName = "bunny.obj";
 	char relativeFileName[1024];
 	if (b3ResourcePath::findResourcePath(fileName, relativeFileName, 1024, 0))
 	{
@@ -2070,9 +2068,38 @@ static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
 
 	b3BulletDefaultFileIO fileIO;
 	GLInstanceGraphicsShape* glmesh = LoadMeshFromObj(relativeFileName, "", &fileIO);
-	printf("[INFO] Obj loaded: Extracted %d verticed from obj file [%s]\n", glmesh->m_numvertices, fileName);
 
-	/* btConvexHullShape* shape = new btConvexHullShape();
+	// BtGImpact
+	// Create arrays to hold the vertex and index data
+	btIndexedMesh indexedMesh;
+	indexedMesh.m_vertexType = PHY_FLOAT;
+
+	// Set index data
+	indexedMesh.m_numTriangles = glmesh->m_numIndices / 3;  // Each triangle has 3 indices
+	indexedMesh.m_triangleIndexBase = (const unsigned char*)(&glmesh->m_indices->at(0));
+	indexedMesh.m_triangleIndexStride = 3 * sizeof(int);  // Each triangle uses 3 indices
+
+	// Set vertex data
+	indexedMesh.m_numVertices = glmesh->m_numvertices;
+	indexedMesh.m_vertexBase = (const unsigned char*)(&glmesh->m_vertices->at(0));
+	indexedMesh.m_vertexStride = 9 * sizeof(float);  // Each vertex has 9 floats (x, y, z, w, nx, ny, nz, u, v)
+
+	// Create a btTriangleIndexVertexArray and add the indexed mesh to it
+	btTriangleIndexVertexArray* triangleArray = new btTriangleIndexVertexArray();
+	triangleArray->addIndexedMesh(indexedMesh, PHY_INTEGER);
+	btGImpactMeshShape* shape = new btGImpactMeshShape(triangleArray);
+	shape->setMargin(0);
+	shape->setLocalScaling(btVector3(3, 1, 1));
+	shape->updateBound();
+
+	// btBvhTriangleMeshShape
+	btBvhTriangleMeshShape* shapeT = new btBvhTriangleMeshShape(shape->getMeshInterface(), true, true);
+	shapeT->setMargin(0);
+	shapeT->setLocalScaling(btVector3(10, 1.5, 1.5));
+
+	// ConvexHull
+	/*
+	btConvexHullShape* shape = new btConvexHullShape();
 	for (int i = 0; i < glmesh->m_numvertices; i++)
 	{
 		const GLInstanceVertex& v = glmesh->m_vertices->at(i);
@@ -2080,45 +2107,26 @@ static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
 		btVector3 vtx(v.xyzw[0], v.xyzw[1], v.xyzw[2]);
 		shape->addPoint(vtx);
 	}
-	shape->setLocalScaling(btVector3(2,2,2));
+	shape->setLocalScaling(btVector3(2, 2, 2));
 	shape->optimizeConvexHull();
 	shape->initializePolyhedralFeatures();
 	*/
-	
-	btTriangleMesh* meshInterface = new btTriangleMesh();
-	for (int i = 0; i < glmesh->m_numIndices / 3; i++)
-	{
-		const GLInstanceVertex& cv0 = glmesh->m_vertices->at(glmesh->m_indices->at(i * 3));
-		const btVector3& v0 = btVector3(cv0.xyzw[0], cv0.xyzw[1], cv0.xyzw[2]);
-		const GLInstanceVertex& cv1 = glmesh->m_vertices->at(glmesh->m_indices->at(i * 3 + 1));
-		const btVector3& v1 = btVector3(cv1.xyzw[0], cv1.xyzw[1], cv1.xyzw[2]);
-		const GLInstanceVertex& cv2 = glmesh->m_vertices->at(glmesh->m_indices->at(i * 3 + 2));
-		const btVector3& v2 = btVector3(cv2.xyzw[0], cv2.xyzw[1], cv2.xyzw[2]);
-		meshInterface->addTriangle(v0, v1, v2);
-	}	
-	btBvhTriangleMeshShape* shape = new btBvhTriangleMeshShape(meshInterface, true, true);
-	shape->setLocalScaling(btVector3(2, 2, 2));
-	btTriangleInfoMap* triangleInfoMap = new btTriangleInfoMap();
-	btGenerateInternalEdgeInfo(shape, triangleInfoMap);
-	
-	
 
+	btVector3 duckPosition = btVector3(0, 3.5, 0);
+	btTransform transformDuck = btTransform();
+	transformDuck.setIdentity();
+	transformDuck.setOrigin(duckPosition);
+	transformDuck.setRotation(btQuaternion(btVector3(0, 1, 0), SIMD_PI / 2.0) + btQuaternion(btVector3(0, 0, 1), SIMD_PI / 5.0));
+	btRigidBody* obstacle = pdemo->createRigidBody(0, transformDuck, shapeT);
+	obstacle->setSleepingThresholds(0, 0);
+	obstacle->setDamping(0.1, 0.1);
 
-	btTransform t = btTransform();
-	t.setIdentity();
-	t.setOrigin(btVector3(0, 3, 0));
-	//btQuaternion r = btQuaternion();
-	//r.setRotation(btVector3(0, 1, 0), SIMD_PI * 0.40);
-	//t.setRotation(r);
-	shape->setMargin(0.0);
-	btRigidBody* sphere = pdemo->createRigidBody(0, t, shape);
-	
-
-	btVector3 groundPos = btVector3(0, -8, 0);
+	btVector3 groundPos = btVector3(0, -22, 0);
 	btTransform transformGround = btTransform();
 	transformGround.setIdentity();
 	transformGround.setOrigin(groundPos);
-	btRigidBody* ground = pdemo->createRigidBody(0, transformGround, new btBoxShape(btVector3(50, 2, 50)));
+	btRigidBody* ground = pdemo->createRigidBody(0, transformGround, new btBoxShape(btVector3(50, 20, 50)));
+	ground->setRestitution(0);
 
 	btTransform transformRight = btTransform();
 	transformRight.setIdentity();
@@ -2128,16 +2136,24 @@ static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
 	btTransform transformLeft = btTransform();
 	transformLeft.setIdentity();
 	transformLeft.setOrigin(btVector3(-5, 7, 0));
-	btRigidBody* bodyLeftAnchor = pdemo->createRigidBody(1000, transformLeft, new btBoxShape(btVector3(1, 1, 1)));
+	btRigidBody* bodyLeftAnchor = pdemo->createRigidBody(10, transformLeft, new btBoxShape(btVector3(1, 1, 1)));
+	bodyLeftAnchor->setRestitution(0);
+
+	// Resolution's cable
+	int resolution = 75;
+	int iterations = 100;
+	btScalar margin = 0.01;
 
 	btCable* cable = pdemo->createCable(resolution, iterations, 1, transformRight.getOrigin(), transformLeft.getOrigin() + btVector3(1, 0, 0), bodyLeftAnchor, bodyRightAnchor);
 	cable->setUseCollision(true);
-	cable->getCollisionShape()->setMargin(margin);
+	cable->getCollisionShape()->setMargin(margin/2.0);
 	cable->setUseLRA(true);
 	cable->setCollisionMargin(margin);
-	cable->setCollisionParameters(1,1,0);
+	cable->setCollisionParameters(1, 1, 0);
 
 	pdemo->SetCameraPosition(btVector3(0, 0.5, 0));
+	///register GIMPACT algorithm
+	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
 }
 
 static void Init_TestCollisionRingBox(CableDemo* pdemo)

@@ -46,6 +46,7 @@ subject to the following restrictions:
 #include "LinearMath/btMotionState.h"
 
 #include "LinearMath/btSerializer.h"
+#include <bitset>
 
 #if 0
 btAlignedObjectArray<btVector3> debugContacts;
@@ -563,7 +564,12 @@ void btDiscreteDynamicsWorld::collisionWorldStep() {
 		btPersistentManifold* manifold = m_dispatcher1->getManifoldByIndexInternal(i);
 		if(manifold->m_hasCollided)
 		{
-			if(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterGroup == 4 || manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterGroup == 4) {
+			// The 2nd bit of the m_collisionFilterMask needs to be 1
+			std::string byte0 = std::bitset<8>(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterMask).to_string();
+			std::string byte1 = std::bitset<8>(manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterMask).to_string();
+			int bitTerrain = byte0.size() - 2;
+			if (byte0[bitTerrain] == '1' || byte1[bitTerrain] == '1')
+			{
 				btPersistentManifold* newManifold = new btPersistentManifold;
 				*newManifold = *manifold;
 				newManifold->CopyContactsFromManifold(manifold);
