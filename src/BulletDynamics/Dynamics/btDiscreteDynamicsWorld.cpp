@@ -417,47 +417,20 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 {
 	startProfiling(timeStep);
 
-	m_subIteration = 0;
+	m_fixedTimeStep = fixedTimeStep;
+	m_subIteration = maxSubSteps;
+	m_clampedSimulationSteps = m_subIteration;
 
-	if (maxSubSteps)
-	{
-		//fixed timestep with interpolation
-		m_fixedTimeStep = fixedTimeStep;
-		m_localTime += timeStep;
-		if (m_localTime >= fixedTimeStep)
-		{
-			m_subIteration = int(m_localTime / fixedTimeStep);
-			m_localTime -= m_subIteration * fixedTimeStep;
-		}
-	}
-	else
-	{
-		//variable timestep
-		fixedTimeStep = timeStep;
-		m_localTime = m_latencyMotionStateInterpolation ? 0 : timeStep;
-		m_fixedTimeStep = 0;
-		if (btFuzzyZero(timeStep))
-		{
-			m_subIteration = 0;
-			maxSubSteps = 0;
-		}
-		else
-		{
-			m_subIteration = 1;
-			maxSubSteps = 1;
-		}
-	}
-
+	
 	//process some debugging flags
 	if (getDebugDrawer())
 	{
 		btIDebugDraw* debugDrawer = getDebugDrawer();
 		gDisableDeactivation = (debugDrawer->getDebugMode() & btIDebugDraw::DBG_NoDeactivation) != 0;
 	}
-	if (m_subIteration)
+
+	if (m_subIteration >= 1)
 	{
-		//clamp the number of substeps, to prevent simulation grinding spiralling down to a halt
-		m_clampedSimulationSteps = (m_subIteration > maxSubSteps) ? maxSubSteps : m_subIteration;
 
 		// Save Kinematics' positions and Calculate their velocities (may have been moved by animation)
 		saveKinematicState(fixedTimeStep * m_clampedSimulationSteps);
