@@ -2005,11 +2005,15 @@ void btCable::Shrinks(float dt)
 		btVector3 nodePos = m_nodes.at(nodesSize - 1).m_x;
 		btVector3 nodeVel = m_nodes.at(nodesSize - 1).m_v;
 
-		// Remove the last node and the last link
-		m_links.removeAtIndex(linkSize - 1);
-		removeNodeAt(nodesSize - 1);
-		nodesSize--;
-		linkSize--;
+		if (nodesSize > 2)
+		{
+			// Remove the last node and the last link
+			m_links.removeAtIndex(linkSize - 1);
+			removeNodeAt(nodesSize - 1);
+			nodesSize--;
+			linkSize--;
+		}
+		
 		int indexNode = nodesSize - 1;
 		
 		for (int i = 0; i < m_anchors.size(); i++)
@@ -2030,7 +2034,6 @@ void btCable::Shrinks(float dt)
 		// Set the new restLength and mass
 		m_links.at(linkSize - 1).m_rl = dist;
 		m_links.at(linkSize - 1).m_c1 = dist * dist;
-
 
 		firstNodeMass = m_linearMass * 0.5f * dist;
 		setMass(nodesSize - 1, firstNodeMass);
