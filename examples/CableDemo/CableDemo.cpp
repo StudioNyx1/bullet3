@@ -2007,13 +2007,58 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	btTransform trA18 = btTransform();
 	trA18.setIdentity();
 	trA18.setOrigin(btVector3(0, 1, 0));
-	btRigidBody* a18 = pdemo->createRigidBody(704, trA18, new btBoxShape(btVector3(4, 5, 0.5)));
+	btRigidBody* a18 = pdemo->createRigidBody(10, trA18, new btBoxShape(btVector3(4, 5, 0.5)));
+	a18->setMaxLinearVelocity(30);
+
+	// 1. Geometry ----------------------------------------------------------------
+	static const btVector3 kHalfExtents(4.0f, 0.5f, 0.5f);
+
+	static const btVector3 kCubeVerts[8] = {
+		{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 0
+		{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 1
+		{kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},    // 2
+		{-kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},   // 3
+		{-kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},   // 4
+		{kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},    // 5
+		{kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()},     // 6
+		{-kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}     // 7
+	};
+
+	// 12 triangles (two per face)
+	static const unsigned int kCubeIdx[36] = {
+		0, 2, 1,	2, 0, 3,  // −Z
+		4, 5, 6,	6, 7, 4,  // +Z
+		0, 5, 4,	5, 0, 1,  // −Y
+		3, 6, 2,	6, 3, 7,  // +Y
+		1, 6, 5,	6, 1, 2,  // +X
+		0, 7, 3,	7, 0, 4   // −X
+	};
+
+	// ---------------------------------------------------------------------------
+	// 2. Fill a btIndexedMesh -----------------------------------------------------
+	btIndexedMesh mesh;
+	mesh.m_numTriangles = 12;
+	mesh.m_triangleIndexBase = reinterpret_cast<const unsigned char*>(kCubeIdx);
+	mesh.m_triangleIndexStride = 3 * sizeof(unsigned int);
+	mesh.m_numVertices = 8;
+	mesh.m_vertexBase = reinterpret_cast<const unsigned char*>(kCubeVerts);
+	mesh.m_vertexStride = sizeof(btVector3);
+	mesh.m_indexType = PHY_INTEGER;  // int indices 
+	mesh.m_vertexType = PHY_DOUBLE;
+
+	static btTriangleIndexVertexArray triArray;
+	triArray.addIndexedMesh(mesh, PHY_INTEGER);  // stride chosen above 
+
+	// ---------------------------------------------------------------------------
+	// 3. Create the GImpact shape -------------------------------------------------
+	btGImpactMeshShape* gimpactShape = new btGImpactMeshShape(&triArray);
+	gimpactShape->updateBound();   
 
 	// Claw
 	btTransform trClaw = btTransform();
 	trClaw.setIdentity();
 	trClaw.setOrigin(btVector3(0, 7.5, 0));
-	btRigidBody* claw = pdemo->createRigidBody(0, trClaw, new btBoxShape(btVector3(4, 0.5, 0.5)), 6789);
+	btRigidBody* claw = pdemo->createRigidBody(0, trClaw, gimpactShape, 6789);
 	claw->setCollisionFlags(claw->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
 	claw->m_redirectionTarget = a18;
 	claw->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 6.5, 0));
@@ -2035,7 +2080,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	btCable* cable = pdemo->createCableWaypoint(resolution, iterations, 1, waypointPos, LestBody, anchorUp, true, true);
 	cable->setFriction(1);
 	cable->setUseBending(true);
-	cable->setUseCollision(true);
+	cable->setUseCollision(false);
 	cable->setUseLRA(true);
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setCollisionMargin(margin);
@@ -2051,6 +2096,9 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 		cable->m_anchors[i].BodyMassRatio = 0.000015;
 	}
 	pdemo->SetCameraPosition(btVector3(0, 10, 0));
+
+	///register GIMPACT algorithm
+	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
 }
 
 static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
