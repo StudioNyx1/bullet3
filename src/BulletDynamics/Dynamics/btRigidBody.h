@@ -263,9 +263,9 @@ public:
 
 	void saveKinematicState(btScalar step);
 
-	void saveKinematicVelocity(btScalar step);
+	void syncKinematicState();
 
-	void syncKinematicState(btScalar step);
+	void saveKinematicVelocity(btScalar step);
 
 	void applyGravity();
     

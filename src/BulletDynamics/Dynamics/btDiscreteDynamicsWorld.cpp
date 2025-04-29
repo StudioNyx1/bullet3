@@ -259,8 +259,22 @@ void btDiscreteDynamicsWorld::saveKinematicState(btScalar timeStep)
 		btRigidBody* body = btRigidBody::upcast(colObj);
 		if (body && body->isKinematicObject())
 		{
-			//to calculate velocities next frame
+			// Save the kinematic's position for the current frame
 			body->saveKinematicState(timeStep);
+		}
+	}
+}
+
+void btDiscreteDynamicsWorld::syncKinematicState()
+{
+	for (int i = 0; i < m_collisionObjects.size(); i++)
+	{
+		btCollisionObject* colObj = m_collisionObjects[i];
+		btRigidBody* body = btRigidBody::upcast(colObj);
+		if (body && body->isKinematicObject())
+		{
+			// Update the kinematic's position for the next frame
+			body->syncKinematicState();
 		}
 	}
 }
@@ -276,25 +290,12 @@ void btDiscreteDynamicsWorld::saveKinematicVelocity(btScalar timeStep)
 		btRigidBody* body = btRigidBody::upcast(colObj);
 		if (body && body->isKinematicObject())
 		{
-			//to calculate velocities next frame
+			// Calculate the kinematic's velocity
 			body->saveKinematicVelocity(timeStep);
 		}
 	}
 }
 
-void btDiscreteDynamicsWorld::syncKinematicState(btScalar timeStep)
-{
-	for (int i = 0; i < m_collisionObjects.size(); i++)
-	{
-		btCollisionObject* colObj = m_collisionObjects[i];
-		btRigidBody* body = btRigidBody::upcast(colObj);
-		if (body && body->isKinematicObject())
-		{
-			//to calculate velocities next frame
-			body->syncKinematicState(timeStep);
-		}
-	}
-}
 
 void btDiscreteDynamicsWorld::debugDrawWorld()
 {
@@ -432,10 +433,6 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 
 	if (m_subIteration >= 1)
 	{
-
-		// Save Kinematics' positions and Calculate their velocities (may have been moved by animation)
-		saveKinematicState(fixedTimeStep * m_clampedSimulationSteps);
-
 		applyGravity();
 
 		// Go through all manifolds and set m_lifePoints to clampedSimulationSteps
@@ -452,6 +449,9 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 		m_dispatcher1->ClearManifoldsCache();
 		m_dispatcher1->ClearParticlesManifolds();
 		
+		// Save Kinematics' position for the current frame
+		saveKinematicState(fixedTimeStep);
+
 		m_indexSubIteration = 0;
 		for (int i = 0; i < m_clampedSimulationSteps; i++)
 		{
@@ -464,8 +464,8 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 			m_indexSubIteration++;
 		}
 
-		// Update Kinematics' position
-		syncKinematicState(fixedTimeStep);
+		// Update Kinematics' position for the next frame
+		syncKinematicState();
 	}
 	else
 	{

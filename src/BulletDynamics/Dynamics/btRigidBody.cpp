@@ -120,30 +120,12 @@ void btRigidBody::updateKinematicChildren(btScalar timeStep)
 
 		// World transform kinematic = WordlTransform Parent * LocalTransform Kinematic	
 		btTransform res = getWorldTransform() * kinematic->m_localTransform;
+		kinematic->setInterpolationWorldTransform(kinematic->getWorldTransform());
 		kinematic->setWorldTransform(res);
 		kinematic->getMotionState()->setWorldTransform(res);
-		kinematic->saveKinematicVelocity(timeStep);
 	}
 }
 
-void btRigidBody::saveKinematicState(btScalar timeStep)
-{
-	//todo: clamp to some (user definable) safe minimum timestep, to limit maximum angular/linear velocities
-	if (timeStep != btScalar(0.))
-	{
-		//if we use motionstate to synchronize world transforms, get the new kinematic/animated world transform
-		if (getMotionState()) getMotionState()->getWorldTransform(m_worldTransform);
-
-		m_startStepWorldTransform = m_worldTransform;
-
-		m_interpolationLinearVelocity = m_linearVelocity;
-		m_interpolationAngularVelocity = m_angularVelocity;
-
-		//if we use motionstate to synchronize world transforms, get the new kinematic/animated world transform
-		btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep, m_linearVelocity, m_angularVelocity);
-		m_interpolationWorldTransform = m_worldTransform;
-	}
-}
 
 void btRigidBody::saveKinematicVelocity(btScalar timeStep)
 {
@@ -151,19 +133,35 @@ void btRigidBody::saveKinematicVelocity(btScalar timeStep)
 	if (timeStep != btScalar(0.))
 	{
 		btVector3 linVel, angVel;
-
-		m_interpolationLinearVelocity = m_linearVelocity;
-		m_interpolationAngularVelocity = m_angularVelocity;
-
-		//if we use motionstate to synchronize world transforms, get the new kinematic/animated world transform
-		btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep, m_linearVelocity, m_angularVelocity);
-		m_linearVelocity += m_interpolationLinearVelocity;
-		m_angularVelocity += m_interpolationAngularVelocity;
-		m_interpolationWorldTransform = m_worldTransform;
+		btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep, linVel, angVel);
+		m_linearVelocity = linVel;
+		m_angularVelocity = angVel;
 	}
 }
 
-void btRigidBody::syncKinematicState(btScalar timeStep)
+void btRigidBody::saveKinematicState(btScalar timeStep)
+{
+	// //todo: clamp to some (user definable) safe minimum timestep, to limit maximum angular/linear velocities
+	// if (timeStep != btScalar(0.))
+	// {
+	//		//if we use motionstate to synchronize world transforms, get the new kinematic/animated world transform
+	//		if (getMotionState())
+	//			getMotionState()->getWorldTransform(m_worldTransform);
+	//		btVector3 linVel, angVel;
+	//		
+	//		btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep, m_linearVelocity, m_angularVelocity);
+	//		m_interpolationLinearVelocity = m_linearVelocity;
+	//		m_interpolationAngularVelocity = m_angularVelocity;
+	//		m_interpolationWorldTransform = m_worldTransform;
+	//		//printf("angular = %f %f %f\n",m_angularVelocity.getX(),m_angularVelocity.getY(),m_angularVelocity.getZ());
+	// }
+
+	//if we use motionstate to synchronize world transforms, get the new kinematic/animated world transform
+	if (getMotionState()) getMotionState()->getWorldTransform(m_worldTransform);
+	m_startStepWorldTransform = m_worldTransform;
+}
+
+void btRigidBody::syncKinematicState()
 {
 	m_interpolationWorldTransform = m_startStepWorldTransform;
 }

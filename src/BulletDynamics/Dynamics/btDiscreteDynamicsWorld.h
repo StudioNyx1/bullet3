@@ -93,8 +93,8 @@ protected:
 	virtual void createPredictiveContacts(btScalar timeStep);
 
 	virtual void saveKinematicState(btScalar timeStep);
+	void syncKinematicState();
 	void saveKinematicVelocity(btScalar timeStep);
-	void syncKinematicState(btScalar timeStep);
 
 	void serializeRigidBodies(btSerializer * serializer);
 
