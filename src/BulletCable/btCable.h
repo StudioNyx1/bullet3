@@ -60,7 +60,6 @@ class btCable : public btSoftBody
 		btTransform worldToLocal;
 
 		btVector3 lastPosition;
-		btVector3 impulse;
 		btVector3 normal;
 		btScalar distance;
 		bool hit = false;
@@ -204,16 +203,16 @@ private:
 	void predictMotion(btScalar dt) override;
 	void solveConstraints() override;
 	void ResolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact,btAlignedObjectArray<int>* indexNodeContact);
-	bool anchorConstraint();
+	void anchorConstraint(bool& impacted);
 	
-	void solveContact(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
+	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
 	void solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, int limitMin, int limitMax);
 
 	btVector3 ComputeCollisionSphere(btVector3 pos, btCollisionObject* obj, Node* n);
 	//int solveContact(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact);
 
 
-	btVector3 calculateBodyImpulse(btRigidBody* body, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
+	void calculateBodyImpulse(btRigidBody* body, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
 	btVector3 PositionStartRayCalculation(Node* n, btCollisionObject* obj);
 
 	// Methods for collision
@@ -265,7 +264,7 @@ public:
 		ExternalForcesError = 2
 	};
 
-	CableState cableState = Valid;
+	CableState cableState = CableState::Valid;
 
 	struct SectionInfo
 	{
@@ -285,7 +284,7 @@ public:
 
 	btVector3 getTensionAt(int index);
 
-	void bendingConstraintDistance();
+	void bendingConstraint();
 
 	void setUseBending(bool active);
 	bool getUseBending();
@@ -360,8 +359,6 @@ public:
 	void removeNodeAt(const int index);
 
 	void setTotalMass(btScalar mass, bool fromfaces = false) override;
-
-	bool checkCollisionAnchor(Node* n, btCollisionObject* obj);
 
 	void setCollisionMargin(float colMargin);
 
