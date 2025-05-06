@@ -456,10 +456,9 @@ public:
 	void applyRedirectionImpulse(const btVector3& impulse, const btVector3& hitWorldPosition)
 	{
 		// Apply the impulse on the redirection target
-		if (m_redirectionTarget != NULL)
+		if (m_redirectionTarget)
 		{
-			btVector3 targetHitWorldPosition = hitWorldPosition - m_redirectionTarget->getCenterOfMassPosition();
-			m_redirectionTarget->applyImpulse(impulse, targetHitWorldPosition);
+			m_redirectionTarget->applyRedirectionImpulse(impulse, hitWorldPosition);
 		} 
 		// Apply the impulse on the current rigidbody
 		else
