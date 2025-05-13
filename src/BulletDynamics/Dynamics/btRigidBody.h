@@ -357,8 +357,8 @@ public:
 
 	const btVector3& updateAcceleration()
 	{
-		float mass = 1 / m_inverseMass;
-		float newInverseMass = 1 / (mass + m_addedMass);
+		btScalar mass = 1.0 / m_inverseMass;
+		btScalar newInverseMass = 1.0 / (mass + m_addedMass);
 
 		m_lastAcceleration = m_totalForce * newInverseMass;
 		return m_lastAcceleration;
