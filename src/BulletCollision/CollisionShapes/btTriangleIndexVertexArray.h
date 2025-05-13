@@ -96,9 +96,9 @@ public:
 
 	/// unLockVertexBase finishes the access to a subpart of the triangle mesh
 	/// make a call to unLockVertexBase when the read and write access (using getLockedVertexIndexBase) is finished
-	virtual void unLockVertexBase(int subpart) { (void)subpart; }
+	virtual void unLockVertexBase(int subpart) override { (void)subpart; }
 
-	virtual void unLockReadOnlyVertexBase(int subpart) const { (void)subpart; }
+	virtual void unLockReadOnlyVertexBase(int subpart) const override { (void)subpart; }
 
 	/// getNumSubParts returns the number of separate subparts
 	/// each subpart has a continuous array of vertices and indices

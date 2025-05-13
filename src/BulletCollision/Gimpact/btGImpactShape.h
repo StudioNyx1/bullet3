@@ -594,7 +594,7 @@ public:
 				--m_lock_count;
 				return;
 			}
-			// m_meshInterface->unLockReadOnlyVertexBase(m_part);
+			m_meshInterface->unLockReadOnlyVertexBase(m_part);
 			vertexbase = NULL;
 			m_lock_count = 0;
 		}
