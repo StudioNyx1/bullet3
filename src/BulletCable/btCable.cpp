@@ -1563,6 +1563,7 @@ btVector3 btCable::fastTrigoPositionCompute(Node* n)
 	btScalar angle;
 	btVector3 n0, n1;
 	btVector3 moyDirection;
+	btVector3 newPos = (n->hitPosition[0] + n->hitPosition[1]) * 0.5;
 	
 	n0 = n->normals[0];
 	n1 = n->normals[1];
@@ -1571,13 +1572,18 @@ btVector3 btCable::fastTrigoPositionCompute(Node* n)
 	angle = PI - acos(dotProduct);
 	moyDirection = ((n0 + n1) * 0.5).normalized();
 	btScalar sinA = sin(angle);
-	btScalar a = n->topMargin;
-	btScalar B = 0.5*PI - (angle * 0.5);
+	// if sinA is 0, the two normals are opposite and the correction cannot be calculated with sinA
+	if (abs(sinA) < FLT_EPSILON)
+	{
+		return newPos;
+	}
 
-	btScalar b = (a * 0.5) /( sinA* 0.5) * sin(B);
+	btScalar a = n->topMargin;
+	btScalar B = 0.5 * PI - (angle * 0.5);
+	btScalar b = (a * 0.5) / (sinA * 0.5) * sin(B);
 
   	btVector3 correction = b * moyDirection;
-	btVector3 newPos = ((n->hitPosition[0] + n->hitPosition[1])*0.5)+ correction; 
+	newPos += correction; 
 	
  	return newPos;
 }
