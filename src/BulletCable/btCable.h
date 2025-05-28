@@ -61,6 +61,7 @@ class btCable : public btSoftBody
 
 		btVector3 lastPosition;
 		btVector3 normal;
+		btVector3 impulse;
 		btScalar distance;
 		bool hit = false;
 		bool hitInIteration = false;
@@ -212,7 +213,7 @@ private:
 	//int solveContact(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact);
 
 
-	void calculateBodyImpulse(btRigidBody* body, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
+	btVector3 calculateBodyImpulse(btRigidBody* body, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
 	btVector3 PositionStartRayCalculation(Node* n, btCollisionObject* obj);
 
 	// Methods for collision
@@ -224,9 +225,7 @@ private:
 	btScalar computeCollisionMargin(btCollisionShape* shape);
 	btCollisionWorld::ClosestRayResultCallback castRay(btVector3 positionStart, btVector3 positionEnd, NodePairNarrowPhase* contact, btScalar margin);
 
-
-	void recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCompoundShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btVector3 minLink, btVector3 maxLink, btTransform transform);
-	//void recursiveBroadPhase(BroadPhasePair* obj, Node* n, Node* n1, btCompoundShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btVector3 minLink, btVector3 maxLink, btTransform transform);
+	void recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCollisionShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btVector3 minLink, btVector3 maxLink, btTransform transform);
 
 	void resetManifoldLifeTime();
 	void clearManifoldContact();
