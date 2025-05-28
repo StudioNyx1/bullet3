@@ -104,6 +104,8 @@ void btRigidBody::setupRigidBody(const btRigidBody::btRigidBodyConstructionInfo&
 	m_turnVelocity.setZero();
 
 	m_kinematicChildren = {};
+	m_cableCollisionObject = nullptr;
+	m_cableCollisionLocalTransform = btTransform();
 }
 
 void btRigidBody::predictIntegratedTransform(btScalar timeStep, btTransform& predictedTransform)

@@ -109,6 +109,10 @@ public:
 	btRigidBody* m_redirectionTarget;
 	btTransform m_localTransform;
 
+	// to synchronize the bodies of the CableCollisionComponents (for Unity)
+	btCollisionObject* m_cableCollisionObject;
+	btTransform m_cableCollisionLocalTransform;
+
 protected:
 	ATTRIBUTE_ALIGNED16(btVector3 m_deltaLinearVelocity);
 	btVector3 m_deltaAngularVelocity;

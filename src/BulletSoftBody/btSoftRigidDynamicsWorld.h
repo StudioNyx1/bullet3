@@ -43,6 +43,8 @@ protected:
 
 	virtual void internalSingleStepSimulation(btScalar timeStep);
 
+	void updateCableCollisionObjects();
+
 	void solveSoftBodiesConstraints(btScalar timeStep);
 
 	void serializeSoftBodies(btSerializer* serializer);

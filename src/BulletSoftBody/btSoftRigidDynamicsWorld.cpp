@@ -162,11 +162,22 @@ void btSoftRigidDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
 
 	btDiscreteDynamicsWorld::internalSingleStepSimulation(timeStep);
 
+	updateCableCollisionObjects();
+
 	///solve soft bodies constraints
 	solveSoftBodiesConstraints(timeStep);
+}
 
-	// End solver-wise simulation step
-	// ///////////////////////////////
+void btSoftRigidDynamicsWorld::updateCableCollisionObjects()
+{
+	for (int i = 0; i < m_collisionObjects.size(); ++i)
+	{
+		btRigidBody* rb = btRigidBody::upcast(m_collisionObjects[i]);
+		if (rb && rb->m_cableCollisionObject != nullptr)
+		{
+			rb->m_cableCollisionObject->setWorldTransform(rb->getWorldTransform() * rb->m_cableCollisionLocalTransform);
+		}
+	}
 }
 
 void btSoftRigidDynamicsWorld::solveSoftBodiesConstraints(btScalar timeStep)
