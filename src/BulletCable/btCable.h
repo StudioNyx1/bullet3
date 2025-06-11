@@ -36,7 +36,7 @@ public:
 		lifeTime = time;
 	}
 };
-	
+
 ///The btCable is a class that inherits from btSoftBody.
 ///Its purpose is to be able to create a cable/rope with our own method parameters that Bullet does not implement.
 class btCable : public btSoftBody
@@ -58,15 +58,15 @@ class btCable : public btSoftBody
 		btCollisionShape* collisionShape;
 		BroadPhasePair* pair;
 		btTransform worldToLocal;
-
+		btVector3 impulse;
 		btVector3 lastPosition;
 		btVector3 normal;
-		btVector3 impulse;
+
 		btScalar distance;
 		bool hit = false;
 		bool hitInIteration = false;
 	};
-	
+
 	enum class CollisionMode
 	{
 		Linear = 0,
@@ -130,7 +130,7 @@ public :
 		float volume;
 	};
 	static const std::size_t NodeDataSize = sizeof(NodeData);
-	
+
 private:
 	// Growing state for Unity control
 	// 0: cable length isn't changing
@@ -138,21 +138,21 @@ private:
 	// 2: cable shinks at the minimal value
 	// 3: cable shrinks on an anchor
 	// 4: cable grow but cant add node
-	
-	int m_growingState=0;
+
+	int m_growingState = 0;
 	// Number of solverIteration for 1 deltaTime passed
 	int m_solverSubStep = 1;
 	// Actual iteration
 	int m_cpt;
 	int m_sectionCount = 0;
-	int m_sectionCurrent = 0; 
+	int m_sectionCurrent = 0;
 	btScalar m_minLength;
 	bool useLRA = true;
 	bool invertLRA = false;
 	bool useBending = true;
 	bool useGravity = true;
 	bool useCollision = true;
-	btScalar m_linearMass=1.0;
+	btScalar m_linearMass = 1.0;
 	btScalar m_maxTension = -1.0;
 
 	vector<btScalar> collisionFonctionPointX;
@@ -164,21 +164,21 @@ private:
 	bool impulseCompute = true;
 
 	btScalar penetrationMin = 0;
-	btScalar penetrationMax  = 0.1;
+	btScalar penetrationMax = 0.1;
 	btScalar collisionStiffnessMin = 100;
 	btScalar collisionStiffnessMax = 10000;
 
 	btScalar collisionViscosity = 10;
 
-	btScalar m_defaultRestLength; 
+	btScalar m_defaultRestLength;
 
 	btScalar maxAngle = 0;
 	btScalar bendingStiffness = 0;
 
-	// disabled collision detection if this movement 
+	// disabled collision detection if this movement
 	btScalar m_collisionSleepingThreshold = 0.0;
 
-	// number of iteration step between each iteration of the collision constraint 
+	// number of iteration step between each iteration of the collision constraint
 	int m_substepDelayCollision = 1;
 
 	// number of iteration of the resolution on multi-collision node
@@ -203,17 +203,17 @@ private:
 
 	void predictMotion(btScalar dt) override;
 	void solveConstraints() override;
-	void ResolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact,btAlignedObjectArray<int>* indexNodeContact);
+	void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
+	void ResolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
 	void anchorConstraint(bool& impacted);
-	
+
 	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
 	void solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, int limitMin, int limitMax);
 
 	btVector3 ComputeCollisionSphere(btVector3 pos, btCollisionObject* obj, Node* n);
 	//int solveContact(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact);
 
-
-	btVector3 calculateBodyImpulse(btRigidBody* body, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
+	btVector3 calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
 	btVector3 PositionStartRayCalculation(Node* n, btCollisionObject* obj);
 
 	// Methods for collision
@@ -225,7 +225,8 @@ private:
 	btScalar computeCollisionMargin(btCollisionShape* shape);
 	btCollisionWorld::ClosestRayResultCallback castRay(btVector3 positionStart, btVector3 positionEnd, NodePairNarrowPhase* contact, btScalar margin);
 
-	void recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCollisionShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btVector3 minLink, btVector3 maxLink, btTransform transform);
+	void recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCollisionShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact,
+							 btVector3 minLink, btVector3 maxLink, btTransform worldToLocal);
 
 	void resetManifoldLifeTime();
 	void clearManifoldContact();
@@ -236,7 +237,7 @@ private:
 	btScalar getLinkRestLength(int index);
 
 public:
-	btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count,int section_count, const btVector3* x, const btScalar* m);
+	btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m);
 
 	CollisionMode collisionMode;
 	btScalar WantedDistance = 0;
@@ -277,7 +278,6 @@ public:
 
 #pragma region Use methods
 public:
-	
 	btScalar getLength();
 	btScalar getRestLength();
 
@@ -306,9 +306,9 @@ public:
 
 	void setCollisionParameters(int substepDelayCollision, int subIterationCollision, btScalar sleepingThreshold);
 
-    bool getUseHydroAero();
+	bool getUseHydroAero();
 	void setUseHydroAero(bool active);
-	
+
 	btCable::CableData& getCableData()
 	{
 		return m_cableData;
@@ -363,7 +363,7 @@ public:
 
 	float getCollisionMargin();
 
-	void addSection(btScalar rl,int start,int end,int nbNodes);
+	void addSection(btScalar rl, int start, int end, int nbNodes);
 
 	void setDefaultRestLength(btScalar rl);
 	void setMinLength(btScalar value);
