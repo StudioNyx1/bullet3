@@ -21,6 +21,7 @@ subject to the following restrictions:
 #include "btSoftBody.h"
 // add btCable include for sending data
 #include "BulletCable/btCable.h"
+#include <map>
 
 typedef btAlignedObjectArray<btSoftBody*> btSoftBodyArray;
 
@@ -137,6 +138,8 @@ public:
 	btCable::NodeData* m_nodesData;
 
 	int* m_cableIndexesArray;
+
+	map<btCollisionObject*, btCollisionObject*> m_cableCollisionObjects;
 };
 
 #endif  //BT_SOFT_RIGID_DYNAMICS_WORLD_H
