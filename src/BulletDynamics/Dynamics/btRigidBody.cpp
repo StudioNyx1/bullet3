@@ -230,8 +230,12 @@ void btRigidBody::applyDamping(btScalar timeStep)
 	// m_angularDamping is LCS
 	// m_angularVelocity is ECEF
 	// Convert angular velocity to LCS, apply damping, convert it back to ECEF
+	btTransform tr = getWorldTransform();
 	btDefaultMotionState* mo = (btDefaultMotionState*)m_optionalMotionState;
-	btTransform tr = mo->getGraphicsWorldTransform();
+	if (mo)
+	{
+		tr = mo->getGraphicsWorldTransform();
+	}
 	btVector3 angularVelocityLCS = tr.getBasis().inverse() * m_angularVelocity;
 	angularVelocityLCS.setX(angularVelocityLCS.getX() * btPow(btScalar(1) - m_angularDamping.getX(), timeStep));
 	angularVelocityLCS.setY(angularVelocityLCS.getY() * btPow(btScalar(1) - m_angularDamping.getY(), timeStep));
