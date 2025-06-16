@@ -20,6 +20,7 @@
 
 #include "CableDemo.h"
 #include "GL_ShapeDrawer.h"
+#include "../CommonInterfaces/CommonParameterInterface.h"
 
 #include "LinearMath/btAlignedObjectArray.h"
 #include "BulletSoftBody/btSoftBody.h"
@@ -58,7 +59,7 @@ class btSoftRigidDynamicsWorld;
 class CableDemo : public CommonRigidBodyBase
 {
 public:
-	int substepSolver = 1;
+	int substepSolver = 4;
 	btAlignedObjectArray<btSoftSoftCollisionAlgorithm*> m_SoftSoftCollisionAlgorithms;
 	btAlignedObjectArray<btSoftRididCollisionAlgorithm*> m_SoftRigidCollisionAlgorithms;
 
@@ -3035,6 +3036,196 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
 }
 
+
+static btPoint2PointConstraint* ballJoint;
+static btRigidBody* rod;
+btScalar tau = 0.0f;
+btScalar damping = 0.0f;
+btScalar impClamp = 0.0f;
+btScalar rodAngularDamping = 0.0f;
+btScalar rodLinearDamping = 0.0f;
+
+void OnRodAngularDampingChanged(float value, void* userPtr) {
+	if (rod) {
+		rod->setDamping(rod->getLinearDamping(), value);
+	}
+}
+
+void OnRodLinearDampingChanged(float value, void* userPtr) {
+	if (rod) {
+		rod->setDamping(value, rod->getAngularDamping());
+	}
+}
+
+void OnBallJointTauChanged(float value, void* userPtr) {
+
+	if (ballJoint) {
+		ballJoint->m_setting.m_tau = value;
+	}
+}
+
+void OnBallJointDampingChanged(float value, void* userPtr) {
+	if (ballJoint) {
+		ballJoint->m_setting.m_damping = value;
+	}
+}
+
+void OnBallJointImpulseClampChanged(float value, void* userPtr) {
+	if (ballJoint) {
+		ballJoint->m_setting.m_impulseClamp = value;
+	}
+}
+
+static void Init_BallJoint(CableDemo* pdemo) {
+	
+	// Shape
+	btCollisionShape* boxShape = new btBoxShape(btVector3(0.5, 2, 0.5));
+	btCollisionShape* ballShape = new btSphereShape(0.2f);
+
+	// Masses
+	btScalar massKinematic(0);
+	btScalar massPhysic(100);
+
+	// Rotation
+	btQuaternion rotation(0, 0, 0, 1);
+
+	// Transform
+	btTransform transformPhysic;
+	transformPhysic.setIdentity();
+	transformPhysic.setRotation(rotation);
+
+	btTransform transformKinematic;
+	transformKinematic.setOrigin(btVector3(0, 4, 0));
+	transformKinematic.setRotation(rotation);
+	
+	// RB
+	rod = pdemo->createRigidBody(massPhysic, transformPhysic, boxShape);
+	rod->setRestitution(0);
+	rod->setFriction(0.5);
+	rod->setSleepingThresholds(0, 0);
+	rod->setFlags(0);
+	
+	btRigidBody* sphere = pdemo->createRigidBody(massKinematic, transformKinematic, ballShape);
+	sphere->setRestitution(0);
+	sphere->setFriction(0.5);
+	sphere->setSleepingThresholds(0, 0);
+	sphere->setFlags(0);
+	
+	// Constraint
+	//  To calculate the locals points:
+	//      MatrixLocalA = Identity * LocalPivot
+	//      MatrixWorld = LtWA * MatrixLocalA
+	//      MatrixLocalA = WtLA * MatrixWorld
+	//      MatrixLocalB = WtLB * MatrixWorld
+	btTransform framePivot = btTransform::getIdentity();
+	btTransform frameWorld = sphere->getWorldTransform() * framePivot;
+	btTransform frameInA = sphere->getWorldTransform().inverse() * frameWorld;
+	btTransform frameInB = rod->getWorldTransform().inverse() * frameWorld;
+	//btPoint2PointConstraint* ballJoint = new btPoint2PointConstraint(*sphere, *rod, frameInA.getOrigin(), frameInB.getOrigin());
+	ballJoint = new btPoint2PointConstraint(*sphere, *rod, frameInA.getOrigin(), frameInB.getOrigin());
+	ballJoint->setOverrideNumSolverIterations(256);
+	
+	// Constraint settings
+	ballJoint->m_setting.m_tau = tau;
+	ballJoint->m_setting.m_damping = damping;
+	ballJoint->m_setting.m_impulseClamp = impClamp;
+	
+	SliderParams sliderTau("tau", &tau);
+	sliderTau.m_minVal = 0;
+	sliderTau.m_maxVal = 1;
+	sliderTau.m_callback = OnBallJointTauChanged;
+
+	SliderParams sliderDamp("damping", &damping);
+	sliderDamp.m_minVal = 0;
+	sliderDamp.m_maxVal = 1;
+	sliderDamp.m_callback = OnBallJointDampingChanged;
+	
+	SliderParams sliderImp("impulseClamp", &impClamp);
+	sliderImp.m_minVal = 0;
+	sliderImp.m_maxVal = 1;
+	sliderImp.m_callback = OnBallJointImpulseClampChanged;
+
+	SliderParams sliderRodAngularDamping("rod angular damping", &rodAngularDamping);
+	sliderRodAngularDamping.m_minVal = 0;
+	sliderRodAngularDamping.m_maxVal = 1;
+	sliderRodAngularDamping.m_callback = OnRodAngularDampingChanged;
+
+	SliderParams sliderRodLinearDamping("rod linear damping", &rodLinearDamping);
+	sliderRodLinearDamping.m_minVal = 0;
+	sliderRodLinearDamping.m_maxVal = 1;
+	sliderRodLinearDamping.m_callback = OnRodLinearDampingChanged;
+	
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderTau);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderDamp);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderImp);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderRodAngularDamping);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderRodLinearDamping);
+	
+	pdemo->getDynamicsWorld()->addConstraint(ballJoint);
+}
+
+static void Init_FixedJoint(CableDemo* pdemo) {
+	
+	// Shape
+	btCollisionShape* boxShape = new btCylinderShape(btVector3(0.2, 1, 0.2));
+	btCollisionShape* cubeShape = new btBoxShape(btVector3(1, 1, 1));
+	btCollisionShape* planeShape = new btBoxShape(btVector3(10, 0.1, 10));
+
+	// Masses
+	btScalar massKinematic(0);
+	btScalar massRod(100);
+	btScalar massCube(513.5f);
+
+	// Rotation
+	btQuaternion rotation(0, 0, 0, 1);
+	btQuaternion rotationRod(0, 0, 1.5708);
+	
+
+	// Transform
+	btTransform transformBox;
+	transformBox.setOrigin(btVector3(-2.2f, 2, 0));
+	transformBox.setRotation(rotationRod);
+
+	btTransform transformCube;
+	transformCube.setOrigin(btVector3(0, 2, 0));
+	transformCube.setRotation(rotation);
+
+	btTransform transformPlane;
+	transformPlane.setOrigin(btVector3(0, 0, 0));
+	transformPlane.setRotation(rotation);
+	
+	// RB
+	btRigidBody* rod = pdemo->createRigidBody(massRod, transformBox, boxShape);
+	rod->setMassProps(massRod, btVector3(5.583, 5.583, 0.5f));
+	rod->setRestitution(0);
+	rod->setFriction(0.5);
+	rod->setSleepingThresholds(0, 0);
+	rod->setFlags(0);
+	
+	btRigidBody* cube = pdemo->createRigidBody(massCube, transformCube, cubeShape);
+	cube->setSleepingThresholds(0, 0);
+	cube->setFlags(0);
+	
+	btRigidBody* plane = pdemo->createRigidBody(massKinematic, transformPlane, planeShape);
+	plane->setSleepingThresholds(0, 0);
+	plane->setFriction(0.5);
+	plane->setFlags(0);
+	 
+
+	// Constraint
+	//  To calculate the locals points:
+	//      MatrixLocalA = Identity * LocalPivot
+	//      MatrixWorld = LtWA * MatrixLocalA
+	//      MatrixLocalA = WtLA * MatrixWorld
+	//      MatrixLocalB = WtLB * MatrixWorld
+	btTransform framePivot = btTransform::getIdentity();
+	framePivot.setOrigin(btVector3(0, -0.5, 0));
+	btTransform frameWorld = rod->getWorldTransform() * framePivot;
+	btTransform frameA = rod->getWorldTransform().inverse() * frameWorld;
+	btTransform frameB = cube->getWorldTransform().inverse() * frameWorld;
+	btFixedConstraint* fixed = pdemo->createFixedConstraint(*rod, *cube, frameA, frameB, 256);
+}
+
 void (*demofncs[])(CableDemo*) =
 	{
 		Init_CableForceDown,
@@ -3062,7 +3253,9 @@ void (*demofncs[])(CableDemo*) =
 		Init_CableBending,
 		Init_TwoCablesOneCube,
 		Init_DetachA18,
-		Init_MCMVCable
+		Init_MCMVCable,
+		Init_BallJoint,
+		Init_FixedJoint
 };
 
 ////////////////////////////////////
