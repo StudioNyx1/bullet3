@@ -334,6 +334,12 @@ void btCable::Grows(float dt)
 	// Case when we need to add at least 1 node
 	while (distance > linkRestLength * 2)
 	{
+		if (totalNumNodes >= m_worldInfo->maxNodeNumber || nodeSize >= m_worldInfo->maxNodeNumberPerCable) {
+			m_growingState = 4;
+			return;
+		}
+
+		
 		Node* node0 = &m_nodes[nodeSize - 1];
 		Node* node1 = &m_nodes[nodeSize - 2];
 
