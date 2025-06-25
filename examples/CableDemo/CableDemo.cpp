@@ -3167,8 +3167,8 @@ static void Init_BallJoint(CableDemo* pdemo) {
 static void Init_FixedJoint(CableDemo* pdemo) {
 	
 	// Shape
-	btCollisionShape* boxShape = new btCylinderShape(btVector3(0.2, 1, 0.2));
-	btCollisionShape* cubeShape = new btBoxShape(btVector3(1, 1, 1));
+	btCollisionShape* rodShape = new btCylinderShape(btVector3(0.2, 0.5, 0.2));
+	btCollisionShape* cubeShape = new btBoxShape(btVector3(0.5, 0.5, 0.5));
 	btCollisionShape* planeShape = new btBoxShape(btVector3(10, 0.1, 10));
 
 	// Masses
@@ -3179,12 +3179,11 @@ static void Init_FixedJoint(CableDemo* pdemo) {
 	// Rotation
 	btQuaternion rotation(0, 0, 0, 1);
 	btQuaternion rotationRod(0, 0, 1.5708);
-	
 
 	// Transform
-	btTransform transformBox;
-	transformBox.setOrigin(btVector3(-2.2f, 2, 0));
-	transformBox.setRotation(rotationRod);
+	btTransform transformRod;
+	transformRod.setOrigin(btVector3(-2.2f, 2, 0));
+	transformRod.setRotation(rotationRod);
 
 	btTransform transformCube;
 	transformCube.setOrigin(btVector3(0, 2, 0));
@@ -3195,14 +3194,17 @@ static void Init_FixedJoint(CableDemo* pdemo) {
 	transformPlane.setRotation(rotation);
 	
 	// RB
-	btRigidBody* rod = pdemo->createRigidBody(massRod, transformBox, boxShape);
-	rod->setMassProps(massRod, btVector3(5.583, 5.583, 0.5f));
+	btRigidBody* rod = pdemo->createRigidBody(massRod, transformRod, rodShape);
+	rod->setMassProps(massRod, btVector3(9.333333f, 9.333333f, 2.0f));
 	rod->setRestitution(0);
 	rod->setFriction(0.5);
 	rod->setSleepingThresholds(0, 0);
 	rod->setFlags(0);
 	
 	btRigidBody* cube = pdemo->createRigidBody(massCube, transformCube, cubeShape);
+	cube->setMassProps(massCube, btVector3(85.58335f, 85.58335f, 85.58335f));
+	cube->setRestitution(0);
+	cube->setFriction(0.5);
 	cube->setSleepingThresholds(0, 0);
 	cube->setFlags(0);
 	
@@ -3210,8 +3212,7 @@ static void Init_FixedJoint(CableDemo* pdemo) {
 	plane->setSleepingThresholds(0, 0);
 	plane->setFriction(0.5);
 	plane->setFlags(0);
-	 
-
+	
 	// Constraint
 	//  To calculate the locals points:
 	//      MatrixLocalA = Identity * LocalPivot
@@ -3223,7 +3224,12 @@ static void Init_FixedJoint(CableDemo* pdemo) {
 	btTransform frameWorld = rod->getWorldTransform() * framePivot;
 	btTransform frameA = rod->getWorldTransform().inverse() * frameWorld;
 	btTransform frameB = cube->getWorldTransform().inverse() * frameWorld;
-	btFixedConstraint* fixed = pdemo->createFixedConstraint(*rod, *cube, frameA, frameB, 256);
+	btFixedConstraint* fixed = pdemo->createFixedConstraint(*rod, *cube, frameA, frameB, 1000);
+
+	b3Printf("frameA: %f %f %f\n", frameA.getOrigin().getX(), frameA.getOrigin().getY(), frameA.getOrigin().getZ());
+	b3Printf("frameB: %f %f %f\n", frameB.getOrigin().getX(), frameB.getOrigin().getY(), frameB.getOrigin().getZ());
+	b3Printf("Rod inertia matrix: %f %f %f\n", rod->getLocalInertia().getX(), rod->getLocalInertia().getY(), rod->getLocalInertia().getZ());
+	b3Printf("Cube inertia matrix: %f %f %f\n", cube->getLocalInertia().getX(), cube->getLocalInertia().getY(), cube->getLocalInertia().getZ());
 }
 
 void (*demofncs[])(CableDemo*) =
