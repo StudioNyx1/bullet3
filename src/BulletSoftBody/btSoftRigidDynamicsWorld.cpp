@@ -124,30 +124,51 @@ void btSoftRigidDynamicsWorld::prepareSingleStepSimulation()
 	}
 
 	//Set Arrays
-	int NodesIndex = 0;
+	m_totalNodeCount = 0;
+	m_totalActiveNodeCount = 0;
+	m_totalPhysicsNodeCount = 0;
+
+	m_totalCableCount = 0;
+	m_totalActiveCableCount = 0;
+	m_totalPhysicsCableCount = 0;
+	
+	int nodesIndex = 0;
+	int physicCableIndex = 0;
 	for (int i = 0; i < m_softBodies.size(); i++)
 	{		
 		btCable* cable = reinterpret_cast<btCable*>(m_softBodies[i]);
+		std::size_t const nodesCount = cable->m_nodes.size();
 
 		// Store each cable data into a single one for GPU computing of Hydro and Aero Forces
-		if (cable->isActive())
+		if (cable->getUseHydroAero())
 		{
-			std::size_t const nodesCount = cable->m_nodes.size();
-			cable->setStartIndex(NodesIndex);
+			cable->setStartIndex(nodesIndex);
 
 			// Clean and fast chunks initialization (see https://godbolt.org/z/nWK63GYcc)
-			std::fill_n(m_cableIndexesArray + NodesIndex, nodesCount, i);
-			memcpy(m_nodesData + NodesIndex, cable->getNodeData(), nodesCount * cable->NodeDataSize);
-			memcpy(m_nodesPos + NodesIndex, cable->getNodePos(), nodesCount * cable->NodePosSize);
+			std::fill_n(m_cableIndexesArray + nodesIndex, nodesCount, physicCableIndex);
+			memcpy(m_nodesData + nodesIndex, cable->getNodeData(), nodesCount * cable->NodeDataSize);
+			memcpy(m_nodesPos + nodesIndex, cable->getNodePos(), nodesCount * cable->NodePosSize);
 
 			// First update `endIndex` before performing the copy
-			NodesIndex += nodesCount;
-			cable->setEndIndex(NodesIndex - 1);
+			nodesIndex += nodesCount;
+			cable->setEndIndex(nodesIndex - 1);
 			memcpy(m_cablesData + i, &cable->getCableData(), cable->CableDataSize);
+
+			physicCableIndex += 1;
 		}
+
+		if (cable->getActivationState() == ACTIVE_TAG)
+		{
+			m_totalActiveNodeCount += nodesCount;
+			m_totalActiveCableCount += 1;
+		}
+
+		m_totalNodeCount += nodesCount;
+		m_totalCableCount += 1;
 	}
 
-	m_hydroCableNodesNumber = NodesIndex;
+	m_totalPhysicsNodeCount = nodesIndex;
+	m_totalPhysicsCableCount = physicCableIndex;
 }
 
 void btSoftRigidDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
@@ -430,10 +451,6 @@ void btSoftRigidDynamicsWorld::serialize(btSerializer* serializer)
 	serializer->finishSerialization();
 }
 
-int btSoftRigidDynamicsWorld::getHydroNodesNumber()
-{
-	return m_hydroCableNodesNumber;
-}
 
 void btSoftRigidDynamicsWorld::updateCableForces(btSoftBody::NodeForces* co, int size)
 {

@@ -29,8 +29,8 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 
 	// Initialize Data
 	m_cableData = CableData();
-	m_nodePos = new NodePos[worldInfo->maxNodeNumber]();
-	m_nodeData = new NodeData[worldInfo->maxNodeNumber]();
+	m_nodePos = new NodePos[worldInfo->maxNodeNumberPerCable]();
+	m_nodeData = new NodeData[worldInfo->maxNodeNumberPerCable]();
 
 	for (int i = 0; i < this->m_nodes.size(); i++)
 	{
@@ -2387,5 +2387,6 @@ int btCable::getGrowingState()
 {
 	return m_growingState;
 }
+
 
 #pragma endregion

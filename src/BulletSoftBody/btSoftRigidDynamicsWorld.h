@@ -51,7 +51,12 @@ protected:
 	void serializeSoftBodies(btSerializer* serializer);
 
 	int m_sizeOfNodeForcesStruct;
-	int m_hydroCableNodesNumber;
+	int m_totalNodeCount;
+	int m_totalActiveNodeCount;
+	int m_totalPhysicsNodeCount;
+	int m_totalCableCount;
+	int m_totalActiveCableCount;
+	int m_totalPhysicsCableCount;
 
 	// Default structs (with values at 0) used to reset the arrays used by the world
 	btCable::NodeData m_defaultNodeData;
@@ -109,6 +114,36 @@ public:
 		return total;
 	}
 
+	int btSoftRigidDynamicsWorld::getTotalNodeCount()
+	{
+		return m_totalNodeCount;
+	}
+
+	int btSoftRigidDynamicsWorld::getTotalActiveNodeCount()
+	{
+		return m_totalActiveNodeCount;
+	}
+
+	int btSoftRigidDynamicsWorld::getTotalPhysicNodeCount()
+	{
+		return m_totalPhysicsNodeCount;
+	}
+
+	int btSoftRigidDynamicsWorld::getTotalCableCount()
+	{
+		return m_totalCableCount;
+	}
+
+	int btSoftRigidDynamicsWorld::getTotalActiveCableCount()
+	{
+		return m_totalActiveCableCount;
+	}
+
+	int btSoftRigidDynamicsWorld::getTotalPhysicCableCount()
+	{
+		return m_totalPhysicsCableCount;
+	}
+
 	virtual void rayTest(const btVector3& rayFromWorld, const btVector3& rayToWorld, RayResultCallback& resultCallback) const;
 
 	/// rayTestSingle performs a raycast call and calls the resultCallback. It is used internally by rayTest.
@@ -122,7 +157,6 @@ public:
 
 	virtual void serialize(btSerializer* serializer);
 
-	int getHydroNodesNumber();
 
 	void updateCableForces(btSoftBody::NodeForces* co, int size);
 
