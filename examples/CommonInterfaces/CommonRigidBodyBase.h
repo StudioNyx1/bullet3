@@ -438,7 +438,7 @@ struct CommonRigidBodyBase : public CommonExampleInterface
 		body->setDamping(0.0, 0.0);
 
 		body->setUserIndex(-1);
-		m_dynamicsWorld->addRigidBody(body);
+		m_dynamicsWorld->addRigidBody(body, 1, 1);
 		return body;
 	}
 
@@ -473,12 +473,81 @@ struct CommonRigidBodyBase : public CommonExampleInterface
 
 		body->setUserIndex(-1);
 		body->m_debugBodyId = userIndex;
-		m_dynamicsWorld->addRigidBody(body);
+		m_dynamicsWorld->addRigidBody(body, 1, 1);
 		return body;
 	}
-	
+
+	btRigidBody* createCableRigidBody(float mass, const btTransform& startTransform, btCollisionShape* shape, const btVector4& color = btVector4(1, 0, 0, 1))
+	{
+		btAssert((!shape || shape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
+
+		//rigidbody is dynamic if and only if mass is non zero, otherwise static
+		bool isDynamic = (mass != 0.f);
+
+		btVector3 localInertia(0, 0, 0);
+		if (isDynamic)
+			shape->calculateLocalInertia(mass, localInertia);
+
+			//using motionstate is recommended, it provides interpolation capabilities, and only synchronizes 'active' objects
+
+#define USE_MOTIONSTATE 1
+#ifdef USE_MOTIONSTATE
+		btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
+
+		btRigidBody::btRigidBodyConstructionInfo cInfo(mass, myMotionState, shape, localInertia);
+
+		btRigidBody* body = new btRigidBody(cInfo);
+		//body->setContactProcessingThreshold(m_defaultContactProcessingThreshold);
+
+#else
+		btRigidBody* body = new btRigidBody(mass, 0, shape, localInertia);
+		body->setWorldTransform(startTransform);
+#endif  //
+
+		body->setDamping(0.0, 0.0);
+
+		body->setUserIndex(-1);
+		m_dynamicsWorld->addRigidBody(body, 1, 8);
+		return body;
+	}
+
+	btRigidBody* createCableRigidBody(float mass, const btTransform& startTransform, btCollisionShape* shape, int userIndex, const btVector4& color = btVector4(1, 0, 0, 1))
+	{
+		btAssert((!shape || shape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
+
+		//rigidbody is dynamic if and only if mass is non zero, otherwise static
+		bool isDynamic = (mass != 0.f);
+
+		btVector3 localInertia(0, 0, 0);
+		if (isDynamic)
+			shape->calculateLocalInertia(mass, localInertia);
+
+			//using motionstate is recommended, it provides interpolation capabilities, and only synchronizes 'active' objects
+
+#define USE_MOTIONSTATE 1
+#ifdef USE_MOTIONSTATE
+		btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
+
+		btRigidBody::btRigidBodyConstructionInfo cInfo(mass, myMotionState, shape, localInertia);
+
+		btRigidBody* body = new btRigidBody(cInfo);
+		//body->setContactProcessingThreshold(m_defaultContactProcessingThreshold);
+
+#else
+		btRigidBody* body = new btRigidBody(mass, 0, shape, localInertia);
+		body->setWorldTransform(startTransform);
+#endif  //
+
+		body->setDamping(0.0, 0.0);
+
+		body->setUserIndex(-1);
+		body->m_debugBodyId = userIndex;
+		m_dynamicsWorld->addRigidBody(body, 1, 8);
+		return body;
+	}
+
 	btFixedConstraint* createFixedConstraint(btRigidBody& rigidA, btRigidBody& rigidB,
-		btTransform& frameInA, btTransform& frameInB, int iteration, bool wantedCollision = false)
+											 btTransform& frameInA, btTransform& frameInB, int iteration, bool wantedCollision = false)
 	{
 		btFixedConstraint* fixedA18 = new btFixedConstraint(rigidA, rigidB, frameInA, frameInB);
 		fixedA18->setOverrideNumSolverIterations(iteration);
