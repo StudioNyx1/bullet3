@@ -157,9 +157,7 @@ public:
 		m_cameraYaw = yaw;
 	}
 
-	CableDemo(struct GUIHelperInterface* helper) : CommonRigidBodyBase(helper),
-												   m_drag(false)
-
+	CableDemo(struct GUIHelperInterface* helper) : CommonRigidBodyBase(helper), m_drag(false)
 	{
 		m_applyForceOnRigidbody = false;
 		m_attachLock = false;
@@ -593,7 +591,7 @@ public:
 			// RayCastDemo
 			if (m_currentDemoIndex == 28)
 			{
-				btScalar margin = 0.1;
+				btScalar margin = 0.05;
 				btCollisionObjectArray& btCollisionAlgorithm = m_dynamicsWorld->getCollisionObjectArray();
 				btRigidBody* cubeBox = btRigidBody::upcast(btCollisionAlgorithm[0]);
 				cubeBox->setAngularVelocity(btVector3(0.25, 0.5, 1.0));
@@ -606,8 +604,8 @@ public:
 				trRayTo.setIdentity();
 
 				// BoxShape
-				btVector3 rayFromBox = btVector3(0, 3, 0);
-				btVector3 rayToBox = btVector3(100, 3, 0);
+				btVector3 rayFromBox = btVector3(2, 3, 0);
+				btVector3 rayToBox = btVector3(4, 3, 0);
 				m_dynamicsWorld->getDebugDrawer()->drawLine(rayFromBox, rayToBox, btVector3(1, 0, 0));
 				btCollisionWorld::ClosestRayResultCallback resultBox(rayFromBox, rayToBox);
 				resultBox.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
@@ -622,11 +620,11 @@ public:
 				}
 
 				// GImpactShape
-				btVector3 rayFromGImpact = btVector3(0, -3, 0);
-				btVector3 rayToGImpact = btVector3(100, -3, 0);
+				btVector3 rayFromGImpact = btVector3(2, -3, 0);
+				btVector3 rayToGImpact = btVector3(4, -3, 0);
 				m_dynamicsWorld->getDebugDrawer()->drawLine(rayFromGImpact, rayToGImpact, btVector3(1, 0, 0));
 				btCollisionWorld::ClosestRayResultCallback resultGImpact(rayFromGImpact, rayToGImpact);
-				resultGImpact.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
+				// resultGImpact.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
 				resultGImpact.m_collisionFilterGroup = 8;
 				resultGImpact.m_collisionFilterMask = 9;
 				trRayFrom.setOrigin(rayFromGImpact);
@@ -3021,6 +3019,8 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	/// MCMV
 	// Shape: MCMV
 	btCompoundShape* mcmvShape = new btCompoundShape();
+	btGImpactMeshShape* gImpactShape;
+
 	mcmvShape->setMargin(0);
 	{
 		// Shape: MCMV - Floor
@@ -3061,8 +3061,8 @@ static void Init_MCMVCable(CableDemo* pdemo)
 			triArray.addIndexedMesh(mesh, PHY_INTEGER);
 
 			btGImpactMeshShape* floorShape = new btGImpactMeshShape(&triArray);
-			floorShape->setMargin(0);
 			floorShape->updateBound();
+			gImpactShape = floorShape;
 
 			btBoxShape* floorBoxShape = new btBoxShape(kHalfExtents);
 			floorBoxShape->setMargin(0);
@@ -3289,6 +3289,7 @@ static void Init_RayCastGImpact(CableDemo* pdemo)
 		// Create the GImpact shape
 		btGImpactMeshShape* gImpact = new btGImpactMeshShape(&triArray);
 		gImpact->updateBound();
+		gImpact->setMargin(0.1);
 
 		btBvhTriangleMeshShape* triangleMeshShape = new btBvhTriangleMeshShape(gImpact->getMeshInterface(), true);
 

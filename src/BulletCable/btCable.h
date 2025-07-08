@@ -44,6 +44,7 @@ class btCable : public btSoftBody
 	struct BroadPhasePair
 	{
 		btCollisionObject* body;
+		int bodyType;
 		bool haveManifoldsRegister;
 		btPersistentManifold* manifold;
 		btVector3 totalImpulse;
@@ -209,12 +210,7 @@ private:
 
 	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
 	void solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, int limitMin, int limitMax);
-
-	btVector3 ComputeCollisionSphere(btVector3 pos, btCollisionObject* obj, Node* n);
-	//int solveContact(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact);
-
 	btVector3 calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
-	btVector3 PositionStartRayCalculation(Node* n, btCollisionObject* obj);
 
 	// Methods for collision
 	void setupNodeForCollision(btAlignedObjectArray<int>* indexNodeContact);
@@ -224,7 +220,7 @@ private:
 	bool checkCondition(Node* n, int step);
 	btScalar computeCollisionMargin(btCollisionShape* shape);
 	btCollisionWorld::ClosestRayResultCallback castRay(btVector3 positionStart, btVector3 positionEnd, NodePairNarrowPhase* contact, btScalar margin);
-
+	void setRayResult(const btVector3 positionStart, const btVector3 contact, const btVector3 normal, Node* n, NodePairNarrowPhase* temp);
 	void recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCollisionShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact,
 							 btVector3 minLink, btVector3 maxLink, btTransform worldToLocal);
 
@@ -264,7 +260,7 @@ public:
 		ExternalForcesError = 2
 	};
 
-	CableState cableState = CableState::Valid;
+	btCable::CableState cableState = Valid;
 
 	struct SectionInfo
 	{
