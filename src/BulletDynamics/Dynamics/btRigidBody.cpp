@@ -104,8 +104,9 @@ void btRigidBody::setupRigidBody(const btRigidBody::btRigidBodyConstructionInfo&
 	m_turnVelocity.setZero();
 
 	m_kinematicChildren = {};
-	m_cableCollisionObject = nullptr;
-	m_cableCollisionLocalTransform = btTransform();
+	m_cableCollision = nullptr;
+	m_redirectionTarget = nullptr;
+	m_localTransform = btTransform::getIdentity();
 }
 
 void btRigidBody::predictIntegratedTransform(btScalar timeStep, btTransform& predictedTransform)
@@ -125,6 +126,22 @@ void btRigidBody::updateKinematicChildren(btScalar timeStep)
 		kinematic->setInterpolationWorldTransform(kinematic->getWorldTransform());
 		kinematic->setWorldTransform(res);
 		kinematic->getMotionState()->setWorldTransform(res);
+
+		// Care: can lead to infinite loop
+		kinematic->updateKinematicChildren(timeStep);
+	}
+}
+
+void btRigidBody::updateCableCollision(btScalar timeStep)
+{
+	if (m_cableCollision != NULL)
+	{
+		m_cableCollision->setInterpolationWorldTransform(m_cableCollision->getWorldTransform());
+
+		// World transform kinematic = WordlTransform Parent * LocalTransform Kinematic
+		btTransform res = getWorldTransform() * m_cableCollision->m_localTransform;
+		m_cableCollision->setWorldTransform(res);
+		m_cableCollision->getMotionState()->setWorldTransform(res);
 	}
 }
 

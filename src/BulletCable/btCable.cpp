@@ -77,15 +77,21 @@ void btCable::updateLength(btScalar dt)
 		if (WantedDistance > 0)
 		{
 			if (WantedDistance > getRestLength())
+			{
 				Grows(dt);
+			}
 		}
 		else if (WantedDistance == 0)
-			Grows(dt);
+		{
+			Grows(dt);	
+		}
 	}
 	else if (WantedSpeed < 0)
 	{
 		if (WantedDistance < getRestLength())
-			Shrinks(dt);
+		{
+			Shrinks(dt);	
+		}
 	}
 	else
 	{
@@ -636,52 +642,33 @@ void btCable::solveConstraints()
 		btScalar margin;
 		ni = m_nodes.size();
 
-		// Get the overlapping pairs
-		auto cache = m_world->getBroadphase()->getOverlappingPairCache();
-		auto temp = cache->getOverlappingPairArray();
-		// Maybe a faster way is possible using a filter
-		for (int w = 0; w < temp.size(); w++)
+		// BroadPhase (quick check to determine which collisions can collide with a cable)
+		// TODO @benH: Nettoyer code, fusionner Broad&Narrow (uillser les aabbs), faire un meilleur check de collision masks
+		auto objects = m_world->getCollisionObjectArray();
+		for (int w = 0; w < objects.size(); w++)
 		{
-			if (temp[w].m_pProxy0->m_clientObject == this)
+			// Add Object to the potential list
+			btCollisionObject* colObj = objects[w];
+
+			if (colObj->getInternalType() != CO_RIGID_BODY)
+
 			{
-				// Add Object to the potential list
-				btCollisionObject* co = (btCollisionObject*)temp[w].m_pProxy1->m_clientObject;
-
-				// The 4nd bit of the m_collisionFilterMask needs to be 1
-				std::string byte = std::bitset<8>(co->getBroadphaseHandle()->m_collisionFilterMask).to_string();
-				int bitCable = byte.size() - 4;
-				if (byte[bitCable] == '0')
-				{
-					continue;
-				}
-
-				if (co->hasContactResponse() && this->m_collisionDisabledObjects.findLinearSearch(co) == m_collisionDisabledObjects.size())
-				{
-					BroadPhasePair* temp = new BroadPhasePair();
-					temp->body = co;
-					broadPhaseOutput.push_back(temp);
-				}
+				continue;
 			}
 
-			if (temp[w].m_pProxy1->m_clientObject == this)
+			// The 4nd bit of the m_collisionFilterMask needs to be 1
+			std::string byte = std::bitset<8>(colObj->getBroadphaseHandle()->m_collisionFilterMask).to_string();
+			int bitCable = byte.size() - 4;
+			if (byte[bitCable] == '0')
 			{
-				// Add the node to the potential list of node collision
-				btCollisionObject* co = (btCollisionObject*)temp[w].m_pProxy0->m_clientObject;
+				continue;
+			}
 
-				// The 4nd bit of the m_collisionFilterMask needs to be 1
-				std::string byte = std::bitset<8>(co->getBroadphaseHandle()->m_collisionFilterMask).to_string();
-				int bitCable = byte.size() - 4;
-				if (byte[bitCable] == '0')
-				{
-					continue;
-				}
-
-				if (co->hasContactResponse() && this->m_collisionDisabledObjects.findLinearSearch(co) == m_collisionDisabledObjects.size())
-				{
-					BroadPhasePair* temp = new BroadPhasePair();
-					temp->body = co;
-					broadPhaseOutput.push_back(temp);
-				}
+			if (colObj->hasContactResponse() && this->m_collisionDisabledObjects.findLinearSearch(colObj) == m_collisionDisabledObjects.size())
+			{
+				BroadPhasePair* temp = new BroadPhasePair();
+				temp->body = colObj;
+				broadPhaseOutput.push_back(temp);
 			}
 		}
 
@@ -700,8 +687,8 @@ void btCable::solveConstraints()
 					btCollisionObject* co = broadPhaseOutput[j]->body;
 					btVector3 velB = co->getInterpolationLinearVelocity();
 
-					btScalar deltavelocity = (velB - velA).length();
-					margin = marginNode + deltavelocity * m_sst.sdt;
+					btScalar dVel = (velB - velA).length();
+					margin = marginNode + dVel * m_sst.sdt;
 
 					// Box Definition
 					btVector3 minLink = btVector3(0, 0, 0);
@@ -940,7 +927,7 @@ void btCable::distanceConstraint()
 
 void btCable::LRAConstraint()
 {
-	// LRAHierachique();
+	LRAHierachique();
 
 	if (invertLRA)
 	{
@@ -1458,7 +1445,6 @@ btVector3 btCable::ComputeCollisionSphere(btVector3 pos, btCollisionObject* coll
 	tempNodeSphereShape.setCollisionShape(&sphere);
 
 	MyContactResultCallback result(0, &tempNodeSphereShape, collider);
-
 	m_world->contactPairTest(&tempNodeSphereShape, collider, result);
 	return result.m_connected ? result.contactPoint + result.contactNorm * m_collisionMargin : pos;
 }
@@ -1545,16 +1531,32 @@ btCollisionWorld::ClosestRayResultCallback btCable::castRay(btVector3 positionSt
 	m_rayToTrans.setOrigin(endRay);
 
 	btCollisionWorld::ClosestRayResultCallback m_resultCallback(startRay, endRay);
-	btTransform t = contact->worldToLocal;
-
 	m_world->rayTestSingleWithMargin(m_rayFromTrans, m_rayToTrans,
 									 contact->pair->body,
 									 contact->collisionShape,
-									 t,
+									 contact->worldToLocal,
 									 m_resultCallback, margin);
 	return m_resultCallback;
 }
 
+btScalar btCable::computeCollisionMargin(btCollisionShape* shape)
+{
+	bool isSphereShape = shape->getShapeType() == SPHERE_SHAPE_PROXYTYPE;
+	btScalar marginBody = 0;
+	btScalar margin = 0;
+	// SphereShape margin is sphereShape Radius, not a safe margin
+	if (isSphereShape)
+	{
+		marginBody = 0.001;
+		margin = m_collisionMargin + marginBody;
+	}
+	else
+	{
+		marginBody = shape->getMargin();
+		margin = m_collisionMargin + shape->getMargin();
+	}
+	return margin;
+}
 
 // Resolve iteratively all the contact constraint
 // Do nbSubStep times the resolution to valid a good collision
@@ -1649,10 +1651,9 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 				btScalar distPenetration = (contactPoint * offset).length();
 
 				// Calculate & Apply the impulse for colllided object
-				if (impulseCompute && softWorld->m_cableCollisionObjects.count(obj) > 0)
+				if (obj->getInternalType() == CO_RIGID_BODY && impulseCompute)
 				{
-					auto it = softWorld->m_cableCollisionObjects.find(obj);
-					btRigidBody* rb = btRigidBody::upcast(it->second);
+					btRigidBody* rb = btRigidBody::upcast(obj);
 					impulse = calculateBodyImpulse(rb, marginNode, n, normal, contactPoint);
 				}
 
@@ -1747,21 +1748,14 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 				if (temp->node->m_nbCollidingObjectInFrame > 0)
 				{
 					obj = temp->pair->body;
-					if (softWorld->m_cableCollisionObjects.count(obj) > 0)
+					btTransform wtr = obj->getWorldTransform();
+					btVector3 impulse = temp->impulse;
+					temp->impulse = btVector3(0, 0, 0);
+					if (obj->getInternalType() == CO_RIGID_BODY)
 					{
-						auto it = softWorld->m_cableCollisionObjects.find(obj);
-						btRigidBody* rb = btRigidBody::upcast(it->second);
-						rb->applyRedirectionImpulse(temp->impulse, temp->node->m_x);
+						btRigidBody* rb = btRigidBody::upcast(obj);
+						rb->applyRedirectionImpulse(impulse, temp->node->m_x);
 					}
-					// btTransform wtr = obj->getWorldTransform();
-					// // btVector3 ra = temp->node->m_x - wtr.getOrigin();
-					// btVector3 impulse = temp->impulse;
-					// temp->impulse = btVector3(0, 0, 0);
-					// if (obj->getInternalType() == CO_RIGID_BODY)
-					// {
-					// 	btRigidBody* rb = btRigidBody::upcast(obj);
-					// 	rb->applyRedirectionImpulse(impulse, temp->node->m_x);
-					// }
 				}
 			}
 		}
@@ -1780,25 +1774,6 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 			temp->m_Xout = temp->node->m_x;
 		}
 	}
-}
-
-btScalar btCable::computeCollisionMargin(btCollisionShape* shape)
-{
-	bool isSphereShape = shape->getShapeType() == SPHERE_SHAPE_PROXYTYPE;
-	btScalar marginBody = 0;
-	btScalar margin = 0;
-	// SphereShape margin is sphereShape Radius, not a safe margin
-	if (isSphereShape)
-	{
-		marginBody = 0.001;
-		margin = m_collisionMargin + marginBody;
-	}
-	else
-	{
-		marginBody = shape->getMargin();
-		margin = m_collisionMargin + shape->getMargin();
-	}
-	return margin;
 }
 
 void btCable::solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, int limitLow, int limitHigh)
@@ -2387,6 +2362,5 @@ int btCable::getGrowingState()
 {
 	return m_growingState;
 }
-
 
 #pragma endregion

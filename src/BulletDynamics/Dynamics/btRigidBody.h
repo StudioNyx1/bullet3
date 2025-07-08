@@ -106,6 +106,7 @@ public:
 
 	// to synchronize the bodies of the kinematics (for Unity)
 	std::vector<btRigidBody*> m_kinematicChildren;
+	btRigidBody* m_cableCollision;
 	btRigidBody* m_redirectionTarget;
 	btTransform m_localTransform;
 
@@ -244,6 +245,8 @@ public:
 	}
 
 	void updateKinematicChildren(btScalar timeStep);
+
+	void updateCableCollision(btScalar timeStep);
 
 	void proceedToTransform(const btTransform& newTrans);
 

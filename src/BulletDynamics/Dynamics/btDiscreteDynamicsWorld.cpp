@@ -1132,8 +1132,6 @@ void btDiscreteDynamicsWorld::integrateTransformsInternal(btRigidBody** bodies, 
 			}
 
 			body->proceedToTransform(predictedTrans);
-
-			body->updateKinematicChildren(timeStep);
 		}
 	}
 }
@@ -1144,6 +1142,17 @@ void btDiscreteDynamicsWorld::integrateTransforms(btScalar timeStep)
 	if (m_nonStaticRigidBodies.size() > 0)
 	{
 		integrateTransformsInternal(&m_nonStaticRigidBodies[0], m_nonStaticRigidBodies.size(), timeStep);
+	}
+
+	for (int i = 0; i < getCollisionObjectArray().size(); ++i)
+	{
+		btCollisionObject* co = getCollisionObjectArray()[i];
+		btRigidBody* rb = btRigidBody::upcast(co);
+		if (rb)
+		{
+			rb->updateKinematicChildren(timeStep);
+			rb->updateCableCollision(timeStep);
+		}
 	}
 
 	///this should probably be switched on by default, but it is not well tested yet
