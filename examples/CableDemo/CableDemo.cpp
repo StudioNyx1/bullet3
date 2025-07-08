@@ -1,8 +1,8 @@
-﻿#include "Bullet3Common/b3FileUtils.h"
-#include "../Importers/ImportObjDemo/LoadMeshFromObj.h"
-#include "../OpenGLWindow/GLInstanceGraphicsShape.h"
-#include "../Utils/b3BulletDefaultFileIO.h"
+﻿#include "../OpenGLWindow/GLInstanceGraphicsShape.h"
+#include "Bullet3Common/b3FileUtils.h"
 
+#include "../Utils/b3BulletDefaultFileIO.h"
+#include "../Importers/ImportObjDemo/LoadMeshFromObj.h"
 #include "../CommonInterfaces/CommonRigidBodyBase.h"
 
 #include "btBulletDynamicsCommon.h"
@@ -38,6 +38,9 @@
 #include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <BulletCollision/CollisionShapes/btTriangleMeshShape.h>
+#include <BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h>
+#include <BulletCollision/CollisionShapes/btTriangleInfoMap.h>
+#include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 
 // #include "BunnyMesh.h"
 
@@ -59,8 +62,9 @@ class btSoftRigidDynamicsWorld;
 class CableDemo : public CommonRigidBodyBase
 {
 public:
-	int substepSolver = 4;
+	int substepSolver = 1;
 	btAlignedObjectArray<btSoftSoftCollisionAlgorithm*> m_SoftSoftCollisionAlgorithms;
+
 	btAlignedObjectArray<btSoftRididCollisionAlgorithm*> m_SoftRigidCollisionAlgorithms;
 
 	btSoftBodyWorldInfo m_softBodyWorldInfo;
@@ -120,13 +124,14 @@ private:
 	btScalar m_cameraDistance;
 	btScalar m_cameraPitch;
 	btScalar m_cameraYaw;
+	int nbFrame = 0;
+	int nbStep = 0;
 
 	using Clock = std::chrono::high_resolution_clock;
 
 	std::chrono::steady_clock::time_point startingTime{Clock::now()};
 
 	btVector3 m_waterCurrent;
-
 
 public:
 	void initPhysics();
@@ -244,6 +249,7 @@ public:
 			m_grow = false;
 			m_shrink = true;
 		}
+
 		if (key == 'k' && state)
 		{
 			m_grow = false;
@@ -289,6 +295,7 @@ public:
 			else
 				speed = 0.0;
 		}
+
 		if (key == 'c' && state)
 		{
 			m_moveBody = true;
@@ -314,6 +321,7 @@ public:
 		{
 			m_printFPS = !m_printFPS;
 		}
+
 		if (key == 'n' && state)
 		{
 			m_attachLock = true;
@@ -574,8 +582,64 @@ public:
 	}
 	void stepSimulation(float deltaTime) override
 	{
+		if (nbFrame % 10 == 0)
+		{
+			nbStep++;
+		}
+		nbFrame++;
+
 		if (m_dynamicsWorld)
 		{
+			// RayCastDemo
+			if (m_currentDemoIndex == 28)
+			{
+				btScalar margin = 0.1;
+				btCollisionObjectArray& btCollisionAlgorithm = m_dynamicsWorld->getCollisionObjectArray();
+				btRigidBody* cubeBox = btRigidBody::upcast(btCollisionAlgorithm[0]);
+				cubeBox->setAngularVelocity(btVector3(0.25, 0.5, 1.0));
+				btRigidBody* cubeGImpact = btRigidBody::upcast(btCollisionAlgorithm[1]);
+				cubeGImpact->setAngularVelocity(btVector3(0.25, 0.5, 1.0));
+
+				btTransform trRayFrom = btTransform();
+				trRayFrom.setIdentity();
+				btTransform trRayTo = btTransform();
+				trRayTo.setIdentity();
+
+				// BoxShape
+				btVector3 rayFromBox = btVector3(0, 3, 0);
+				btVector3 rayToBox = btVector3(100, 3, 0);
+				m_dynamicsWorld->getDebugDrawer()->drawLine(rayFromBox, rayToBox, btVector3(1, 0, 0));
+				btCollisionWorld::ClosestRayResultCallback resultBox(rayFromBox, rayToBox);
+				resultBox.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
+				resultBox.m_collisionFilterGroup = 8;
+				resultBox.m_collisionFilterMask = 9;
+				trRayFrom.setOrigin(rayFromBox);
+				trRayTo.setOrigin(rayToBox);
+				m_dynamicsWorld->rayTestSingleWithMargin(trRayFrom, trRayTo, cubeBox, cubeBox->getCollisionShape(), cubeBox->getWorldTransform(), resultBox, margin);
+				if (resultBox.hasHit())
+				{
+					m_dynamicsWorld->getDebugDrawer()->drawSphere(resultBox.m_hitPointWorld, margin, btVector3(0, 0, 1));
+				}
+
+				// GImpactShape
+				btVector3 rayFromGImpact = btVector3(0, -3, 0);
+				btVector3 rayToGImpact = btVector3(100, -3, 0);
+				m_dynamicsWorld->getDebugDrawer()->drawLine(rayFromGImpact, rayToGImpact, btVector3(1, 0, 0));
+				btCollisionWorld::ClosestRayResultCallback resultGImpact(rayFromGImpact, rayToGImpact);
+				resultGImpact.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
+				resultGImpact.m_collisionFilterGroup = 8;
+				resultGImpact.m_collisionFilterMask = 9;
+				trRayFrom.setOrigin(rayFromGImpact);
+				trRayTo.setOrigin(rayToGImpact);
+				m_dynamicsWorld->rayTestSingleWithMargin(trRayFrom, trRayTo, cubeGImpact, cubeGImpact->getCollisionShape(), cubeGImpact->getWorldTransform(), resultGImpact, margin);
+				if (resultGImpact.hasHit())
+				{
+					m_dynamicsWorld->getDebugDrawer()->drawSphere(resultGImpact.m_hitPointWorld, margin, btVector3(0, 0, 1));
+				}
+
+				m_dynamicsWorld->getDebugDrawer()->drawBox(btVector3(0, 0, 0), btVector3(0, 0, 0), btVector3(0, 1, 0));
+			}
+
 			const auto currentTime{Clock::now()};
 			if (m_applyForceOnRigidbody)
 			{
@@ -652,6 +716,7 @@ public:
 
 			int subStep = substepSolver;
 			m_dynamicsWorld->stepSimulation(deltaTime, subStep, deltaTime / subStep);
+
 			delta_ticks = clock() - current_ticks;
 
 			// draws
@@ -665,7 +730,7 @@ public:
 				// m_dynamicsWorld->getDebugDrawer()->drawBox(AabbMin, AabbMax, btVector3(0,1,1));
 				// m_dynamicsWorld->getDebugDrawer()->drawSphere(co->getWorldTransform().getOrigin(), 0.05, btVector3(1, 0, 1));
 			}
-			
+
 			if (m_printFPS && delta_ticks > 0)
 			{
 				m_fps = CLOCKS_PER_SEC / delta_ticks;
@@ -840,6 +905,68 @@ public:
 		return cable;
 	}
 };
+
+btTriangleMesh* buildCylinderMesh(float length,
+								  float height,
+								  int slices = 32,
+								  int stacks = 1)
+{
+	const float radius = height * 0.5f;  // height here = diameter
+	const float halfL = length * 0.5f;
+
+	auto* mesh = new btTriangleMesh(/*use32bitIndices=*/true, /*use4componentVertices=*/false);
+
+	// -----------------------------------------------------------------------
+	// 1. Curved side ─────────────────────────────────────────────────────────
+	// -----------------------------------------------------------------------
+	for (int iStack = 0; iStack < stacks; ++iStack)
+	{
+		float x0 = halfL - length * iStack / stacks;  // from +X → -X
+		float x1 = halfL - length * (iStack + 1) / stacks;
+
+		for (int iSlice = 0; iSlice < slices; ++iSlice)
+		{
+			float a0 = 2.f * SIMD_PI * iSlice / slices;
+			float a1 = 2.f * SIMD_PI * (iSlice + 1) / slices;
+
+			btVector3 v00(x0, radius * btSin(a0), radius * btCos(a0));
+			btVector3 v01(x0, radius * btSin(a1), radius * btCos(a1));
+			btVector3 v10(x1, radius * btSin(a0), radius * btCos(a0));
+			btVector3 v11(x1, radius * btSin(a1), radius * btCos(a1));
+
+			mesh->addTriangle(v00, v11, v10);  // <-- swapped v10 / v11
+			mesh->addTriangle(v00, v01, v11);  // <-- swapped v11 / v01
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// 2. End-caps (disc at +X and -X) ────────────────────────────────────────
+	// -----------------------------------------------------------------------
+	for (int cap = 0; cap < 2; ++cap)
+	{
+		float xCap = (cap == 0 ? halfL : -halfL);  // +X then -X
+		float normal = (cap == 0 ? 1.f : -1.f);    // outward
+
+		btVector3 centre(xCap, 0, 0);
+
+		for (int iSlice = 0; iSlice < slices; ++iSlice)
+		{
+			float a0 = 2.f * SIMD_PI * iSlice / slices;
+			float a1 = 2.f * SIMD_PI * (iSlice + 1) / slices;
+
+			btVector3 v0(xCap, radius * btSin(a0), radius * btCos(a0));
+			btVector3 v1(xCap, radius * btSin(a1), radius * btCos(a1));
+
+			// ------------------ end-caps ---------------------
+			if (normal > 0)                         // +X cap
+				mesh->addTriangle(centre, v1, v0);  // swap
+			else                                    // –X cap
+				mesh->addTriangle(centre, v0, v1);  // swap
+		}
+	}
+
+	return mesh;
+}
 
 static void Init_Nodes(CableDemo* pdemo)
 {
@@ -1451,9 +1578,6 @@ static void Init_TestCollisionFreeCableWithStaticCube(CableDemo* pdemo)
 
 	btRigidBody* wall = pdemo->createRigidBody(0, transformWall, new btBoxShape(btVector3(0.5, 0.5, 0.5)));
 	wall->getCollisionShape()->setMargin(0);
-	wall->m_cableCollisionObject = wallCableCollision;
-	wall->m_cableCollisionLocalTransform.setIdentity();
-	wall->m_cableCollisionLocalTransform.setOrigin(btVector3(0, 0, 0));
 
 	// Anchor's positions
 	btVector3 anchorPositionKinematic = positionKinematic + btVector3(0, 0, 0);
@@ -1465,6 +1589,7 @@ static void Init_TestCollisionFreeCableWithStaticCube(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(0.01);
 	cable->setCollisionMargin(0.01);
 	cable->setCollisionParameters(1, 1, 0);
+
 	pdemo->SetCameraPosition(btVector3(0, 10, 0));
 }
 
@@ -1579,7 +1704,7 @@ static void Init_TestCableCollisionMt(CableDemo* pdemo)
 	btRigidBody* kinematic = pdemo->createRigidBody(0, transformKinematic, shape);
 	btRigidBody* physic = pdemo->createRigidBody(100, transformPhysic, shape);
 
-	btRigidBody* wall = pdemo->createRigidBody(0, transformWall, new btBoxShape(btVector3(1, 1, 1)));
+	btRigidBody* wall = pdemo->createCableRigidBody(0, transformWall, new btBoxShape(btVector3(1, 1, 1)));
 
 	wall->getCollisionShape()->setMargin(0);
 
@@ -1917,8 +2042,8 @@ createTIVAfromIndexedMesh(std::vector<btScalar>& verts,
 /// 3.  Factory: radius  →  ready-to-use GImpact mesh shape
 /// ---------------------------------------------------------------------------
 btGImpactMeshShape* makeSphereGImpact(float radius,
-				  int stacks = 18,
-				  int slices = 36)
+									  int stacks = 18,
+									  int slices = 36)
 {
 	static std::vector<btScalar> vertices;
 	static std::vector<int> indices;
@@ -1982,7 +2107,6 @@ static void Init_TestCollisionCableSphere(CableDemo* pdemo)
 
 	btRigidBody* spheres = pdemo->createRigidBody(100000, t, compound);
 	spheres->setSleepingThresholds(0, 0);
-	
 
 	btVector3 groundPos = btVector3(0, -15, 0);
 	btTransform transformGround = btTransform();
@@ -2138,7 +2262,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	btTransform Lest = btTransform();
 	Lest.setIdentity();
 	Lest.setOrigin(btVector3(0, 6.5, 2.8));
-	btRigidBody* LestBody = pdemo->createRigidBody(1000000, Lest, new btBoxShape(btVector3(10, 0.5, 0.5)), 1234);
+	btRigidBody* LestBody = pdemo->createRigidBody(1000000000, Lest, new btBoxShape(btVector3(10, 0.5, 0.5)), 1234);
 
 	// Blue Cube
 	btTransform trAnchorUp = btTransform();
@@ -2158,16 +2282,72 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	trA18.setIdentity();
 	trA18.setOrigin(btVector3(0, 1, 0));
 	btRigidBody* a18 = pdemo->createRigidBody(704, trA18, new btBoxShape(btVector3(4, 5, 0.5)));
+	a18->setMaxLinearVelocity(30);
+	a18->setSleepingThresholds(0, 0);
+
+	// 1. Geometry ----------------------------------------------------------------
+	static const btVector3 kHalfExtents(4.0f, 0.5f, 0.5f);
+	btBoxShape* boxClaw = new btBoxShape(kHalfExtents);
+
+	static const btVector3 kCubeVerts[8] = {
+		{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 0
+		{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 1
+		{kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},    // 2
+		{-kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},   // 3
+		{-kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},   // 4
+		{kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},    // 5
+		{kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()},     // 6
+		{-kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}     // 7
+	};
+
+	// 12 triangles (two per face)
+	static const unsigned int kCubeIdx[36] = {
+		0, 2, 1, 2, 0, 3,  // −Z
+		4, 5, 6, 6, 7, 4,  // +Z
+		0, 5, 4, 5, 0, 1,  // −Y
+		3, 6, 2, 6, 3, 7,  // +Y
+		1, 6, 5, 6, 1, 2,  // +X
+		0, 7, 3, 7, 0, 4   // −X
+	};
+
+	// 2. Fill a btIndexedMesh
+	btIndexedMesh mesh;
+	mesh.m_numTriangles = 12;
+	mesh.m_triangleIndexBase = reinterpret_cast<const unsigned char*>(kCubeIdx);
+	mesh.m_triangleIndexStride = 3 * sizeof(unsigned int);
+	mesh.m_numVertices = 8;
+	mesh.m_vertexBase = reinterpret_cast<const unsigned char*>(kCubeVerts);
+	mesh.m_vertexStride = sizeof(btVector3);
+	mesh.m_indexType = PHY_INTEGER;  // int indices
+	mesh.m_vertexType = PHY_DOUBLE;
+
+	static btTriangleIndexVertexArray triArray;
+	triArray.addIndexedMesh(mesh, PHY_INTEGER);  // stride chosen above
+
+	// 4-m long, 0.5-m diameter
+	btTriangleMesh* cylMesh = buildCylinderMesh(8.0f, 0.45f, 10, 1);
+	btCylinderShapeX* cylShape = new btCylinderShapeX(btVector3(4.0, 0.5, 0.5));
+
+	// 3. Create the GImpact shape
+	btGImpactMeshShape* gimpactShape = new btGImpactMeshShape(&triArray);
+	gimpactShape->updateBound();
+
+	btBvhTriangleMeshShape* triangleShape = new btBvhTriangleMeshShape(gimpactShape->getMeshInterface(), true);
 
 	// Claw
 	btTransform trClaw = btTransform();
 	trClaw.setIdentity();
 	trClaw.setOrigin(btVector3(0, 7.5, 0));
-	btRigidBody* claw = pdemo->createRigidBody(0, trClaw, new btBoxShape(btVector3(4, 0.5, 0.5)), 6789);
-	claw->setCollisionFlags(claw->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+
+	btRigidBody* claw = pdemo->createRigidBody(0, trClaw, boxClaw, 159);
 	claw->m_redirectionTarget = a18;
-	claw->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 6.5, 0));
 	a18->m_kinematicChildren.push_back(claw);
+	claw->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 6.5, 0));
+
+	btRigidBody* clawCC = pdemo->createCableRigidBody(0, trClaw, boxClaw, 123456);
+	claw->m_cableCollision = clawCC;
+	clawCC->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 0, 0));
+	clawCC->m_redirectionTarget = a18;
 
 	// Cable's Waypoints
 	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
@@ -2183,16 +2363,17 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 
 	// Cable
 	btCable* cable = pdemo->createCableWaypoint(resolution, iterations, 1, waypointPos, LestBody, anchorUp, true, true);
-	cable->setFriction(1);
+	cable->setFriction(0);
+	cable->setUseLRA(true);
 	cable->setUseBending(true);
 	cable->setUseCollision(true);
-	cable->setUseLRA(true);
-	cable->getCollisionShape()->setMargin(margin);
+
 	cable->setCollisionMargin(margin);
 	cable->setCollisionResponseActive(true);
-	cable->setCollisionViscosity(50);
-	cable->setCollisionStiffness(0, 10000000, 0, 1);
+	cable->getCollisionShape()->setMargin(margin);
+	cable->setCollisionViscosity(20);
 	cable->setCollisionParameters(3, 3, 0);
+	cable->setCollisionStiffness(0, 100000, 0, 1);
 
 	//cable->setCollisionMode(1);
 
@@ -2201,8 +2382,10 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 		cable->m_anchors[i].BodyMassRatio = 0.000015;
 	}
 	pdemo->SetCameraPosition(btVector3(0, 10, 0));
-}
 
+	///register GIMPACT algorithm
+	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
+}
 
 static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
 {
@@ -2248,12 +2431,15 @@ static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
 	shapeT->setMargin(0);
 	shapeT->setLocalScaling(btVector3(10, 1.5, 1.5));
 
+	btCompoundShape* compound = new btCompoundShape();
+	compound->addChildShape(btTransform::getIdentity(), shape);
+
 	btVector3 duckPosition = btVector3(0, 3.5, 0);
 	btTransform transformDuck = btTransform();
 	transformDuck.setIdentity();
 	transformDuck.setOrigin(duckPosition);
 	transformDuck.setRotation(btQuaternion(btVector3(0, 1, 0), SIMD_PI / 2.0) + btQuaternion(btVector3(0, 0, 1), SIMD_PI / 5.0));
-	btRigidBody* obstacle = pdemo->createRigidBody(0, transformDuck, shape);
+	btRigidBody* obstacle = pdemo->createCableRigidBody(0, transformDuck, compound);
 	obstacle->setSleepingThresholds(0, 0);
 	obstacle->setDamping(0.1, 0.1);
 
@@ -2288,6 +2474,9 @@ static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
 	cable->setCollisionParameters(1, 1, 0);
 
 	pdemo->SetCameraPosition(btVector3(0, 0.5, 0));
+
+	///register GIMPACT algorithm
+	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
 }
 
 static void Init_TestCollisionRingBox(CableDemo* pdemo)
@@ -2553,7 +2742,7 @@ static void Init_TestClaw(CableDemo* pdemo)
 
 	// body
 	auto a = new btBoxShape(btVector3(1, 1, 5));
-	a->setMargin(0.01);
+	a->setMargin(0);
 	btTransform t = btTransform();
 	t.setIdentity();
 	t.setOrigin(btVector3(0, 0, 0));
@@ -2565,12 +2754,12 @@ static void Init_TestClaw(CableDemo* pdemo)
 
 	// Claw
 	auto b = new btBoxShape(btVector3(3, 0.25, 0.25));
-	b->setMargin(0.01);
+	b->setMargin(0);
 	btQuaternion rotation = btQuaternion(btVector3(0, 1, 0), SIMD_PI * 0.45);
 	y.setRotation(rotation);
 	c->addChildShape(y, b);
 
-	btRigidBody* obj = pdemo->createRigidBody(100, blocCompound, c);
+	btRigidBody* obj = pdemo->createCableRigidBody(100, blocCompound, c);
 	obj->setGravity(btVector3(0, 0, 5));
 	obj->getCollisionShape()->setMargin(0);
 
@@ -2630,13 +2819,13 @@ static void Init_TestConstraintClawA18(CableDemo* pdemo)
 	// Lest
 	btTransform transformLest = btTransform::getIdentity();
 	transformLest.setOrigin(btVector3(0, -3, 0));
-	btRigidBody* lest = pdemo->createRigidBody(10, transformLest, new btBoxShape(btVector3(0.1, 0.2, 0.11)));
+	btRigidBody* lest = pdemo->createCableRigidBody(10, transformLest, new btBoxShape(btVector3(0.1, 0.2, 0.11)));
 	lest->getCollisionShape()->setMargin(0);
 
 	// Lest's support
 	btTransform transformLestSupport = btTransform::getIdentity();
 	transformLestSupport.setOrigin(btVector3(0, 3, 0));
-	btRigidBody* lestSupport = pdemo->createRigidBody(0, transformLestSupport, new btBoxShape(btVector3(1, 1, 1)));
+	btRigidBody* lestSupport = pdemo->createCableRigidBody(0, transformLestSupport, new btBoxShape(btVector3(1, 1, 1)));
 	lestSupport->getCollisionShape()->setMargin(0);
 
 	// Cable
@@ -2709,7 +2898,7 @@ static void Init_DetachA18(CableDemo* pdemo)
 	btCollisionShape* a18Shape = new btBoxShape(btVector3(0.4, 0.4, 2));
 
 	// Positions
-	btVector3 a18Position = btVector3(0, 0, 1);
+	btVector3 a18Position = btVector3(0, 0, 10);
 	btVector3 clawPosition = btVector3(0, 1, 0);
 	// Transform
 	btTransform a18Transform = btTransform();
@@ -2726,6 +2915,8 @@ static void Init_DetachA18(CableDemo* pdemo)
 
 	// 1. Geometry ----------------------------------------------------------------
 	static const btVector3 kHalfExtents(0.75, 0.15, 0.1);
+	btCollisionShape* clawShape = new btBoxShape(kHalfExtents);
+	clawShape->setMargin(0.001);
 
 	static const btVector3 kCubeVerts[8] = {
 		{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 0
@@ -2767,12 +2958,14 @@ static void Init_DetachA18(CableDemo* pdemo)
 	// 3. Create the GImpact shape -------------------------------------------------
 	btGImpactMeshShape* gimpactShape = new btGImpactMeshShape(&triArray);
 	gimpactShape->updateBound();
+	gimpactShape->setMargin(0.001);
 
-	btRigidBody* clawBody = pdemo->createRigidBody(0, clawTransform, gimpactShape);
+	btRigidBody* clawBody = pdemo->createCableRigidBody(0, clawTransform, clawShape);
 	clawBody->setCollisionFlags(clawBody->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
 	clawBody->m_redirectionTarget = a18Body;
 	clawBody->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 0, 2.30));
-	a18Body->m_kinematicChildren.push_back(clawBody);
+	// a18Body->m_kinematicChildren.push_back(clawBody);
+	a18Body->m_cableCollision = clawBody;
 
 	/// Create Inspector125 + Lest:
 	// Shapes
@@ -2789,8 +2982,8 @@ static void Init_DetachA18(CableDemo* pdemo)
 	lestTransform.setIdentity();
 	lestTransform.setOrigin(lestPosition);
 	// Rigid bodies
-	btRigidBody* inspector125Body = pdemo->createRigidBody(0, inspector125Transform, inspector125Shape);
-	btRigidBody* lestBody = pdemo->createRigidBody(0, lestTransform, lestShape);
+	btRigidBody* inspector125Body = pdemo->createCableRigidBody(0, inspector125Transform, inspector125Shape);
+	btRigidBody* lestBody = pdemo->createCableRigidBody(0, lestTransform, lestShape);
 
 	/// Create Cable:
 	// Resolution's cable
@@ -2806,7 +2999,7 @@ static void Init_DetachA18(CableDemo* pdemo)
 	cable->setUseCollision(true);
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setCollisionMargin(margin);
-	cable->setUseLRA(false);
+	cable->setUseLRA(true);
 	cable->setCollisionParameters(1, 1, 0);
 
 	// cable->setCollisionParameters(3, 3, 0);
@@ -2936,8 +3129,8 @@ static void Init_MCMVCable(CableDemo* pdemo)
 			btTransform wallTransform = btTransform();
 			wallTransform.setIdentity();
 			wallTransform.setOrigin(btVector3(0, 2, 4.5));
-			mcmvShape->addChildShape(wallTransform, wallBoxShape);
-			mcmvShape->createAabbTreeFromChildren();
+			// mcmvShape->addChildShape(wallTransform, wallShape);
+			// mcmvShape->createAabbTreeFromChildren();
 		}
 
 		// Shape: MCMV - Corner
@@ -2987,8 +3180,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	btTransform mcmvTransform = btTransform();
 	mcmvTransform.setIdentity();
 	// Rigid: MCMV
-	btRigidBody* mcmvBody = pdemo->createRigidBody(0, mcmvTransform, mcmvShape);
-
+	btRigidBody* mcmvBody = pdemo->createCableRigidBody(0, mcmvTransform, mcmvShape);
 
 	/// Left Arm
 	// Shape: Left Arm
@@ -2999,8 +3191,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	leftArmTransform.setIdentity();
 	leftArmTransform.setOrigin(btVector3(2.5, 3, 10));
 	// Rigid: Left Arm
-	btRigidBody* leftArmBody = pdemo->createRigidBody(0, leftArmTransform, leftArmShape);	
-
+	btRigidBody* leftArmBody = pdemo->createRigidBody(0, leftArmTransform, leftArmShape);
 
 	/// Right Arm
 	// Shape: Right Arm
@@ -3012,7 +3203,6 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	rightArmTransform.setOrigin(btVector3(0.5, 1.5, 2.5));
 	// Rigid: Right Arm
 	btRigidBody* rightArmBody = pdemo->createRigidBody(0, rightArmTransform, rightArmShape);
-
 
 	/// Cable
 	// Resolution's cable
@@ -3030,12 +3220,85 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	mcmvCable->getCollisionShape()->setMargin(0.01);
 	mcmvCable->setCableRadius(0.01);
 	mcmvCable->setCollisionMargin(0.01);
-	mcmvCable->setCollisionParameters(2, 3, 0);
+	mcmvCable->setCollisionParameters(3, 3, 0);
 
 	// Register GIMPACT algorithm
 	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
 }
 
+static void Init_RayCastGImpact(CableDemo* pdemo)
+{
+	static const btVector3 kHalfExtents(1.0, 1.0, 1.0);
+
+	// BoxShape
+	{
+		btTransform trCubeBox = btTransform();
+		trCubeBox.setIdentity();
+		trCubeBox.setOrigin(btVector3(5, 3, 0));
+
+		btBoxShape* boxShape = new btBoxShape(kHalfExtents);
+		boxShape->setMargin(0.0);
+
+		btRigidBody* cubeBoxShape = pdemo->createCableRigidBody(10, trCubeBox, boxShape);
+		cubeBoxShape->setGravity(btVector3(0, 0, 0));
+	}
+
+	// GimpactShape
+	{
+		btTransform trCubeGImpact = btTransform();
+		trCubeGImpact.setIdentity();
+		trCubeGImpact.setOrigin(btVector3(5, -3, 0));
+
+		// 8 vertices
+		static const btVector3 kCubeVerts[8] = {
+			{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 0
+			{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 1
+			{kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},    // 2
+			{-kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},   // 3
+			{-kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},   // 4
+			{kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},    // 5
+			{kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()},     // 6
+			{-kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}     // 7
+		};
+
+		// 12 triangles
+		static const unsigned int kCubeIdx[36] = {
+			0, 2, 1, 2, 0, 3,  // −Z
+			4, 5, 6, 6, 7, 4,  // +Z
+			0, 5, 4, 5, 0, 1,  // −Y
+			3, 6, 2, 6, 3, 7,  // +Y
+			1, 6, 5, 6, 1, 2,  // +X
+			0, 7, 3, 7, 0, 4   // −X
+		};
+
+		// Fill a btIndexedMesh
+		btIndexedMesh mesh;
+		mesh.m_numTriangles = 12;
+		mesh.m_triangleIndexBase = reinterpret_cast<const unsigned char*>(kCubeIdx);
+		mesh.m_triangleIndexStride = 3 * sizeof(unsigned int);
+		mesh.m_numVertices = 8;
+		mesh.m_vertexBase = reinterpret_cast<const unsigned char*>(kCubeVerts);
+		mesh.m_vertexStride = sizeof(btVector3);
+		mesh.m_indexType = PHY_INTEGER;  // int indices
+		mesh.m_vertexType = PHY_DOUBLE;
+		static btTriangleIndexVertexArray triArray;
+		triArray.addIndexedMesh(mesh, PHY_INTEGER);
+
+		btTriangleMesh* cylMesh = buildCylinderMesh(1.0f, 0.75f, 16, 1);
+
+		// Create the GImpact shape
+		btGImpactMeshShape* gImpact = new btGImpactMeshShape(&triArray);
+		gImpact->updateBound();
+
+		btBvhTriangleMeshShape* triangleMeshShape = new btBvhTriangleMeshShape(gImpact->getMeshInterface(), true);
+
+		btRigidBody* cubeGImpactShape = pdemo->createCableRigidBody(10, trCubeGImpact, gImpact);
+		cubeGImpactShape->setGravity(btVector3(0, 0, 0));
+	}
+
+	///register GIMPACT algorithm
+	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
+}
 
 static btPoint2PointConstraint* ballJoint;
 static btRigidBody* rod;
@@ -3045,39 +3308,48 @@ btScalar impClamp = 0.0f;
 btScalar rodAngularDamping = 0.0f;
 btScalar rodLinearDamping = 0.0f;
 
-void OnRodAngularDampingChanged(float value, void* userPtr) {
-	if (rod) {
+void OnRodAngularDampingChanged(float value, void* userPtr)
+{
+	if (rod)
+	{
 		rod->setDamping(rod->getLinearDamping(), value);
 	}
 }
 
-void OnRodLinearDampingChanged(float value, void* userPtr) {
-	if (rod) {
+void OnRodLinearDampingChanged(float value, void* userPtr)
+{
+	if (rod)
+	{
 		rod->setDamping(value, rod->getAngularDamping());
 	}
 }
 
-void OnBallJointTauChanged(float value, void* userPtr) {
-
-	if (ballJoint) {
+void OnBallJointTauChanged(float value, void* userPtr)
+{
+	if (ballJoint)
+	{
 		ballJoint->m_setting.m_tau = value;
 	}
 }
 
-void OnBallJointDampingChanged(float value, void* userPtr) {
-	if (ballJoint) {
+void OnBallJointDampingChanged(float value, void* userPtr)
+{
+	if (ballJoint)
+	{
 		ballJoint->m_setting.m_damping = value;
 	}
 }
 
-void OnBallJointImpulseClampChanged(float value, void* userPtr) {
-	if (ballJoint) {
+void OnBallJointImpulseClampChanged(float value, void* userPtr)
+{
+	if (ballJoint)
+	{
 		ballJoint->m_setting.m_impulseClamp = value;
 	}
 }
 
-static void Init_BallJoint(CableDemo* pdemo) {
-	
+static void Init_BallJoint(CableDemo* pdemo)
+{
 	// Shape
 	btCollisionShape* boxShape = new btBoxShape(btVector3(0.5, 2, 0.5));
 	btCollisionShape* ballShape = new btSphereShape(0.2f);
@@ -3097,20 +3369,20 @@ static void Init_BallJoint(CableDemo* pdemo) {
 	btTransform transformKinematic;
 	transformKinematic.setOrigin(btVector3(0, 4, 0));
 	transformKinematic.setRotation(rotation);
-	
+
 	// RB
 	rod = pdemo->createRigidBody(massPhysic, transformPhysic, boxShape);
 	rod->setRestitution(0);
 	rod->setFriction(0.5);
 	rod->setSleepingThresholds(0, 0);
 	rod->setFlags(0);
-	
+
 	btRigidBody* sphere = pdemo->createRigidBody(massKinematic, transformKinematic, ballShape);
 	sphere->setRestitution(0);
 	sphere->setFriction(0.5);
 	sphere->setSleepingThresholds(0, 0);
 	sphere->setFlags(0);
-	
+
 	// Constraint
 	//  To calculate the locals points:
 	//      MatrixLocalA = Identity * LocalPivot
@@ -3124,12 +3396,12 @@ static void Init_BallJoint(CableDemo* pdemo) {
 	//btPoint2PointConstraint* ballJoint = new btPoint2PointConstraint(*sphere, *rod, frameInA.getOrigin(), frameInB.getOrigin());
 	ballJoint = new btPoint2PointConstraint(*sphere, *rod, frameInA.getOrigin(), frameInB.getOrigin());
 	ballJoint->setOverrideNumSolverIterations(256);
-	
+
 	// Constraint settings
 	ballJoint->m_setting.m_tau = tau;
 	ballJoint->m_setting.m_damping = damping;
 	ballJoint->m_setting.m_impulseClamp = impClamp;
-	
+
 	SliderParams sliderTau("tau", &tau);
 	sliderTau.m_minVal = 0;
 	sliderTau.m_maxVal = 1;
@@ -3139,7 +3411,7 @@ static void Init_BallJoint(CableDemo* pdemo) {
 	sliderDamp.m_minVal = 0;
 	sliderDamp.m_maxVal = 1;
 	sliderDamp.m_callback = OnBallJointDampingChanged;
-	
+
 	SliderParams sliderImp("impulseClamp", &impClamp);
 	sliderImp.m_minVal = 0;
 	sliderImp.m_maxVal = 1;
@@ -3154,21 +3426,21 @@ static void Init_BallJoint(CableDemo* pdemo) {
 	sliderRodLinearDamping.m_minVal = 0;
 	sliderRodLinearDamping.m_maxVal = 1;
 	sliderRodLinearDamping.m_callback = OnRodLinearDampingChanged;
-	
+
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderTau);
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderDamp);
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderImp);
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderRodAngularDamping);
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderRodLinearDamping);
-	
+
 	pdemo->getDynamicsWorld()->addConstraint(ballJoint);
 }
 
-static void Init_FixedJoint(CableDemo* pdemo) {
-	
+static void Init_FixedJoint(CableDemo* pdemo)
+{
 	// Shape
-	btCollisionShape* rodShape = new btCylinderShape(btVector3(0.2, 0.5, 0.2));
-	btCollisionShape* cubeShape = new btBoxShape(btVector3(0.5, 0.5, 0.5));
+	btCollisionShape* boxShape = new btCylinderShape(btVector3(0.2, 1, 0.2));
+	btCollisionShape* cubeShape = new btBoxShape(btVector3(1, 1, 1));
 	btCollisionShape* planeShape = new btBoxShape(btVector3(10, 0.1, 10));
 
 	// Masses
@@ -3181,9 +3453,9 @@ static void Init_FixedJoint(CableDemo* pdemo) {
 	btQuaternion rotationRod(0, 0, 1.5708);
 
 	// Transform
-	btTransform transformRod;
-	transformRod.setOrigin(btVector3(-2.2f, 2, 0));
-	transformRod.setRotation(rotationRod);
+	btTransform transformBox;
+	transformBox.setOrigin(btVector3(-2.2f, 2, 0));
+	transformBox.setRotation(rotationRod);
 
 	btTransform transformCube;
 	transformCube.setOrigin(btVector3(0, 2, 0));
@@ -3192,27 +3464,25 @@ static void Init_FixedJoint(CableDemo* pdemo) {
 	btTransform transformPlane;
 	transformPlane.setOrigin(btVector3(0, 0, 0));
 	transformPlane.setRotation(rotation);
-	
+
 	// RB
-	btRigidBody* rod = pdemo->createRigidBody(massRod, transformRod, rodShape);
-	rod->setMassProps(massRod, btVector3(9.333333f, 9.333333f, 2.0f));
+	btRigidBody* rod = pdemo->createRigidBody(massRod, transformBox, boxShape);
+	rod->setMassProps(massRod, btVector3(5.583, 5.583, 0.5f));
 	rod->setRestitution(0);
 	rod->setFriction(0.5);
 	rod->setSleepingThresholds(0, 0);
 	rod->setFlags(0);
-	
+
 	btRigidBody* cube = pdemo->createRigidBody(massCube, transformCube, cubeShape);
-	cube->setMassProps(massCube, btVector3(85.58335f, 85.58335f, 85.58335f));
-	cube->setRestitution(0);
-	cube->setFriction(0.5);
+
 	cube->setSleepingThresholds(0, 0);
 	cube->setFlags(0);
-	
+
 	btRigidBody* plane = pdemo->createRigidBody(massKinematic, transformPlane, planeShape);
 	plane->setSleepingThresholds(0, 0);
 	plane->setFriction(0.5);
 	plane->setFlags(0);
-	
+
 	// Constraint
 	//  To calculate the locals points:
 	//      MatrixLocalA = Identity * LocalPivot
@@ -3224,12 +3494,7 @@ static void Init_FixedJoint(CableDemo* pdemo) {
 	btTransform frameWorld = rod->getWorldTransform() * framePivot;
 	btTransform frameA = rod->getWorldTransform().inverse() * frameWorld;
 	btTransform frameB = cube->getWorldTransform().inverse() * frameWorld;
-	btFixedConstraint* fixed = pdemo->createFixedConstraint(*rod, *cube, frameA, frameB, 1000);
-
-	b3Printf("frameA: %f %f %f\n", frameA.getOrigin().getX(), frameA.getOrigin().getY(), frameA.getOrigin().getZ());
-	b3Printf("frameB: %f %f %f\n", frameB.getOrigin().getX(), frameB.getOrigin().getY(), frameB.getOrigin().getZ());
-	b3Printf("Rod inertia matrix: %f %f %f\n", rod->getLocalInertia().getX(), rod->getLocalInertia().getY(), rod->getLocalInertia().getZ());
-	b3Printf("Cube inertia matrix: %f %f %f\n", cube->getLocalInertia().getX(), cube->getLocalInertia().getY(), cube->getLocalInertia().getZ());
+	btFixedConstraint* fixed = pdemo->createFixedConstraint(*rod, *cube, frameA, frameB, 256);
 }
 
 void (*demofncs[])(CableDemo*) =
@@ -3261,8 +3526,8 @@ void (*demofncs[])(CableDemo*) =
 		Init_DetachA18,
 		Init_MCMVCable,
 		Init_BallJoint,
-		Init_FixedJoint
-};
+		Init_FixedJoint,
+		Init_RayCastGImpact};
 
 ////////////////////////////////////
 ///for mouse picking
@@ -3502,7 +3767,7 @@ void CableDemo::initPhysics()
 	m_guiHelper->autogenerateGraphicsObjects(m_dynamicsWorld);
 
 	// register GIMPACT algorithm
-	btGImpactCollisionAlgorithm::registerAlgorithm((btCollisionDispatcher*) m_dynamicsWorld->getDispatcher());
+	btGImpactCollisionAlgorithm::registerAlgorithm((btCollisionDispatcher*)m_dynamicsWorld->getDispatcher());
 }
 
 void CableDemo::exitPhysics()
