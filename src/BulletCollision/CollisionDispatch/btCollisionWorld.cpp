@@ -436,6 +436,14 @@ void btCollisionWorld::rayTestSingleInternal(const btTransform& rayFromTrans, co
 				rcb.m_hitFraction = resultCallback.m_closestHitFraction;
 				triangleMesh->performRaycast(&rcb, rayFromLocal, rayToLocal);
 			}
+			else if (collisionShape->getShapeType() == GIMPACT_SHAPE_PROXYTYPE)
+			{
+				btGImpactMeshShape* gImpactMesh = (btGImpactMeshShape*)collisionShape;
+
+				BridgeTriangleRaycastCallback rcb(rayFromLocal, rayToLocal, &resultCallback, collisionObjectWrap->getCollisionObject(), colObjWorldTransform, margin);
+				rcb.m_hitFraction = resultCallback.m_closestHitFraction;
+				gImpactMesh->processAllTrianglesRay(&rcb, rayFromLocal, rayToLocal);
+			}
 			else if (collisionShape->getShapeType() == SCALED_TRIANGLE_MESH_SHAPE_PROXYTYPE)
 			{
 				///optimized version for btScaledBvhTriangleMeshShape

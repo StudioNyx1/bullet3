@@ -49,7 +49,7 @@ void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId,
 	const btScalar dist = vert0.dot(triangleNormal);
 	btScalar dist_a = triangleNormal.dot(m_from);
 	dist_a -= dist;
-	btScalar dist_b = triangleNormal.dot(m_to);
+	btScalar dist_b = triangleNormal.dot(m_to + (m_to - m_from).normalized() * FLT_EPSILON);
 	dist_b -= dist;
 
 	if (dist_a * dist_b >= btScalar(0.0))
