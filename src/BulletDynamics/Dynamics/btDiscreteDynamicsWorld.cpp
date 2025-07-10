@@ -257,7 +257,7 @@ void btDiscreteDynamicsWorld::saveKinematicState(btScalar timeStep)
 	{
 		btCollisionObject* colObj = m_collisionObjects[i];
 		btRigidBody* body = btRigidBody::upcast(colObj);
-		if (body && body->isKinematicObject())
+		if (body && body->isStaticOrKinematicObject())
 		{
 			// Save the kinematic's position for the current frame
 			body->saveKinematicState(timeStep);
@@ -271,7 +271,7 @@ void btDiscreteDynamicsWorld::syncKinematicState()
 	{
 		btCollisionObject* colObj = m_collisionObjects[i];
 		btRigidBody* body = btRigidBody::upcast(colObj);
-		if (body && body->isKinematicObject())
+		if (body && body->isStaticOrKinematicObject())
 		{
 			// Update the kinematic's position for the next frame
 			body->syncKinematicState();
@@ -288,7 +288,7 @@ void btDiscreteDynamicsWorld::saveKinematicVelocity(btScalar timeStep)
 	{
 		btCollisionObject* colObj = m_collisionObjects[i];
 		btRigidBody* body = btRigidBody::upcast(colObj);
-		if (body && body->isKinematicObject())
+		if (body && body->isStaticOrKinematicObject())
 		{
 			// Calculate the kinematic's velocity
 			body->saveKinematicVelocity(timeStep);

@@ -183,6 +183,8 @@ void btRigidBody::saveKinematicState(btScalar timeStep)
 void btRigidBody::syncKinematicState()
 {
 	m_interpolationWorldTransform = m_startStepWorldTransform;
+	m_interpolationLinearVelocity = m_linearVelocity;
+	m_interpolationAngularVelocity = m_angularVelocity;
 }
 
 void btRigidBody::getAabb(btVector3& aabbMin, btVector3& aabbMax) const
