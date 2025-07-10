@@ -2361,17 +2361,17 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 
 	// Cable
 	btCable* cable = pdemo->createCableWaypoint(resolution, iterations, 1, waypointPos, LestBody, anchorUp, true, true);
-	cable->setFriction(0);
+	cable->setFriction(1);
 	cable->setUseLRA(true);
-	cable->setUseBending(true);
-	cable->setUseCollision(true);
-
-	cable->setCollisionMargin(margin);
-	cable->setCollisionResponseActive(true);
+	cable->setUseBending(false);
 	cable->getCollisionShape()->setMargin(margin);
-	cable->setCollisionViscosity(20);
+
+	cable->setUseCollision(true);
+	cable->setCollisionViscosity(50);
+	cable->setCollisionMargin(margin);
 	cable->setCollisionParameters(3, 3, 0);
-	cable->setCollisionStiffness(0, 100000, 0, 1);
+	cable->setCollisionResponseActive(true);
+	cable->setCollisionStiffness(0, 10000000, 0, 1);
 
 	//cable->setCollisionMode(1);
 

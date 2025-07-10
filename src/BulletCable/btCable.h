@@ -198,14 +198,13 @@ private:
 	void distanceConstraintLock(int limMin, int limMax);
 	void LRAConstraint();
 	void LRAHierachique();
-	void DistanceHierachy(int indexStart, int indexEnd);
-	void LRAConstraintNode();
+	void distanceHierachy(int indexStart, int indexEnd);
 	btVector3 fastTrigoPositionCompute(Node* n);
 
 	void predictMotion(btScalar dt) override;
 	void solveConstraints() override;
 	void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
-	void ResolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
+	void resolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
 	void anchorConstraint(bool& impacted);
 
 	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
@@ -226,7 +225,7 @@ private:
 
 	void resetManifoldLifeTime();
 	void clearManifoldContact();
-	void UpdateManifoldBroadphase(btAlignedObjectArray<BroadPhasePair*> broadphasePair);
+	void updateManifoldBroadphase(btAlignedObjectArray<BroadPhasePair*> broadphasePair);
 
 	void updateNodeDeltaPos(int iteration);
 
