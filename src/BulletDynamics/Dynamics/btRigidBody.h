@@ -575,7 +575,7 @@ public:
 	inline void setLinearVelocity(const btVector3& lin_vel)
 	{
 		m_updateRevision++;
-		m_linearVelocity = lin_vel;
+		m_linearVelocity = lin_vel * m_linearFactor;
 		#if defined(BT_CLAMP_VELOCITY_TO) && BT_CLAMP_VELOCITY_TO > 0
 		clampVelocity(m_linearVelocity);
 		#endif
@@ -584,7 +584,7 @@ public:
 	inline void setAngularVelocity(const btVector3& ang_vel)
 	{
 		m_updateRevision++;
-		m_angularVelocity = ang_vel;
+		m_angularVelocity = ang_vel * m_angularFactor;
 		#if defined(BT_CLAMP_VELOCITY_TO) && BT_CLAMP_VELOCITY_TO > 0
 		clampVelocity(m_angularVelocity);
 		#endif
