@@ -651,7 +651,6 @@ void btCable::solveConstraints()
 			btCollisionObject* colObj = objects[w];
 
 			if (colObj->getInternalType() != CO_RIGID_BODY)
-
 			{
 				continue;
 			}
@@ -1333,15 +1332,15 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 				continue;
 			}
 
-			btCollisionWorld::ClosestRayResultCallback m_resultCallback = castRay(positionStart, positionEnd, temp, margin);
-			if (m_resultCallback.hasHit())
+			btCollisionWorld::ClosestRayResultCallback result = castRay(positionStart, positionEnd, temp, margin);
+			if (result.hasHit())
 			{
 				n->collide = true;
 				if (n->topMargin < margin)
 					n->topMargin = margin;
 
-				btVector3 contact = m_resultCallback.m_hitPointWorld;
-				btVector3 normal = m_resultCallback.m_hitNormalWorld;
+				btVector3 contact = result.m_hitPointWorld;
+				btVector3 normal = result.m_hitNormalWorld;
 
 				setRayResult(positionStart, contact, normal, n, temp);
 
@@ -1385,17 +1384,17 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 						NodePairNarrowPhase* contact = &nodePairContact->at(contactIndex);
 
 						margin = computeCollisionMargin(shape);
-						btCollisionWorld::ClosestRayResultCallback m_resultCallback = castRay(node->hitPosition[0], newPos, contact, margin);
+						btCollisionWorld::ClosestRayResultCallback result = castRay(node->hitPosition[0], newPos, contact, margin);
 
 						// Cast ray from m_x to newPos;
-						if (m_resultCallback.hasHit())
+						if (result.hasHit())
 						{
 							// That means we replace the node in an other body
-							btVector3 contactPoint = m_resultCallback.m_hitPointWorld;
-							btVector3 normal = m_resultCallback.m_hitNormalWorld;
+							btVector3 contact = result.m_hitPointWorld;
+							btVector3 normal = result.m_hitNormalWorld;
 
 							node->normals[1] = normal;
-							node->hitPosition[1] = contactPoint;
+							node->hitPosition[1] = contact;
 
 							btVector3 temp = fastTrigoPositionCompute(node);
 							newPos = temp;
@@ -1406,8 +1405,6 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 				{
 					if (nbCorrection == 2)
 					{
-						btScalar dist = (node->hitPosition[0] - node->hitPosition[1]).length();
-
 						btVector3 temp = fastTrigoPositionCompute(node);
 						newPos = temp;
 					}
@@ -1456,22 +1453,6 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 		{
 			temp->m_Xout = temp->node->m_x;
 		}
-	}
-}
-
-void btCable::setupNodeForCollision(btAlignedObjectArray<int>* indexNodeContact)
-{
-	Node* n;
-	for (int i = 0; i < indexNodeContact->size(); i++)
-	{
-		n = &m_nodes.at(indexNodeContact->at(i));
-		n->collide = false;
-		n->posBeforeCollision = n->m_x;
-		for (int nbCollide = 0; nbCollide < n->m_nbCollidingObjectPotential; nbCollide++)
-		{
-			n->narrowPhaseIndex[nbCollide] = -1;
-		}
-		n->topMargin = 0;
 	}
 }
 
@@ -1557,15 +1538,15 @@ void btCable::solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nod
 				continue;
 			}
 
-			btCollisionWorld::ClosestRayResultCallback m_resultCallback = castRay(positionStart, positionEnd, temp, margin);
-			if (m_resultCallback.hasHit())
+			btCollisionWorld::ClosestRayResultCallback result = castRay(positionStart, positionEnd, temp, margin);
+			if (result.hasHit())
 			{
 				n->collide = true;
 				if (n->topMargin < margin)
 					n->topMargin = margin;
 
-				btVector3 contact = m_resultCallback.m_hitPointWorld;
-				btVector3 normal = m_resultCallback.m_hitNormalWorld;
+				btVector3 contact = result.m_hitPointWorld;
+				btVector3 normal = result.m_hitNormalWorld;
 
 				setRayResult(positionStart, contact, normal, n, temp);
 			}
@@ -1602,17 +1583,17 @@ void btCable::solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nod
 						NodePairNarrowPhase* contact = &nodePairContact->at(contactIndex);
 
 						margin = computeCollisionMargin(shape);
-						btCollisionWorld::ClosestRayResultCallback m_resultCallback = castRay(node->hitPosition[0], newPos, contact, margin);
+						btCollisionWorld::ClosestRayResultCallback result = castRay(node->hitPosition[0], newPos, contact, margin);
 
 						// Cast ray from m_x to newPos;
-						if (m_resultCallback.hasHit())
+						if (result.hasHit())
 						{
 							// That means we replace the node in an other body
-							btVector3 contactPoint = m_resultCallback.m_hitPointWorld;
-							btVector3 normal = m_resultCallback.m_hitNormalWorld;
+							btVector3 contact = result.m_hitPointWorld;
+							btVector3 normal = result.m_hitNormalWorld;
 
 							node->normals[1] = normal;
-							node->hitPosition[1] = contactPoint;
+							node->hitPosition[1] = contact;
 
 							btVector3 temp = fastTrigoPositionCompute(node);
 							newPos = temp;
@@ -1623,8 +1604,6 @@ void btCable::solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nod
 				{
 					if (nbCorrection == 2)
 					{
-						btScalar dist = (node->hitPosition[0] - node->hitPosition[1]).length();
-
 						btVector3 temp = fastTrigoPositionCompute(node);
 						newPos = temp;
 					}
@@ -1655,6 +1634,22 @@ void btCable::solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nod
 	}
 }
 
+void btCable::setupNodeForCollision(btAlignedObjectArray<int>* indexNodeContact)
+{
+	Node* n;
+	for (int i = 0; i < indexNodeContact->size(); i++)
+	{
+		n = &m_nodes.at(indexNodeContact->at(i));
+		n->collide = false;
+		n->posBeforeCollision = n->m_x;
+		for (int nbCollide = 0; nbCollide < n->m_nbCollidingObjectPotential; nbCollide++)
+		{
+			n->narrowPhaseIndex[nbCollide] = -1;
+		}
+		n->topMargin = 0;
+	}
+}
+
 void btCable::resolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact)
 {
 	Node* node;
@@ -1679,12 +1674,15 @@ void btCable::resolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>* node
 				nodeAfter = &m_nodes.at(i);
 
 				if (!nodeAfter->collideInAllIteration)
+				{
 					indexDist--;
-
+				}
 				else
-					indexDist = distSectorMax;
-				if (indexDist == 0)
+				{
+					indexDist = distSectorMax;	
+				}
 
+				if (indexDist == 0)
 				{
 					continousSector = false;
 					limitMax = i;
@@ -1836,14 +1834,14 @@ btCollisionWorld::ClosestRayResultCallback btCable::castRay(btVector3 positionSt
 	btTransform m_rayToTrans = btTransform::getIdentity();
 	m_rayToTrans.setOrigin(endRay);
 
-	btCollisionWorld::ClosestRayResultCallback m_resultCallback(startRay, endRay);
+	btCollisionWorld::ClosestRayResultCallback result(startRay, endRay);
 	if (startRay.distance(endRay) > FLT_EPSILON)
 	{
 		m_world->rayTestSingleWithMargin(m_rayFromTrans, m_rayToTrans,
 			contact->pair->body, contact->collisionShape,contact->worldToLocal,
-			m_resultCallback, margin);
+			result, margin);
 	}
-	return m_resultCallback;
+	return result;
 }
 
 btScalar btCable::computeCollisionMargin(btCollisionShape* shape)
