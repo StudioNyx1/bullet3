@@ -21,6 +21,8 @@
 #include <iostream>
 
 #include "cubic_spline.hpp"
+#include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
+#include "BulletCollision/CollisionShapes/btTriangleShape.h"
 
 
 using namespace std;
@@ -41,33 +43,6 @@ public:
 ///Its purpose is to be able to create a cable/rope with our own method parameters that Bullet does not implement.
 class btCable : public btSoftBody
 {
-	struct BroadPhasePair
-	{
-		btCollisionObject* body;
-		int bodyType;
-		bool haveManifoldsRegister;
-		btPersistentManifold* manifold;
-		btVector3 totalImpulse;
-		btVector3 applicationPoint;
-		int count;
-	};
-
-	struct NodePairNarrowPhase
-	{
-		Node* node;
-		btVector3 m_Xout;
-		btCollisionShape* collisionShape;
-		BroadPhasePair* pair;
-		btTransform worldToLocal;
-		btVector3 impulse;
-		btVector3 lastPosition;
-		btVector3 normal;
-
-		btScalar distance;
-		bool hit = false;
-		bool hitInIteration = false;
-	};
-
 	enum class CollisionMode
 	{
 		Linear = 0,
@@ -133,6 +108,129 @@ public :
 		float volume;
 	};
 	static const std::size_t NodeDataSize = sizeof(NodeData);
+
+	struct BroadPhasePair
+	{
+		Node* node;
+		btVector3 minLink;
+		btVector3 maxLink;
+		btCollisionObject* body;
+		int bodyType;
+	};
+
+	struct NodePairNarrowPhase
+	{
+		Node* node;
+		int numContacts;
+		std::vector<btVector3> m_Xouts;
+		std::vector<btVector3> normals;
+		BroadPhasePair* pair;
+		btTransform worldTransform;
+
+		btPersistentManifold* manifold = nullptr;
+		bool haveManifoldsRegister = false;
+		std::vector<btScalar> distances;
+	};
+
+	struct CollisionState {
+		btVector3              posBefore;
+		btVector3              accumulatedShift = btVector3(0,0,0);
+		int                    hitCount         = 0;
+		btScalar               topMargin        = 0;
+		std::array<btVector3,2> normals;
+		std::array<btVector3,2> hits;
+		bool                   collided         = false;
+		bool                   everCollided     = false;
+		std::array<int,2>      phaseIdx         = {{ -1, -1 }};
+	};
+
+	struct RayJob {
+		int                    nodeIdx;
+		NodePairNarrowPhase*   pair;
+		int                    rayIdx;
+		btVector3              from, to;
+		btScalar               margin;
+	};
+
+	struct ObjData {
+		btCollisionObject* obj;
+		btVector3          minAabb, maxAabb;
+		btVector3          objVelocity;
+	};
+
+	struct ContactInfo {
+		btVector3 point;
+		btVector3 normal;
+		btScalar distance;
+	};
+
+	struct MyContactResultCallback : btCollisionWorld::ContactResultCallback
+	{
+		btScalar m_margin;
+		btCollisionObject* A;
+		btCollisionObject* B;
+
+		std::vector<ContactInfo> contacts;
+		int numContacts = 0;
+
+		MyContactResultCallback(btScalar pMargin,
+		                        btCollisionObject* pA,
+		                        btCollisionObject* pB)
+			: m_margin(pMargin), A(pA), B(pB)
+			{
+				contacts.reserve(4);
+			}
+
+		/// This is called for *each* contact point Bullet finds.
+		btScalar addSingleResult(btManifoldPoint& cp,
+		                                 const btCollisionObjectWrapper* colliderA, int partId0, int index0,
+		                                 const btCollisionObjectWrapper* colliderB, int partId1, int index1) override
+		{
+			btScalar dist = cp.getDistance();
+			if (dist > m_margin) {
+				// outside your tolerance → ignore
+				return 0;
+			}
+
+			// Determine ordering (which wrapper corresponds to A and B)
+			bool orderIsAB = (colliderA->m_collisionObject == A &&
+				colliderB->m_collisionObject == B);
+
+			// Back-face culling on triangle shapes
+			if (colliderB->m_shape->getShapeType() == TRIANGLE_SHAPE_PROXYTYPE) {
+			        const btTriangleShape* tri =
+			            static_cast<const btTriangleShape*>(colliderB->getCollisionShape());
+			        btVector3 triNormal;
+			        tri->calcNormal(triNormal);
+		    		
+			        // cp.m_normalWorldOnB points *out* of B
+			        if (triNormal.dot(cp.m_normalWorldOnB) < 0)
+			        {
+					// hit on the back side → skip
+					return 0;
+			        }
+			}
+
+			// assemble contact info
+			ContactInfo info;
+			if (orderIsAB)
+			{
+				info.point   = cp.getPositionWorldOnB();
+				info.normal  = cp.m_normalWorldOnB;
+			} else
+			{
+				info.point   = cp.getPositionWorldOnA();
+				info.normal  = -cp.m_normalWorldOnB;
+			}
+
+			info.distance = dist;
+
+			contacts.push_back(info);
+			numContacts++;
+			
+			return 0;
+		}
+	};
 
 private:
 	// Growing state for Unity control
@@ -201,29 +299,29 @@ private:
 	void LRAConstraint();
 	void LRAHierachique();
 	void distanceHierachy(int indexStart, int indexEnd);
-	btVector3 fastTrigoPositionCompute(Node* n);
+	btVector3 fastTrigoPositionCompute(CollisionState*state);
 
 	void predictMotion(btScalar dt) override;
 	void solveConstraints() override;
-	void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
-	void resolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
+	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink) ;
+	void resolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>*nodePairContact,btAlignedObjectArray<CollisionState>*collisionStates);
 	void anchorConstraint(bool& impacted);
 
-	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* indexNodeContact);
-	void solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, int limitMin, int limitMax);
+	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>*nodePairContact, btAlignedObjectArray<CollisionState>*collisionStates,btAlignedObjectArray<int>*indexNodeContact);
+	void solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>*nodePairContact, btAlignedObjectArray<CollisionState>*collisionStates, int limitLow,int limitHigh);
 	btVector3 calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
 
 	// Methods for collision
-	void setupNodeForCollision(btAlignedObjectArray<int>* indexNodeContact);
-	void resetNormalAndHitPosition(btAlignedObjectArray<int>* indexNodeContact);
+	void setupNodeForCollision(btAlignedObjectArray<int>*indexNodeContact);
+	void resetNormalAndHitPosition(btAlignedObjectArray<int>*indexNodeContact);
 
 	void updateContactPos(Node* n, int position, int step);
 	bool checkCondition(Node* n, int step);
 	btScalar computeCollisionMargin(btCollisionShape* shape);
-	btCollisionWorld::ClosestRayResultCallback castRay(btVector3 positionStart, btVector3 positionEnd, NodePairNarrowPhase* contact, btScalar margin);
-	void setRayResult(const btVector3 positionStart, const btVector3 contact, const btVector3 normal, Node* n, NodePairNarrowPhase* temp);
-	void recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCollisionShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact,
-							 btVector3 minLink, btVector3 maxLink, btTransform worldToLocal);
+	btCollisionWorld::ClosestRayResultCallback castRay(btVector3 positionStart, btVector3 positionEnd, NodePairNarrowPhase*contact, btScalar margin);
+	void setRayResult(const btVector3 &positionStart,  btVector3 contactPoint, const btVector3 &normal, Node*n,NodePairNarrowPhase*temp,int rayIndex);
+	void recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCollisionShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* nodeIndexOut,
+							 btVector3 minLink, btVector3 maxLink, btTransform* worldTransform);
 
 	void resetManifoldLifeTime();
 	void clearManifoldContact();
@@ -232,6 +330,18 @@ private:
 	void updateNodeDeltaPos(int iteration);
 
 	btScalar getLinkRestLength(int index);
+
+	void detectCollisionsThreaded(btAlignedObjectArray<int> * bt_aligned_objects, btAlignedObjectArray<NodePairNarrowPhase> * node_pair_contact);
+	void detectCollisions(btAlignedObjectArray<int>* bt_aligned_objects, btAlignedObjectArray<NodePairNarrowPhase>* node_pair_contact, btAlignedObjectArray<BroadPhasePair*>* broadPhaseOut);
+
+	void collectPotentials(btCollisionObjectArray &collisionObjectArray, std::vector<btCollisionObject*>& out) const;
+	void buildObjData(const std::vector<btCollisionObject*>& pots,
+			  std::vector<ObjData>& out) const;
+	void runBroadPhase(std::vector<ObjData>& data, std::vector<BroadPhasePair>* candidates);	
+	void runNarrowPhase(std::vector<BroadPhasePair>& cands,
+			    btAlignedObjectArray<int>* indexNodeContact,
+			    btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact);
+	bool aabbTestMargin(  btVector3 nodeVel,btVector3 objVel,btVector3 nodeMinAabb,btVector3 nodeMaxAabb,btVector3 minAabb,btVector3 maxAabb);
 
 public:
 	btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m);
@@ -379,6 +489,8 @@ public:
 
 	void synchNodesInfos();
 	void setMaxTension(btScalar maxTension);
+
+	bool shouldTestObject(btCollisionObject*colObj) const;
 
 #pragma endregion
 };

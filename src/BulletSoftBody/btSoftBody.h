@@ -300,10 +300,8 @@ public:
 	};
 	struct Node : Feature
 	{
-		btScalar areColliding;
 		btVector3 m_x;       // Position
 		btVector3 m_xn;      // Previous position from the last step, not the substep
-		btVector3 m_xOut;	 // Previous step position/Test position
 		int m_nbCollidingObjectPotential;  // Number of element in potential collision
 		int m_nbCollidingObjectInFrame;  // Number of element in collision
 		btVector3 m_q;       // Previous step position/Test position
@@ -320,18 +318,9 @@ public:
 		btVector3 m_splitv;               // velocity associated with split impulse
 		btMatrix3x3 m_effectiveMass;      // effective mass in contact
 		btMatrix3x3 m_effectiveMass_inv;  // inverse of effective mass
-		btVector3 posBeforeCollision;
-		btVector3 positionCollision;
-
-		btVector3* normals;
-		btVector3* hitPosition;
-		int* narrowPhaseIndex;
-		btScalar topMargin;
-
-		bool collide;
-		bool collideInAllIteration;
 
 		btVector3 posPreviousIteration;
+		bool collideInAllIteration;
 		bool computeNodeConstraint;
 		int cptIteration;
 
@@ -353,7 +342,6 @@ public:
 	ATTRIBUTE_ALIGNED16(struct)
 	Link : Feature
 	{
-		btScalar nbCollision;
 		btVector3 m_c3;      // gradient
 		Node* m_n[2];        // Node pointers
 		btScalar m_rl;       // Rest length
