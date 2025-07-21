@@ -1,29 +1,17 @@
 #ifndef _BT_CABLE_H
 #define _BT_CABLE_H
-#include "LinearMath/btAlignedObjectArray.h"
-#include "LinearMath/btTransform.h"
-#include "LinearMath/btIDebugDraw.h"
-#include "LinearMath/btVector3.h"
-#include "LinearMath/btMinMax.h"
-#include "BulletDynamics/Dynamics/btRigidBody.h"
-
-#include "BulletCollision/CollisionShapes/btConcaveShape.h"
-#include "BulletCollision/CollisionDispatch/btCollisionCreateFunc.h"
-#include "BulletCollision/BroadphaseCollision/btDbvt.h"
-#include "BulletDynamics/Featherstone/btMultiBodyLinkCollider.h"
-#include "BulletDynamics/Featherstone/btMultiBodyConstraint.h"
-#include "BulletSoftBody/btSoftBody.h"
-#include "BulletCollision/CollisionDispatch/btCollisionWorld.h"
-#include <BulletCollision/CollisionShapes/btCompoundShape.h>
-#include <list>
-#include <vector>
-#include <omp.h>
-#include <iostream>
 
 #include "cubic_spline.hpp"
-#include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
+#include "LinearMath/btVector3.h"
+#include "LinearMath/btTransform.h"
+#include "BulletSoftBody/btSoftBody.h"
+#include "LinearMath/btAlignedObjectArray.h"
 #include "BulletCollision/CollisionShapes/btTriangleShape.h"
+#include "BulletCollision/CollisionDispatch/btCollisionWorld.h"
+#include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
 
+#include <vector>
+#include <BulletCollision/CollisionShapes/btCompoundShape.h>
 
 using namespace std;
 
@@ -132,18 +120,6 @@ public :
 		std::vector<btScalar> distances;
 	};
 
-	struct CollisionState {
-		btVector3              posBefore;
-		btVector3              accumulatedShift = btVector3(0,0,0);
-		int                    hitCount         = 0;
-		btScalar               topMargin        = 0;
-		std::array<btVector3,2> normals;
-		std::array<btVector3,2> hits;
-		bool                   collided         = false;
-		bool                   everCollided     = false;
-		std::array<int,2>      phaseIdx         = {{ -1, -1 }};
-	};
-
 	struct RayJob {
 		int                    nodeIdx;
 		NodePairNarrowPhase*   pair;
@@ -175,11 +151,10 @@ public :
 
 		MyContactResultCallback(btScalar pMargin,
 		                        btCollisionObject* pA,
-		                        btCollisionObject* pB)
-			: m_margin(pMargin), A(pA), B(pB)
-			{
-				contacts.reserve(4);
-			}
+		                        btCollisionObject* pB) : m_margin(pMargin), A(pA), B(pB)
+		{
+			contacts.reserve(4);
+		}
 
 		/// This is called for *each* contact point Bullet finds.
 		btScalar addSingleResult(btManifoldPoint& cp,
@@ -198,16 +173,15 @@ public :
 
 			// Back-face culling on triangle shapes
 			if (colliderB->m_shape->getShapeType() == TRIANGLE_SHAPE_PROXYTYPE) {
-			        const btTriangleShape* tri =
-			            static_cast<const btTriangleShape*>(colliderB->getCollisionShape());
+			        const btTriangleShape* tri = static_cast<const btTriangleShape*>(colliderB->getCollisionShape());
 			        btVector3 triNormal;
 			        tri->calcNormal(triNormal);
 		    		
 			        // cp.m_normalWorldOnB points *out* of B
 			        if (triNormal.dot(cp.m_normalWorldOnB) < 0)
 			        {
-					// hit on the back side → skip
-					return 0;
+						// hit on the back side → skip
+						return 0;
 			        }
 			}
 
@@ -307,7 +281,7 @@ private:
 	void resolveConflitZone(btAlignedObjectArray<NodePairNarrowPhase>*nodePairContact,btAlignedObjectArray<CollisionState>*collisionStates);
 	void anchorConstraint(bool& impacted);
 
-	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>*nodePairContact, btAlignedObjectArray<CollisionState>*collisionStates,btAlignedObjectArray<int>*indexNodeContact);
+	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>*nodePairContact, btAlignedObjectArray<int>*indexNodeContact);
 	void solveContactLimited(btAlignedObjectArray<NodePairNarrowPhase>*nodePairContact, btAlignedObjectArray<CollisionState>*collisionStates, int limitLow,int limitHigh);
 	btVector3 calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
 

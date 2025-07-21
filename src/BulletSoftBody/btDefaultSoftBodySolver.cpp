@@ -18,6 +18,9 @@ subject to the following restrictions:
 #include "BulletCollision/CollisionShapes/btCollisionShape.h"
 
 #include "btDefaultSoftBodySolver.h"
+
+#include <omp.h>
+
 #include "BulletCollision/CollisionShapes/btCapsuleShape.h"
 #include "BulletSoftBody/btSoftBody.h"
 #include <BulletCable/btCable.h>

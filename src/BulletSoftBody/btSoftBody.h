@@ -18,6 +18,8 @@ subject to the following restrictions:
 #define _BT_SOFT_BODY_H
 
 
+#include <array>
+
 #include "LinearMath/btAlignedObjectArray.h"
 #include "LinearMath/btTransform.h"
 #include "LinearMath/btIDebugDraw.h"
@@ -298,6 +300,17 @@ public:
 		btVector3 m_uv1;
 		btVector3 m_normal;
 	};
+	
+	struct CollisionState {
+		btVector3					posBefore;
+		int                   		hitCount         = 0;
+		btScalar              		topMargin        = 0;
+		std::array<btVector3, 4>	normals;
+		std::array<btVector3, 4>	hits;
+		bool                   		collided         = false;
+		bool                   		everCollided     = false;
+	};
+	
 	struct Node : Feature
 	{
 		btVector3 m_x;       // Position
@@ -327,6 +340,8 @@ public:
 		int m_maxSizeMovingAverage;
 		btVector3* m_movingAverage;
 		int m_indexMovingAverage;
+
+		CollisionState m_collisionState;
 	};
 
 	/* SumForces of a node*/
