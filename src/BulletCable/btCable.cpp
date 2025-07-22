@@ -1772,7 +1772,7 @@ void btCable::recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCollisionShape
 			nodePair.normal = result.m_connected ? result.contactNorm : btVector3(0, 0, 0);
 			nodePairContact->push_back(nodePair);
 
-			m_world->getDebugDrawer()->drawSphere(nodePair.m_Xout, m_collisionMargin * 2.0, btVector3(1, 0, 1));
+			//m_world->getDebugDrawer()->drawSphere(nodePair.m_Xout, m_collisionMargin * 2.0, btVector3(1, 0, 1));
 		}
 	}
 }
