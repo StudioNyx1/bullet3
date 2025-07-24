@@ -308,6 +308,7 @@ static ExampleEntry gDefaultExamples[] =
 		ExampleEntry(1, "Test BallJoint", "BallJointDampingTest", CableDemoCreateFunc, 24),
 		ExampleEntry(1, "Test FixedJoint", "FixedJointCollisionTest", CableDemoCreateFunc, 25),
 		ExampleEntry(1, "Test RayCast", "", CableDemoCreateFunc, 26),
+		ExampleEntry(1, "Test Collisions", "", CableDemoCreateFunc, 27),
 
 #endif  //INCLUDE_CLOTH_DEMOS
 
