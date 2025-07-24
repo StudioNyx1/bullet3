@@ -27,6 +27,7 @@ public:
 	//input
 	btVector3 m_from;
 	btVector3 m_to;
+	btScalar m_margin;
 
 	//@BP Mod - allow backface filtering and unflipped normals
 	enum EFlags

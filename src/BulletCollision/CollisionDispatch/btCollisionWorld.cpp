@@ -338,7 +338,7 @@ void btCollisionWorld::rayTestSingleInternal(const btTransform& rayFromTrans, co
 			//add hit
 			if (castResult.m_normal.length2() > btScalar(0.0001))
 			{
-				if (castResult.m_fraction < resultCallback.m_closestHitFraction)
+				if (castResult.m_fraction <= resultCallback.m_closestHitFraction)
 				{
 					//todo: figure out what this is about. When is rayFromTest.getBasis() not identity?
 #ifdef USE_SUBSIMPLEX_CONVEX_CAST
@@ -369,7 +369,6 @@ void btCollisionWorld::rayTestSingleInternal(const btTransform& rayFromTrans, co
 				btCollisionWorld::RayResultCallback* m_resultCallback;
 				const btCollisionObject* m_collisionObject;
 				btTransform m_colObjWorldTransform;
-				float m_margin;
 				float m_rayLength;
 				btVector3 m_rayDirLocal;
 
@@ -380,43 +379,29 @@ void btCollisionWorld::rayTestSingleInternal(const btTransform& rayFromTrans, co
 					const btCollisionObject* collisionObject,
 					const btTransform& colObjWorldTransform,
 					float margin)
-					: btTriangleRaycastCallback(from, to, resultCallback->m_flags), m_resultCallback(resultCallback), m_collisionObject(collisionObject), m_colObjWorldTransform(colObjWorldTransform), m_margin(margin)
+					: btTriangleRaycastCallback(from, to, resultCallback->m_flags), m_resultCallback(resultCallback), m_collisionObject(collisionObject), m_colObjWorldTransform(colObjWorldTransform)
 				{
 					// precompute ray‐length & direction in local space
 					m_rayDirLocal = to - from;
 					m_rayLength = m_rayDirLocal.length();
 					m_rayDirLocal /= m_rayLength;  // normalize
 					m_hitFraction = resultCallback->m_closestHitFraction;
+					m_margin = margin;
 				}
 
-				virtual btScalar reportHit(
-					const btVector3& hitNormalLocal,
-					btScalar rawHitFraction,
-					int partId,
-					int triangleIndex) override
+				virtual btScalar reportHit(const btVector3& hitNormalLocal, btScalar hitFraction, int partId, int triangleIndex)
 				{
-					// 1) push the hit back by margin along the ray
-					float adjFraction = rawHitFraction - (m_margin / m_rayLength);
-					if (adjFraction < 0.f || adjFraction > m_resultCallback->m_closestHitFraction)
-						return 1.f;  // no hit
-
-					// 2) compute world‐space hit normal and hit point
-					btVector3 normalWorld = m_colObjWorldTransform.getBasis() * hitNormalLocal;
-					btVector3 localHitPos = m_from + m_rayDirLocal * (adjFraction * m_rayLength);
-					btVector3 worldHitPos = m_colObjWorldTransform * localHitPos;
-
-					// 3) build shapeInfo & LocalRayResult
 					btCollisionWorld::LocalShapeInfo shapeInfo;
 					shapeInfo.m_shapePart = partId;
 					shapeInfo.m_triangleIndex = triangleIndex;
 
-					btCollisionWorld::LocalRayResult rayResult(
-						m_collisionObject,
-						&shapeInfo,
-						normalWorld,
-						adjFraction);
+					btVector3 hitNormalWorld = m_colObjWorldTransform.getBasis() * hitNormalLocal;
 
-					// 4) hand off to the user callback
+					btCollisionWorld::LocalRayResult rayResult(m_collisionObject,
+															   &shapeInfo,
+															   hitNormalWorld,
+															   hitFraction);
+
 					bool normalInWorldSpace = true;
 					return m_resultCallback->addSingleResult(rayResult, normalInWorldSpace);
 				}
