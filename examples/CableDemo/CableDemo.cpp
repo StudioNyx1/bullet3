@@ -597,7 +597,7 @@ public:
 				btScalar margin = 0.02;
 
 				btVector3 toPos = btVector3(0, 9, 0);
-				btVector3 fromPos = btVector3(1.5 - margin, 9, 0);
+				btVector3 fromPos = btVector3(1.5, 9, 0);
 
 				btTransform toTr = btTransform::getIdentity();
 				btTransform fromTr = btTransform::getIdentity();
@@ -606,6 +606,7 @@ public:
 				{
 					int k = i > 5 ? 5 : i;
 					btRigidBody* rb = btRigidBody::upcast(m_dynamicsWorld->getCollisionObjectArray()[k]);
+					// if (i <= 4) rb->setAngularVelocity(btVector3(0, 0, 0.25));
 
 					toPos.setY(9 - 2 * i);
 					fromPos.setY(9 - 2 * i);
@@ -616,11 +617,13 @@ public:
 					fromTr.setOrigin(fromPos);
 
 					btCollisionWorld::ClosestRayResultCallback result(toPos, fromPos);
+					// result.m_flags = btTriangleRaycastCallback::kF_KeepUnflippedNormal;
+					// result.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
 					m_dynamicsWorld->rayTestSingleWithMargin(toTr, fromTr, rb, rb->getCollisionShape(), rb->getWorldTransform(), result, margin);
 					if (result.hasHit())
 					{
 						m_dynamicsWorld->getDebugDrawer()->drawSphere(result.m_hitPointWorld, margin, btVector3(0, 0, 1));
-						// m_dynamicsWorld->getDebugDrawer()->drawLine(result.m_hitPointWorld, result.m_hitPointWorld + result.m_hitNormalWorld * margin, btVector3(1, 0, 0));
+						m_dynamicsWorld->getDebugDrawer()->drawLine(result.m_hitPointWorld, result.m_hitPointWorld + result.m_hitNormalWorld * 0.2, btVector3(0, 0, 1));
 					}
 				}
 			}
@@ -2915,9 +2918,9 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	/// MCMV
 	// Shape: MCMV
 	btCompoundShape* mcmvShape = new btCompoundShape(false);
+	mcmvShape->setMargin(0);
 	btGImpactMeshShape* gImpactShape;
 	btBoxShape* mcmvBoxShape;
-	mcmvShape->setMargin(0);
 	{
 		// Shape: MCMV - Floor
 		{
@@ -2971,7 +2974,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 			btTransform floorTransform = btTransform();
 			floorTransform.setIdentity();
 			floorTransform.setOrigin(btVector3(0, 0, 0));
-			mcmvShape->addChildShape(floorTransform, floorShape);
+			mcmvShape->addChildShape(floorTransform, floorBoxShape);
 		}
 
 		// Shape: MCMV - Wall
@@ -3025,8 +3028,8 @@ static void Init_MCMVCable(CableDemo* pdemo)
 
 			btTransform wallTransform = btTransform();
 			wallTransform.setIdentity();
-			wallTransform.setOrigin(btVector3(0, 2, 4.5));
-			mcmvShape->addChildShape(wallTransform, wallShape);
+			wallTransform.setOrigin(btVector3(0, 2, 4));
+			mcmvShape->addChildShape(wallTransform, wallBoxShape);
 		}
 
 		// Shape: MCMV - Corner
@@ -3068,8 +3071,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 			btTransform cornerTransform = btTransform();
 			cornerTransform.setIdentity();
 			cornerTransform.setOrigin(btVector3(0, 0.75, 3.75));
-			mcmvShape->addChildShape(cornerTransform, gimpactShape);
-			mcmvShape->createAabbTreeFromChildren();
+			//mcmvShape->addChildShape(cornerTransform, gimpactShape);
 		}
 	}
 	// Transform: MCMV
@@ -3141,7 +3143,9 @@ static void Init_RayCast(CableDemo* pdemo)
 		btBoxShape* shape = new btBoxShape(halfExtends);
 		shape->setMargin(0.0);
 
-		btRigidBody* rb = pdemo->createRigidBody(0, trShape, shape);
+		btRigidBody* rb = pdemo->createRigidBody(10, trShape, shape);
+		rb->setGravity(btVector3(0, 0, 0));
+		rb->setSleepingThresholds(0, 0);
 	}
 
 	// SphereShape
@@ -3151,7 +3155,9 @@ static void Init_RayCast(CableDemo* pdemo)
 		btSphereShape* shape = new btSphereShape(halfExtend);
 		shape->setMargin(0.0);
 
-		btRigidBody* rb = pdemo->createRigidBody(0, trShape, shape);
+		btRigidBody* rb = pdemo->createRigidBody(10, trShape, shape);
+		rb->setGravity(btVector3(0, 0, 0));
+		rb->setSleepingThresholds(0, 0);
 	}
 
 	// CylinderShape
@@ -3161,7 +3167,9 @@ static void Init_RayCast(CableDemo* pdemo)
 		btCylinderShape* shape = new btCylinderShape(halfExtends);
 		shape->setMargin(0.0);
 
-		btRigidBody* rb = pdemo->createRigidBody(0, trShape, shape);
+		btRigidBody* rb = pdemo->createRigidBody(10, trShape, shape);
+		rb->setGravity(btVector3(0, 0, 0));
+		rb->setSleepingThresholds(0, 0);
 	}
 
 	// ConvexHullShape
@@ -3191,7 +3199,9 @@ static void Init_RayCast(CableDemo* pdemo)
 		shape->initializePolyhedralFeatures();
 		shape->optimizeConvexHull();
 
-		btRigidBody* rb = pdemo->createRigidBody(0, trShape, shape);
+		btRigidBody* rb = pdemo->createRigidBody(10, trShape, shape);
+		rb->setGravity(btVector3(0, 0, 0));
+		rb->setSleepingThresholds(0, 0);
 	}
 
 	// GImpactShape
@@ -3235,7 +3245,9 @@ static void Init_RayCast(CableDemo* pdemo)
 		shape->updateBound();
 		shape->setMargin(0.0);
 
-		btRigidBody* rb = pdemo->createRigidBody(0, trShape, shape);
+		btRigidBody* rb = pdemo->createRigidBody(10, trShape, shape);
+		rb->setGravity(btVector3(0, 0, 0));
+		rb->setSleepingThresholds(0, 0);
 	}
 
 	// CompoundShape_BoxShape
@@ -3342,7 +3354,9 @@ static void Init_RayCast(CableDemo* pdemo)
 		compoundShape->addChildShape(trShape, shape);
 	}
 
-	btRigidBody* rbCompound = pdemo->createRigidBody(0, btTransform::getIdentity(), compoundShape);
+	btRigidBody* rbCompound = pdemo->createRigidBody(10, btTransform::getIdentity(), compoundShape);
+	rbCompound->setGravity(btVector3(0, 0, 0));
+	rbCompound->setSleepingThresholds(0, 0);
 
 	// Register GIMPACT algorithm
 	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
