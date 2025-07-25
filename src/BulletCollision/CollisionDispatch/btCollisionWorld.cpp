@@ -427,7 +427,13 @@ void btCollisionWorld::rayTestSingleInternal(const btTransform& rayFromTrans, co
 
 				BridgeTriangleRaycastCallback rcb(rayFromLocal, rayToLocal, &resultCallback, collisionObjectWrap->getCollisionObject(), colObjWorldTransform, margin);
 				rcb.m_hitFraction = resultCallback.m_closestHitFraction;
-				gImpactMesh->processAllTrianglesRay(&rcb, rayFromLocal, rayToLocal);
+				btVector3 aabbMargin = btVector3(margin, margin, margin);
+				btVector3 rayAabbMinLocal = rayFromLocal;
+				rayAabbMinLocal.setMin(rayToLocal - aabbMargin);
+				btVector3 rayAabbMaxLocal = rayFromLocal;
+				rayAabbMaxLocal.setMax(rayToLocal + aabbMargin);
+
+				gImpactMesh->processAllTriangles(&rcb, rayAabbMinLocal, rayAabbMaxLocal);
 			}
 			else if (collisionShape->getShapeType() == SCALED_TRIANGLE_MESH_SHAPE_PROXYTYPE)
 			{
