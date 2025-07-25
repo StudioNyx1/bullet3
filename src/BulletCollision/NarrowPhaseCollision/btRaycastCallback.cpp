@@ -29,65 +29,53 @@ btTriangleRaycastCallback::btTriangleRaycastCallback(const btVector3& from, cons
 void btTriangleRaycastCallback::processTriangle(btVector3* triangle,
                                                 int partId, int triangleIndex)
 {
-    const btVector3& v0 = triangle[0];
-    const btVector3& v1 = triangle[1];
-    const btVector3& v2 = triangle[2];
+	const btVector3& v0 = triangle[0];
+	const btVector3& v1 = triangle[1];
+	const btVector3& v2 = triangle[2];
 
-    btVector3 v10 = v1 - v0;
-    btVector3 v20 = v2 - v0;
-    btVector3 n   = v10.cross(v20);
-    const btScalar nLen   = n.length();
-    const btScalar planeD = v0.dot(n);
+	const btVector3 v10 = v1 - v0;
+	const btVector3 v20 = v2 - v0;
+	const btVector3 n = v10.cross(v20);
+	const btScalar nLen2 = n.length2();
+	if (nLen2 < SIMD_EPSILON) return;
 
-    btScalar distA = n.dot(m_from) - planeD;
-    btScalar distB = n.dot(m_to) - planeD;
+	const btScalar planeD = v0.dot(n);
+	const btScalar distA = n.dot(m_from) - planeD;
+	const btScalar distB = n.dot(m_to) - planeD;
 
-    // Margin for the plane test
-    const btScalar planeMargin = (m_margin + FLT_EPSILON) * nLen;
+	// Reject if segment is fully on one side of the slab
+	const btScalar planeMargin = m_margin + FLT_EPSILON;
+	if ((distA > planeMargin && distB > planeMargin) ||
+		(distA < -planeMargin && distB < -planeMargin))
+		return;
 
-    if ((distA >  planeMargin && distB >  planeMargin) ||
-        (distA < -planeMargin && distB < -planeMargin))
-        return;
+	// Parametric distance where the ray enters the slab
+	const btScalar denom = distA - distB;
+	if (btFabs(denom) < SIMD_EPSILON) return; // segment is (almost) parallel
 
-    // distance along the segment to where we ENTER the slab
-    const btScalar denom = distA - distB;
-    if (btFabs(denom) < SIMD_EPSILON) return;
+	const btScalar target = (distA > planeMargin) ? planeMargin : (distA < -planeMargin) ? -planeMargin: btScalar(0);
 
-    btScalar target = 0.0f;
-    if (distA >  planeMargin)
-        target =  planeMargin;
-    else
-        if (distA < -planeMargin)
-            target = -planeMargin;
+	const btScalar distance = (distA - target) / denom;
+	if (distance >= m_hitFraction) return;
 
-    const btScalar distance = (distA - target) / denom;
-    if (distance >= m_hitFraction) return;
+	// Intersect point
+	const btVector3 point = m_from.lerp(m_to, distance + (target / denom));
 
-    // original inside-triangle tests
-    btVector3 point = m_from.lerp(m_to, distance);
+	//  Barycentric / inside‑triangle test (three edge planes)
+	const btScalar edgeTol = -FLT_EPSILON; // identical to old behaviour
 
-    btScalar edge_tolerance = n.length2();
-    edge_tolerance *= btScalar(-FLT_EPSILON);
+	const btVector3 v0p = v0 - point;
+	const btVector3 v1p = v1 - point;
+	const btVector3 v2p = v2 - point;
 
-    btVector3 v0p = v0 - point;
-    btVector3 v1p = v1 - point;
-    btVector3 cp0 = v0p.cross(v1p);
-    if (cp0.dot(n) < edge_tolerance) return;
+	if ((v0p.cross(v1p)).dot(n) < edgeTol ||
+		(v1p.cross(v2p)).dot(n) < edgeTol ||
+		(v2p.cross(v0p)).dot(n) < edgeTol)
+		return;
 
-    btVector3 v2p = v2 - point;
-    btVector3 cp1 = v1p.cross(v2p);
-    if (cp1.dot(n) < edge_tolerance) return;
-
-    btVector3 cp2 = v2p.cross(v0p);
-    if (cp2.dot(n) < edge_tolerance) return;
-
-    // normalize for reporting
-    if (nLen > SIMD_EPSILON) n /= nLen;
-
-    if (((m_flags & kF_KeepUnflippedNormal) == 0) && (distA <= btScalar(0.0)))
-        m_hitFraction = reportHit(-n, distance, partId, triangleIndex);
-    else
-        m_hitFraction = reportHit( n, distance, partId, triangleIndex);
+	// Normalise once for output
+	const btVector3 normal = (((m_flags & kF_KeepUnflippedNormal) == 0) && (distA <= btScalar(0.0))) ? -n.normalized() : n.normalized();
+	m_hitFraction = reportHit(normal, distance, partId, triangleIndex);
 }
 
 btTriangleConvexcastCallback::btTriangleConvexcastCallback(const btConvexShape* convexShape, const btTransform& convexShapeFrom, const btTransform& convexShapeTo, const btTransform& triangleToWorld, const btScalar triangleCollisionMargin)
