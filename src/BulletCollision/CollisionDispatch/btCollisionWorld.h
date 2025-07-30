@@ -468,6 +468,11 @@ public:
 							  const btTransform& colObjWorldTransform,
 							  RayResultCallback& resultCallback, const btScalar margin);
 
+	static void rayTestSingleClosestWithMargin(ClosestRayResultCallback& resultCallback, const btScalar margin,
+							  btCollisionObject* collisionObject,
+							  btCollisionShape* collisionShape,
+							  const btTransform& colObjWorldTransform);
+
 	static void rayTestSingleInternal(const btTransform& rayFromTrans, const btTransform& rayToTrans,
 									  const btCollisionObjectWrapper* collisionObjectWrap,
 									  RayResultCallback& resultCallback, const btScalar margin);
