@@ -28,7 +28,7 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	m_cpt = 0;
 
 	// Initialize Data
-	m_cableData = CableData();
+	m_cableData = new CableData();
 	m_nodePos = new NodePos[worldInfo->maxNodeNumberPerCable]();
 	m_nodeData = new NodeData[worldInfo->maxNodeNumberPerCable]();
 
@@ -55,7 +55,7 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	}
 
 	// Using getCollisionShape we set the cable radius
-	m_cableData.radius = getCollisionShape()->getMargin();
+	m_cableData->radius = getCollisionShape()->getMargin();
 
 	if (section_count > 0)
 	{
@@ -178,7 +178,7 @@ void btCable::updateNodeData()
 		}
 
 		// Using a cylinder volume calculation with 2 links and divide by 2
-		m_nodeData[i].volume = SIMD_PI * m_cableData.radius * m_cableData.radius * sizeElement * 0.5;
+		m_nodeData[i].volume = SIMD_PI * m_cableData->radius * m_cableData->radius * sizeElement * 0.5;
 	}
 }
 
@@ -239,7 +239,7 @@ void btCable::predictMotion(btScalar dt)
 		if (isActive())
 		{
 			// Get the Hydro and Aero forces
-			NodeForces currentNodeForces = nodeForces[m_cableData.startIndex + i];
+			NodeForces currentNodeForces = nodeForces[m_cableData->startIndex + i];
 
 			// Integrate once (first sub step)
 			if (m_world->GetIndexSubIteration() == 0)
