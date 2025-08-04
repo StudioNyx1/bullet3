@@ -254,7 +254,7 @@ public:
 		virtual btScalar addSingleResult(LocalRayResult& rayResult, bool normalInWorldSpace)
 		{
 			//caller already does the filter on the m_closestHitFraction
-			btAssert(rayResult.m_hitFraction <= m_closestHitFraction);
+			if (rayResult.m_hitFraction > m_closestHitFraction) return m_closestHitFraction;
 
 			m_closestHitFraction = rayResult.m_hitFraction;
 			m_collisionObject = rayResult.m_collisionObject;
@@ -467,11 +467,6 @@ public:
 							  btCollisionShape* collisionShape,
 							  const btTransform& colObjWorldTransform,
 							  RayResultCallback& resultCallback, const btScalar margin);
-
-	static void rayTestSingleClosestWithMargin(ClosestRayResultCallback& resultCallback, const btScalar margin,
-							  btCollisionObject* collisionObject,
-							  btCollisionShape* collisionShape,
-							  const btTransform& colObjWorldTransform);
 
 	static void rayTestSingleInternal(const btTransform& rayFromTrans, const btTransform& rayToTrans,
 									  const btCollisionObjectWrapper* collisionObjectWrap,

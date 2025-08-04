@@ -290,24 +290,6 @@ void btCollisionWorld::rayTestSingleWithMargin(const btTransform& rayFromTrans, 
 	
 }
 
-void btCollisionWorld::rayTestSingleClosestWithMargin(ClosestRayResultCallback& resultCallback, const btScalar margin,
-													  btCollisionObject* collisionObject,
-													  btCollisionShape* collisionShape,
-													  const btTransform& colObjWorldTransform)
-{
-	btTransform rayFromTrans = btTransform::getIdentity();
-	rayFromTrans.setOrigin(resultCallback.m_rayFromWorld);
-
-	btTransform rayToTrans = btTransform::getIdentity();
-	rayToTrans.setOrigin(resultCallback.m_rayToWorld);
-
-	btCollisionObject colobj = btCollisionObject();
-	colobj.setWorldTransform(colObjWorldTransform);
-	colobj.setCollisionShape(collisionShape);
-	btCollisionObjectWrapper colObWrap(0, collisionShape, &colobj, colObjWorldTransform, -1, -1);
-	btCollisionWorld::rayTestSingleInternal(rayFromTrans, rayToTrans, &colObWrap, resultCallback, margin);
-}
-
 void btCollisionWorld::rayTestSingle(const btTransform& rayFromTrans, const btTransform& rayToTrans,
 									 btCollisionObject* collisionObject,
 									 const btCollisionShape* collisionShape,
@@ -337,8 +319,7 @@ void btCollisionWorld::rayTestSingleInternal(const btTransform& rayFromTrans, co
 		btConvexShape* convexShape = (btConvexShape*)collisionShape;
 		btVoronoiSimplexSolver simplexSolver;
 		btSubsimplexConvexCast subSimplexConvexCaster(castShape, convexShape, &simplexSolver);
-
-		btGjkConvexCast gjkConvexCaster(castShape, convexShape, &simplexSolver);
+		btGjkConvexCast gjkConvexCaster(castShape, convexShape, &simplexSolver, margin);
 
 		//btContinuousConvexCollision convexCaster(castShape,convexShape,&simplexSolver,0);
 

@@ -27,11 +27,12 @@ subject to the following restrictions:
 #define MAX_ITERATIONS 32
 #endif
 
-btGjkConvexCast::btGjkConvexCast(const btConvexShape* convexA, const btConvexShape* convexB, btSimplexSolverInterface* simplexSolver)
+btGjkConvexCast::btGjkConvexCast(const btConvexShape* convexA, const btConvexShape* convexB, btSimplexSolverInterface* simplexSolver, const btScalar margin)
 	: m_simplexSolver(simplexSolver),
 	  m_convexA(convexA),
 	  m_convexB(convexB)
 {
+	m_margin = margin;
 }
 
 bool btGjkConvexCast::calcTimeOfImpact(
@@ -156,6 +157,19 @@ bool btGjkConvexCast::calcTimeOfImpact(
 		if (n.dot(r) >= -result.m_allowedPenetration)
 			return false;
 
+		if (dist < 0.0)
+		{
+			if (dist >= -m_margin)
+			{
+				result.m_fraction = dist / r.length();
+				result.m_normal = n;
+				result.m_hitPoint = c;
+				return true;
+			}
+
+			return false;
+		}
+		
 		result.m_fraction = lambda;
 		result.m_normal = n;
 		result.m_hitPoint = c;

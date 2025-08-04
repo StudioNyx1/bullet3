@@ -40,7 +40,10 @@ class btMinkowskiSumShape;
 /// btConvexCast is an interface for Casting
 class btConvexCast
 {
+
 public:
+	btScalar m_margin;
+
 	virtual ~btConvexCast();
 
 	///RayResult stores the closest result

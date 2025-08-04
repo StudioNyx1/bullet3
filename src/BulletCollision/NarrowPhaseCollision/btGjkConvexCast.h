@@ -32,7 +32,7 @@ class btGjkConvexCast : public btConvexCast
 	const btConvexShape* m_convexB;
 
 public:
-	btGjkConvexCast(const btConvexShape* convexA, const btConvexShape* convexB, btSimplexSolverInterface* simplexSolver);
+	btGjkConvexCast(const btConvexShape* convexA, const btConvexShape* convexB, btSimplexSolverInterface* simplexSolver, const btScalar margin = 0.0);
 
 	/// cast a convex against another convex object
 	virtual bool calcTimeOfImpact(

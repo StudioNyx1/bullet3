@@ -27,7 +27,6 @@ btTriangleRaycastCallback::btTriangleRaycastCallback(const btVector3& from, cons
 	: m_from(from), m_to(to), m_flags(flags), m_hitFraction(1.0), m_margin(0.0) { }
 
 void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId, int triangleIndex)
-
 {
 	const btVector3& v0 = triangle[0];
 	const btVector3& v1 = triangle[1];
@@ -38,6 +37,11 @@ void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId,
 	btVector3 n = v10.cross(v20);
 	const btScalar nLen = n.length();
 	const btScalar planeD = v0.dot(n);
+
+	// Triangle normal and ray normal are in the same direction, cannot process a hitpoint
+	if ((m_to - m_from).normalized().dot(n) > 0.0) 
+		return;
+
 
 	btScalar distA = n.dot(m_from) - planeD;
 	btScalar distB = n.dot(m_to) - planeD;
@@ -58,11 +62,10 @@ void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId,
 		target = planeMargin;
 	else if (distA < -planeMargin)
 		target = -planeMargin;
-	else
-		return;
+
 
 	const btScalar distance = (distA - target) / denom;
-	if (distance >= m_hitFraction) return;
+	//if (distance >= m_hitFraction) return;
 
 	// original inside-triangle tests
 	btVector3 point = m_from.lerp(m_to, distance);
@@ -85,8 +88,13 @@ void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId,
 	// normalize for reporting
 	if (nLen > SIMD_EPSILON) n /= nLen;
 
-	if (((m_flags & kF_KeepUnflippedNormal) == 0) && (distA <= btScalar(0.0)))
+	if (((m_flags & kF_FilterBackfaces) == 1) && (distA <= btScalar(0.0)))
+		return;
+
+	if (((m_flags & kF_KeepUnflippedNormal) == 1) && (distA <= btScalar(0.0)))
 		m_hitFraction = reportHit(-n, distance, partId, triangleIndex);
+	else if (target > -FLT_EPSILON && target < FLT_EPSILON)
+		m_hitFraction = reportHit(n, distance - planeMargin / denom, partId, triangleIndex);
 	else
 		m_hitFraction = reportHit(n, distance, partId, triangleIndex);
 }
