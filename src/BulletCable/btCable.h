@@ -110,31 +110,35 @@ public :
 	{
 		Node* node;
 		int numContacts;
-		std::vector<btVector3> m_Xouts;
+		std::vector<btVector3> xOuts;
 		std::vector<btVector3> normals;
+		std::vector<btScalar> distances;
 		BroadPhasePair* pair;
 		btTransform worldTransform;
 
 		btPersistentManifold* manifold = nullptr;
 		bool haveManifoldsRegister = false;
-		std::vector<btScalar> distances;
 	};
 
-	struct RayJob {
+	struct RayJob 
+	{
 		int                    nodeIdx;
 		NodePairNarrowPhase*   pair;
 		int                    rayIdx;
-		btVector3              from, to;
+		btVector3			   from;
+		btVector3			   to;
 		btScalar               margin;
 	};
 
-	struct ObjData {
+	struct ObjData 
+	{
 		btCollisionObject* obj;
 		btVector3          minAabb, maxAabb;
 		btVector3          objVelocity;
 	};
 
-	struct ContactInfo {
+	struct ContactInfo 
+	{
 		btVector3 point;
 		btVector3 normal;
 		btScalar distance;
@@ -162,36 +166,52 @@ public :
 		                                 const btCollisionObjectWrapper* colliderB, int partId1, int index1) override
 		{
 			btScalar dist = cp.getDistance();
-			if (dist > m_margin) {
-				// outside your tolerance → ignore
-				return 0;
-			}
+			// outside your tolerance → ignore
+			if (dist > m_margin)
+				return 1.0;
 
 			// Determine ordering (which wrapper corresponds to A and B)
-			bool orderIsAB = (colliderA->m_collisionObject == A &&
-				colliderB->m_collisionObject == B);
+			bool orderIsAB = (colliderA->m_collisionObject == A && colliderB->m_collisionObject == B);
 
-			// Back-face culling on triangle shapes
-			if (colliderB->m_shape->getShapeType() == TRIANGLE_SHAPE_PROXYTYPE) {
-			        const btTriangleShape* tri = static_cast<const btTriangleShape*>(colliderB->getCollisionShape());
-			        btVector3 triNormal;
-			        tri->calcNormal(triNormal);
-		    		
-			        // cp.m_normalWorldOnB points *out* of B
-			        if (triNormal.dot(cp.m_normalWorldOnB) < 0)
-			        {
-						// hit on the back side → skip
-						return 0;
-			        }
+			if (orderIsAB)
+			{
+				// Back-face culling on triangle shapes
+				if (colliderB->m_shape->getShapeType() == TRIANGLE_SHAPE_PROXYTYPE)
+				{
+					const btTriangleShape* tri = static_cast<const btTriangleShape*>(colliderB->getCollisionShape());
+					btVector3 triNormal;
+					tri->calcNormal(triNormal);
+
+					// cp.m_normalWorldOnB points *out* of B
+					// hit on the back side → skip
+					if (triNormal.dot(cp.m_normalWorldOnB) < 0)
+						return 1.0;
+				}
 			}
+			else
+			{
+				// Back-face culling on triangle shapes
+				if (colliderA->m_shape->getShapeType() == TRIANGLE_SHAPE_PROXYTYPE)
+				{
+					const btTriangleShape* tri = static_cast<const btTriangleShape*>(colliderA->getCollisionShape());
+					btVector3 triNormal;
+					tri->calcNormal(triNormal);
 
+					// cp.m_normalWorldOnB points *out* of B
+					// hit on the back side → skip
+					if (triNormal.dot(-cp.m_normalWorldOnB) < 0)
+						return 1.0;
+				}
+			}
+			
 			// assemble contact info
 			ContactInfo info;
 			if (orderIsAB)
 			{
 				info.point   = cp.getPositionWorldOnB();
 				info.normal  = cp.m_normalWorldOnB;
-			} else
+			} 
+			else
 			{
 				info.point   = cp.getPositionWorldOnA();
 				info.normal  = -cp.m_normalWorldOnB;
@@ -202,7 +222,7 @@ public :
 			contacts.push_back(info);
 			numContacts++;
 			
-			return 0;
+			return 1.0;
 		}
 	};
 
@@ -296,7 +316,7 @@ private:
 	void setRayResult(const btVector3 &positionStart,  btVector3 contactPoint, const btVector3 &normal, Node*n,NodePairNarrowPhase*temp,int rayIndex);
 	void recursiveBroadPhase(BroadPhasePair* obj, Node* n, btCollisionShape* shape, btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact, btAlignedObjectArray<int>* nodeIndexOut,
 							 btVector3 minLink, btVector3 maxLink, btTransform* worldTransform);
-
+	btVector3 calculateHitPosition(const btVector3 hit, const btVector3 normal, const btVector3 startingRay, const btScalar margin);
 	void resetManifoldLifeTime();
 	void clearManifoldContact();
 	void updateManifoldBroadphase(btAlignedObjectArray<BroadPhasePair*> broadphasePair);
