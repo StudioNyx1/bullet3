@@ -47,6 +47,7 @@ public:
 	virtual void copyBackToSoftBodies(bool bMove = true);
 
 	virtual void solveConstraints(btScalar solverdt);
+	virtual void solveConstraintsOneCable(btScalar solverdt, btCable *cable);
 
 	virtual void predictMotion(btScalar solverdt);
 

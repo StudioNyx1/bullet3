@@ -189,6 +189,24 @@ void btSoftRigidDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
 	solveSoftBodiesConstraints(timeStep);
 }
 
+void btSoftRigidDynamicsWorld::internalSingleStepSimulationOneCable(btScalar timeStep, btCable* cable)
+{
+	// Let the solver grab the soft bodies and if necessary optimize for it
+	m_softBodySolver->optimize(getSoftBodyArray());
+
+	if (!m_softBodySolver->checkInitialized())
+	{
+		btAssert("Solver initialization failed\n");
+	}
+
+	btDiscreteDynamicsWorld::internalSingleStepSimulation(timeStep);
+
+	updateCableCollisionObjects();
+
+	///solve soft bodies constraints
+	solveSoftBodyConstraintsOneCable(timeStep, cable);
+}
+
 void btSoftRigidDynamicsWorld::updateCableCollisionObjects()
 {
 	for (int i = 0; i < m_collisionObjects.size(); ++i)
@@ -218,7 +236,25 @@ void btSoftRigidDynamicsWorld::solveSoftBodiesConstraints(btScalar timeStep)
 	m_softBodySolver->solveConstraints(timeStep * m_softBodySolver->getTimeScale());
 
 	dispatcher->m_batchUpdating = false;
+}
 
+void btSoftRigidDynamicsWorld::solveSoftBodyConstraintsOneCable(btScalar timeStep, btCable* cable)
+{
+	BT_PROFILE("solveSoftConstraints");
+
+	if (m_softBodies.size())
+	{
+		btSoftBody::solveClusters(m_softBodies);
+	}
+
+	btCollisionDispatcherMt* dispatcher = static_cast<btCollisionDispatcherMt*>(m_dispatcher1);
+
+	dispatcher->m_batchUpdating = true;
+	
+	// Solve constraints solver-wise
+	((btDefaultSoftBodySolver*) m_softBodySolver)->solveConstraintsOneCable(timeStep * m_softBodySolver->getTimeScale(), cable);
+
+	dispatcher->m_batchUpdating = false;
 }
 
 void btSoftRigidDynamicsWorld::addSoftBody(btSoftBody* body, int collisionFilterGroup, int collisionFilterMask)

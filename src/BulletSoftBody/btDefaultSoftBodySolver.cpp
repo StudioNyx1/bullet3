@@ -93,6 +93,25 @@ void btDefaultSoftBodySolver::solveConstraints(btScalar solverdt)
 		}	
 	}
 } 
+
+void btDefaultSoftBodySolver::solveConstraintsOneCable(btScalar solverdt, btCable *cable)
+{
+	// Solve constraints for non-solver softbodies
+	
+	omp_set_dynamic(0);      // Explicitly disable dynamic teams
+	omp_set_num_threads(1);  // Use numThread threads for all consecutive parallel regions
+
+	// grows/shrinks only in physic
+	if (cable != nullptr && cable->isActive())
+	{
+		cable->updateLength(solverdt);
+	}
+
+	if (cable->isActive())
+	{
+		cable->DetectPrepareContacts();
+	}
+}
 // btDefaultSoftBodySolver::solveConstraints
 
 void btDefaultSoftBodySolver::copySoftBodyToVertexBuffer(const btSoftBody *const softBody, btVertexBufferDescriptor *vertexBuffer)

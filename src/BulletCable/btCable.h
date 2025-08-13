@@ -337,6 +337,28 @@ private:
 			    btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact);
 	bool aabbTestMargin(  btVector3 nodeVel,btVector3 objVel,btVector3 nodeMinAabb,btVector3 nodeMaxAabb,btVector3 minAabb,btVector3 maxAabb);
 
+	// Internal: run one 'constraint/projection' iteration of your existing cable solver
+	void solveSingleCableIteration(int currentIter);
+
+	void EndConstraintsSolve();
+
+	struct IterativeSolveState
+	{
+		bool     active = false;
+		int      total = 0;
+		int      current = 0;
+
+		// Add caches you may need across iterations here (e.g., predicted positions)
+		// Example:
+		// btAlignedObjectArray<btVector3> m_predictedPos;
+	};
+
+	IterativeSolveState m_iter;
+
+	btAlignedObjectArray<int> _indexNodeContact;
+	btAlignedObjectArray<NodePairNarrowPhase> _nodePairContact;
+	bool _impacted = false;
+
 public:
 	btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m);
 
@@ -357,6 +379,22 @@ public:
 	void ResetForceAndVelocity();
 
 	void ResetNodePosition(const int nodeIndex, const btVector3 position);
+
+	void DetectPrepareContacts();
+	
+	// Begin an iterative solve session for visual stepping
+	void beginIterativeSolve();
+
+	// Perform exactly one solver iteration; returns true if more remain
+	bool stepOneIteration();
+
+	// Finalize and clean up after the iterative solve session
+	void endIterativeSolve();
+
+	// Query helpers
+	bool isIterativeSolveActive() const { return m_iter.active; }
+	int  currentIteration() const { return m_iter.current; }
+	int  totalIterations() const { return m_iter.total; }
 
 	enum CableState
 	{

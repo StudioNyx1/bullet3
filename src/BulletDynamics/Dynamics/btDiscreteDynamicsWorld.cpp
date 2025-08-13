@@ -25,6 +25,7 @@ subject to the following restrictions:
 #include "LinearMath/btQuickprof.h"
 
 //rigidbody & constraints
+//#include "BulletCable/btCable.h"
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
 #include "BulletDynamics/Dynamics/btRigidBody.h"
 #include "BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolver.h"
@@ -42,6 +43,7 @@ subject to the following restrictions:
 #include "BulletCollision/CollisionShapes/btSphereShape.h"
 
 #include "BulletDynamics/Dynamics/btActionInterface.h"
+#include "BulletSoftBody/btSoftRigidDynamicsWorld.h"
 #include "LinearMath/btQuickprof.h"
 #include "LinearMath/btMotionState.h"
 
@@ -479,6 +481,71 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 #endif  //BT_NO_PROFILE
 
 	return m_indexSubIteration;
+}
+
+int btDiscreteDynamicsWorld::stepSimulationOneCable(btScalar timeStep, int maxSubSteps, btScalar fixedTimeStep, btCable* cable)
+{
+	startProfiling(timeStep);
+
+	m_fixedTimeStep = fixedTimeStep;
+	m_subIteration = maxSubSteps;
+	m_clampedSimulationSteps = m_subIteration;
+
+	
+	//process some debugging flags
+	if (getDebugDrawer())
+	{
+		btIDebugDraw* debugDrawer = getDebugDrawer();
+		gDisableDeactivation = (debugDrawer->getDebugMode() & btIDebugDraw::DBG_NoDeactivation) != 0;
+	}
+
+	if (m_subIteration >= 1)
+	{
+		applyGravity();
+
+		// Go through all manifolds and set m_lifePoints to clampedSimulationSteps
+		for (int i = 0; i < m_dispatcher1->getNumManifolds(); i++)
+		{
+			btPersistentManifold* manifold = m_dispatcher1->getManifoldByIndexInternal(i);
+			for (int j = 0; j < manifold->getNumContacts(); j++)
+			{
+				manifold->getContactPoint(j).m_hasCollided = false;
+			}
+		}
+
+		// Clear all cached manifolds, only the last step manifolds are important
+		m_dispatcher1->ClearManifoldsCache();
+		m_dispatcher1->ClearParticlesManifolds();
+		
+		// Save Kinematics' position for the current frame
+		saveKinematicState(fixedTimeStep);
+
+		m_indexSubIteration = 0;
+		// Update constraints (rigid & soft)
+		((btSoftRigidDynamicsWorld*) this)->internalSingleStepSimulationOneCable(fixedTimeStep, cable);
+	}
+	else
+	{
+		synchronizeMotionStates();
+	}
+
+	return m_indexSubIteration;
+}
+
+void btDiscreteDynamicsWorld::EndStepSimulationOneCable() {
+	// Update Rigids' positions
+	synchronizeMotionStates();
+
+	m_indexSubIteration++;
+
+	// Update Kinematics' position for the next frame
+	syncKinematicState();
+
+	clearForces();
+
+#ifndef BT_NO_PROFILE
+	CProfileManager::Increment_Frame_Counter();
+#endif  //BT_NO_PROFILE
 }
 
 void btDiscreteDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)

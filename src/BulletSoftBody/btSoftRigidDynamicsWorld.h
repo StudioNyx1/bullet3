@@ -48,6 +48,8 @@ protected:
 
 	void solveSoftBodiesConstraints(btScalar timeStep);
 
+	void solveSoftBodyConstraintsOneCable(btScalar timeStep, btCable*cable);
+
 	void serializeSoftBodies(btSerializer* serializer);
 
 	int m_sizeOfNodeForcesStruct;
@@ -74,6 +76,8 @@ public:
 	void addSoftBody(btSoftBody* body, int collisionFilterGroup = btBroadphaseProxy::DefaultFilter, int collisionFilterMask = btBroadphaseProxy::AllFilter);
 
 	void removeSoftBody(btSoftBody* body);
+
+	virtual void internalSingleStepSimulationOneCable(btScalar timeStep, btCable*cable);
 
 	///removeCollisionObject will first check if it is a rigid body, if so call removeRigidBody otherwise call btDiscreteDynamicsWorld::removeCollisionObject
 	virtual void removeCollisionObject(btCollisionObject* collisionObject);

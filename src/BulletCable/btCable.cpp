@@ -1,4 +1,7 @@
-﻿#include <omp.h>
+﻿#include "Bullet3Common/b3Logging.h"
+
+
+#include <omp.h>
 #include <tuple>
 #include <chrono>
 #include <vector>
@@ -88,6 +91,214 @@ void btCable::updateLength(btScalar dt)
 	{
 		m_growingState = 0;
 	}
+}
+
+void btCable::beginIterativeSolve()
+{
+    m_iter.active = true;
+    m_iter.total = m_cfg.piterations;
+    m_iter.current = 0;
+}
+
+bool btCable::stepOneIteration()
+{
+	if (!m_iter.active || m_iter.current >= m_iter.total)
+	    return false;
+
+	// Run exactly one internal relaxation/constraint-projection iteration
+	solveSingleCableIteration(m_iter.current);
+
+	m_iter.current++;
+	
+	b3Printf("Iteration: %d / %d", m_iter.current, m_iter.total);
+
+	return m_iter.current < m_iter.total;
+}
+
+void btCable::endIterativeSolve()
+{
+	if (!m_iter.active)
+	    return;
+
+	// Assures we go through all the iterations before finishing
+	while (stepOneIteration());
+
+	EndConstraintsSolve();
+
+	// Clear session state
+	m_iter = IterativeSolveState();
+
+	updateNodeData();
+}
+
+void btCable::DetectPrepareContacts()
+{
+	int i, ni;
+
+	// Prepare nodes
+	for (i = 0, ni = m_nodes.size(); i < ni; ++i)
+	{
+		Node& node = m_nodes[i];
+		node.cptIteration = 0;
+		node.computeNodeConstraint = true;
+		node.m_splitv = btVector3(0, 0, 0);
+		node.m_nbCollidingObjectPotential = 0;
+		node.m_collisionState.posBefore = m_nodes[i].m_x;
+	}
+
+	// Prepare links
+	for (i = 0, ni = m_links.size(); i < ni; ++i)
+	{
+		Link& l = m_links[i];
+		l.m_c3 = l.m_n[1]->m_q - l.m_n[0]->m_q;
+		l.m_c2 = 1.0 / (l.m_c3.length2() * l.m_c0);
+	}
+
+	// Prepare anchors
+	for (i = 0, ni = this->m_anchors.size(); i < ni; ++i)
+	{
+		Anchor& a = this->m_anchors[i];
+		const btVector3 ra = a.m_body->getWorldTransform().getBasis() * a.m_local;
+
+		const double invMassBody = a.m_body->getInvMass();
+		const double invMassNode = a.m_node->m_im;
+		const auto& invInertiaTensorWorld = a.m_body->getInvInertiaTensorWorld();
+
+		// Compute the real impulse matrix to be able to later compute the cable tension
+		a.m_c0 = ImpulseMatrix(m_sst.sdt,
+							   invMassNode,
+							   invMassBody,
+							   invInertiaTensorWorld,
+							   ra);
+
+		// Compute a tweaked impulse matrix used to stabilized distance body / anchor
+		const double nodeMass = (1.0 / invMassNode);
+		a.impacted = false;
+
+		const double tweakedMass = nodeMass + a.m_body->getMass() * a.BodyMassRatio * (1.0 / a.m_body->m_anchorsCount);
+		a.m_c0_massBalance = ImpulseMatrix(m_sst.sdt,
+										   1.0 / tweakedMass,
+										   invMassBody,
+										   invInertiaTensorWorld,
+										   ra);
+
+		a.m_c1 = ra;
+		a.m_c2 = m_sst.sdt * a.m_node->m_im;
+		a.m_body->activate();
+		a.tension = btVector3(0, 0, 0);
+	}
+
+	// Prepare contacts
+	{
+		// SolveConstraint could be called more than once per frame
+		// To keep contact manifold during all these iteration we had to them a certain lifetime
+		// At the last iteration if the lifeTime = 0 we could remove the manifold
+		if (m_cpt == m_solverSubStep)
+		{
+			m_cpt = 0;
+		}
+		if (m_cpt == 0)
+		{
+			resetManifoldLifeTime();
+		}
+		m_cpt++;
+	}
+	_indexNodeContact = btAlignedObjectArray<int>();
+	_nodePairContact = btAlignedObjectArray<NodePairNarrowPhase>();
+	if (useCollision)
+	{
+		detectCollisionsThreaded(&_indexNodeContact, &_nodePairContact);
+	}
+	
+	_impacted = false;
+}
+
+void btCable::solveSingleCableIteration(int currentIter)
+{
+	bool lastStep = currentIter == m_cfg.piterations - 1;
+
+	updateNodeDeltaPos(currentIter);
+
+	anchorConstraint(_impacted);
+
+	distanceConstraint();
+
+	if (useLRA)
+	{
+		LRAConstraint();
+	}
+		
+	if (useBending && (currentIter % 2 == 0 || lastStep))
+	{
+		bendingConstraint();
+	}
+
+	if (useCollision && (currentIter % m_substepDelayCollision == 0 || lastStep))
+	{
+		contactConstraint(&_nodePairContact, &_indexNodeContact);
+	}
+}
+
+void btCable::EndConstraintsSolve()
+{
+	if (_impacted)
+	{
+		anchorConstraint(_impacted);
+	}
+
+	for (int i = 0; i < m_anchors.size(); ++i)
+	{
+		Anchor& a = this->m_anchors[i];
+		if (a.m_body->canChangedMassAtImpact() && !a.m_body->isStaticOrKinematicObject())
+		{
+			if (a.impacted)
+			{
+				btScalar limit = a.m_body->getUpperLimitDistanceImpact() - a.m_body->getLowerLimitDistanceImpact();
+				btScalar ratio = (a.m_dist - a.m_body->getLowerLimitDistanceImpact()) / limit;
+				btScalar func = 1.0 - pow(max(0.0, abs(ratio - 1.0) * 1.1 - 0.1), 3);
+				btScalar clampRatio = Clamp(func, 0.0, 1.0);
+				btScalar newMass = Lerp(a.m_body->getLowerLimitMassImpact(), a.m_body->getUpperLimitMassImpact(), clampRatio);
+				a.m_body->setMassProps(newMass, newMass * a.m_body->getLocalInertia() * a.m_body->getInvMass());
+				a.m_body->setGravity(m_worldInfo->m_gravity * (a.m_body->getLowerLimitMassImpact() / newMass));
+			}
+			else
+			{
+				a.m_body->setMassProps(a.m_body->getLowerLimitMassImpact(), a.m_body->getLowerLimitMassImpact() * a.m_body->getLocalInertia() * a.m_body->getInvMass());
+				a.m_body->setGravity(m_worldInfo->m_gravity);
+			}
+		}
+	}
+
+	// TODO @BenH: Add better manifolds
+	// Clear manifolds all cables manifolds
+	clearManifoldContact();
+
+	for (int i = 0; i < _nodePairContact.size(); i++)
+	{
+		NodePairNarrowPhase* nodePair = &_nodePairContact.at(i);
+		btPersistentManifold* manifold = m_world->getDispatcher()->getNewManifold(this, nodePair->pair->body);
+		CableManifolds cm = CableManifolds(manifold, m_solverSubStep);
+		manifolds.push_back(cm);
+		nodePair->manifold = manifold;
+		nodePair->haveManifoldsRegister = true;
+
+		// Obj 0 = Cable
+		// Obj 1 = RigidBody
+		for (int j = 0; j < nodePair->numContacts; j++) 
+		{
+			const btVector3& pointB = nodePair->xOuts[j];
+			const btVector3& normal = nodePair->normals[j];
+			const btScalar distance = nodePair->distances[j];
+
+			btManifoldPoint newPoint = btManifoldPoint(btVector3{0, 0, 0}, btVector3{0, 0, 0}, normal, distance);
+			newPoint.m_positionWorldOnA = pointB + normal * distance;
+			newPoint.m_positionWorldOnB = pointB;
+			manifold->addManifoldPoint(newPoint, true);
+		}
+	}
+
+	_nodePairContact.clear();
+	_indexNodeContact.clear();
 }
 
 void btCable::updateNodeData()
@@ -747,174 +958,15 @@ void btCable::detectCollisionsThreaded(
 
 void btCable::solveConstraints()
 {
-	int i, ni;
-
-	// Prepare nodes
-	for (i = 0, ni = m_nodes.size(); i < ni; ++i)
-	{
-		Node& node = m_nodes[i];
-		node.cptIteration = 0;
-		node.computeNodeConstraint = true;
-		node.m_splitv = btVector3(0, 0, 0);
-		node.m_nbCollidingObjectPotential = 0;
-		node.m_collisionState.posBefore = m_nodes[i].m_x;
-	}
-
-	// Prepare links
-	for (i = 0, ni = m_links.size(); i < ni; ++i)
-	{
-		Link& l = m_links[i];
-		l.m_c3 = l.m_n[1]->m_q - l.m_n[0]->m_q;
-		l.m_c2 = 1.0 / (l.m_c3.length2() * l.m_c0);
-	}
-
-	// Prepare anchors
-	for (i = 0, ni = this->m_anchors.size(); i < ni; ++i)
-	{
-		Anchor& a = this->m_anchors[i];
-		const btVector3 ra = a.m_body->getWorldTransform().getBasis() * a.m_local;
-
-		const double invMassBody = a.m_body->getInvMass();
-		const double invMassNode = a.m_node->m_im;
-		const auto& invInertiaTensorWorld = a.m_body->getInvInertiaTensorWorld();
-
-		// Compute the real impulse matrix to be able to later compute the cable tension
-		a.m_c0 = ImpulseMatrix(m_sst.sdt,
-							   invMassNode,
-							   invMassBody,
-							   invInertiaTensorWorld,
-							   ra);
-
-		// Compute a tweaked impulse matrix used to stabilized distance body / anchor
-		const double nodeMass = (1.0 / invMassNode);
-		a.impacted = false;
-
-		const double tweakedMass = nodeMass + a.m_body->getMass() * a.BodyMassRatio * (1.0 / a.m_body->m_anchorsCount);
-		a.m_c0_massBalance = ImpulseMatrix(m_sst.sdt,
-										   1.0 / tweakedMass,
-										   invMassBody,
-										   invInertiaTensorWorld,
-										   ra);
-
-		a.m_c1 = ra;
-		a.m_c2 = m_sst.sdt * a.m_node->m_im;
-		a.m_body->activate();
-		a.tension = btVector3(0, 0, 0);
-	}
-
-	// Prepare contacts
-	{
-		// SolveConstraint could be called more than once per frame
-		// To keep contact manifold during all these iteration we had to them a certain lifetime
-		// At the last iteration if the lifeTime = 0 we could remove the manifold
-		if (m_cpt == m_solverSubStep)
-		{
-			m_cpt = 0;
-		}
-		if (m_cpt == 0)
-		{
-			resetManifoldLifeTime();
-		}
-		m_cpt++;
-	}
-	btAlignedObjectArray<int> indexNodeContact = btAlignedObjectArray<int>();
-	btAlignedObjectArray<NodePairNarrowPhase> nodePairContact = btAlignedObjectArray<NodePairNarrowPhase>();
-	if (useCollision)
-	{
-		detectCollisionsThreaded(&indexNodeContact, &nodePairContact);
-	}
-
-	// auto start = std::chrono::high_resolution_clock::now();
-	// auto end = std::chrono::high_resolution_clock::now();
-	// std::chrono::duration<double, std::milli> duration = end - start;
-	// std::cout << "[detectCollisions] Took " << duration.count() << " ms" << std::endl;
+	DetectPrepareContacts();
 
 	// Solve constraints
-	bool impacted = false;
-	for (i = 0; i < m_cfg.piterations; ++i)
+	for (int i = 0; i < m_cfg.piterations; ++i)
 	{
-		bool lastStep = i == m_cfg.piterations - 1;
-
-		updateNodeDeltaPos(i);
-
-		anchorConstraint(impacted);
-
-		distanceConstraint();
-
-		if (useLRA)
-		{
-			LRAConstraint();
-		}
-		
-		if (useBending && (i % 2 == 0 || lastStep))
-		{
-			bendingConstraint();
-		}
-
-		if (useCollision && (i % m_substepDelayCollision == 0 || lastStep))
-		{
-			contactConstraint(&nodePairContact, &indexNodeContact);
-		}
+		solveSingleCableIteration(i);
 	}
 
-	if (impacted)
-	{
-		anchorConstraint(impacted);
-	}
-
-	for (int i = 0; i < m_anchors.size(); ++i)
-	{
-		Anchor& a = this->m_anchors[i];
-		if (a.m_body->canChangedMassAtImpact() && !a.m_body->isStaticOrKinematicObject())
-		{
-			if (a.impacted)
-			{
-				btScalar limit = a.m_body->getUpperLimitDistanceImpact() - a.m_body->getLowerLimitDistanceImpact();
-				btScalar ratio = (a.m_dist - a.m_body->getLowerLimitDistanceImpact()) / limit;
-				btScalar func = 1.0 - pow(max(0.0, abs(ratio - 1.0) * 1.1 - 0.1), 3);
-				btScalar clampRatio = Clamp(func, 0.0, 1.0);
-				btScalar newMass = Lerp(a.m_body->getLowerLimitMassImpact(), a.m_body->getUpperLimitMassImpact(), clampRatio);
-				a.m_body->setMassProps(newMass, newMass * a.m_body->getLocalInertia() * a.m_body->getInvMass());
-				a.m_body->setGravity(m_worldInfo->m_gravity * (a.m_body->getLowerLimitMassImpact() / newMass));
-			}
-			else
-			{
-				a.m_body->setMassProps(a.m_body->getLowerLimitMassImpact(), a.m_body->getLowerLimitMassImpact() * a.m_body->getLocalInertia() * a.m_body->getInvMass());
-				a.m_body->setGravity(m_worldInfo->m_gravity);
-			}
-		}
-	}
-
-	// TODO @BenH: Add better manifolds
-	// Clear manifolds all cables manifolds
-	clearManifoldContact();
-
-	for (i = 0; i < nodePairContact.size(); i++)
-	{
-		NodePairNarrowPhase* nodePair = &nodePairContact.at(i);
-		btPersistentManifold* manifold = m_world->getDispatcher()->getNewManifold(this, nodePair->pair->body);
-		CableManifolds cm = CableManifolds(manifold, m_solverSubStep);
-		manifolds.push_back(cm);
-		nodePair->manifold = manifold;
-		nodePair->haveManifoldsRegister = true;
-
-		// Obj 0 = Cable
-		// Obj 1 = RigidBody
-		for (int j = 0; j < nodePair->numContacts; j++) 
-		{
-			const btVector3& pointB = nodePair->xOuts[j];
-			const btVector3& normal = nodePair->normals[j];
-			const btScalar distance = nodePair->distances[j];
-
-			btManifoldPoint newPoint = btManifoldPoint(btVector3{0, 0, 0}, btVector3{0, 0, 0}, normal, distance);
-			newPoint.m_positionWorldOnA = pointB + normal * distance;
-			newPoint.m_positionWorldOnB = pointB;
-			manifold->addManifoldPoint(newPoint, true);
-		}
-	}
-
-	nodePairContact.clear();
-	indexNodeContact.clear();
+	EndConstraintsSolve();
 }
 
 void btCable::resetManifoldLifeTime()

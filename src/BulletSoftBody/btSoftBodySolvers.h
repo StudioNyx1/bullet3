@@ -24,6 +24,7 @@ class btSoftBodyVertexData;
 class btVertexBufferDescriptor;
 class btCollisionObject;
 class btSoftBody;
+class btCable;
 
 class btSoftBodySolver
 {

@@ -8,8 +8,6 @@
 #include "btBulletDynamicsCommon.h"
 #include "BulletSoftBody/btSoftRigidDynamicsWorld.h"
 
-#include "BulletCollision/CollisionDispatch/btSphereSphereCollisionAlgorithm.h"
-#include "BulletCollision/NarrowPhaseCollision/btGjkEpa2.h"
 #include "LinearMath/btQuickprof.h"
 #include "LinearMath/btIDebugDraw.h"
 
@@ -29,18 +27,13 @@
 #include "BulletCollision/GImpact/btGImpactShape.h"
 
 #include "BulletDynamics/MLCPSolvers/btDantzigSolver.h"
-#include "BulletDynamics/MLCPSolvers/btSolveProjectedGaussSeidel.h"
 #include "BulletDynamics/MLCPSolvers/btMLCPSolver.h"
 #include <BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolverMt.h>
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
 #include <iostream>
 #include <chrono>
-#include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
-#include <BulletCollision/CollisionShapes/btTriangleMeshShape.h>
 #include <BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h>
-#include <BulletCollision/CollisionShapes/btTriangleInfoMap.h>
-#include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 
 // #include "BunnyMesh.h"
 
@@ -59,9 +52,91 @@ class btSoftSoftCollisionAlgorithm;
 class btSoftRididCollisionAlgorithm;
 class btSoftRigidDynamicsWorld;
 
+struct CableStepController
+{
+	bool   enabled = false;
+	bool   sessionActive = false;
+};
+
 class CableDemo : public CommonRigidBodyBase
 {
 public:
+	btCable* m_cable = nullptr; // set this to the cable you want to inspect
+	CableStepController m_cableStep;
+
+	void toggleCableIterStepMode()
+	{
+		m_cableStep.enabled = !m_cableStep.enabled;
+		if (!m_cableStep.enabled && m_cableStep.sessionActive && m_cable)
+		{
+			m_cable->endIterativeSolve();
+			m_dynamicsWorld->EndStepSimulationOneCable();
+			m_cableStep.sessionActive = false;
+		}
+	}
+
+	void beginCableIterSession()
+	{
+		if (!m_cable || !m_cableStep.enabled || m_cableStep.sessionActive)
+			return;
+
+		m_dynamicsWorld->stepSimulationOneCable(_deltaTime, 1, _deltaTime, m_cable);
+		m_cable->beginIterativeSolve();
+		m_cableStep.sessionActive = true;
+	}
+
+	void stepCableOneIteration()
+	{
+		if (!m_cable || !m_cableStep.enabled)
+			return;
+
+		if (!m_cableStep.sessionActive)
+			beginCableIterSession();
+
+		bool more = m_cable->stepOneIteration();
+		// After each iteration, request a redrawing to see the intermediate result
+		renderSingleFrame();
+
+		if (!more)
+		{
+			m_cable->endIterativeSolve();
+			m_dynamicsWorld->EndStepSimulationOneCable();
+			m_cableStep.sessionActive = false;
+		}
+	}
+
+	void renderSingleFrame() {
+		// draws
+		for (int i = 0; i < m_dynamicsWorld->getNumCollisionObjects(); ++i)
+		{
+			btCollisionObject* co = m_dynamicsWorld->getCollisionObjectArray().at(i);
+			btCollisionShape* cs = co->getCollisionShape();
+			btVector3 AabbMin, AabbMax;
+			cs->getAabb(co->getWorldTransform(), AabbMin, AabbMax);
+
+			// m_dynamicsWorld->getDebugDrawer()->drawBox(AabbMin, AabbMax, btVector3(0,1,1));
+			// m_dynamicsWorld->getDebugDrawer()->drawSphere(co->getWorldTransform().getOrigin(), 0.05, btVector3(1, 0, 1));
+		}
+	}
+	
+	// In your main simulation tick, pause normal stepping when in cable-step mode.
+	void tick(btScalar dt, int subStep, btScalar fixedTimeStep)
+	{
+		if (m_cableStep.enabled)
+		{
+			// Don't run the full physics step while visually stepping iterations.
+			// Only draw the current state.
+			renderSingleFrame();
+			return;
+		}
+
+		// Normal simulation path
+		m_dynamicsWorld->stepSimulation(dt, subStep, fixedTimeStep);
+		
+		delta_ticks = clock() - current_ticks;
+		renderSingleFrame();
+	}
+	
 	btScalar posX;
 	btScalar posY;
 	btScalar margin;
@@ -110,6 +185,8 @@ private:
 	bool m_growWithSpeedAndDistance = false;
 	bool m_shrink = false;
 	btScalar speed = 0;
+
+	btScalar _deltaTime;
 
 	int nbDelta = 0;
 	int totalDelta = 0;
@@ -333,6 +410,11 @@ public:
 		{
 			m_printTens = !m_printTens;
 		}
+
+		if (key == 'y' && state) // toggle stepping mode
+			toggleCableIterStepMode();
+		else if (key == 'u' && state) // do one iteration
+			stepCableOneIteration();
 
 		return false;
 	}
@@ -585,6 +667,7 @@ public:
 
 	void stepSimulation(float deltaTime) override
 	{
+		_deltaTime = deltaTime;
 		if (nbFrame % 10 == 0)
 		{
 			nbStep++;
@@ -734,22 +817,8 @@ public:
 			}
 
 			int subStep = substepSolver;
-			m_dynamicsWorld->stepSimulation(deltaTime, subStep, deltaTime / subStep);
-
-			delta_ticks = clock() - current_ticks;
-
-			// draws
-			for (int i = 0; i < m_dynamicsWorld->getNumCollisionObjects(); ++i)
-			{
-				btCollisionObject* co = m_dynamicsWorld->getCollisionObjectArray().at(i);
-				btCollisionShape* cs = co->getCollisionShape();
-				btVector3 AabbMin, AabbMax;
-				cs->getAabb(co->getWorldTransform(), AabbMin, AabbMax);
-
-				// m_dynamicsWorld->getDebugDrawer()->drawBox(AabbMin, AabbMax, btVector3(0,1,1));
-				// m_dynamicsWorld->getDebugDrawer()->drawSphere(co->getWorldTransform().getOrigin(), 0.05, btVector3(1, 0, 1));
-			}
-
+			tick(deltaTime, subStep, deltaTime / subStep);
+			
 			if (m_printFPS && delta_ticks > 0)
 			{
 				m_fps = CLOCKS_PER_SEC / delta_ticks;
@@ -3010,7 +3079,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 			btTransform wallTransform = btTransform();
 			wallTransform.setIdentity();
 			wallTransform.setOrigin(btVector3(0, 2, 4));
-			mcmvShape->addChildShape(wallTransform, wallBoxShape);
+			//mcmvShape->addChildShape(wallTransform, wallBoxShape);
 		}
 
 		// Shape: MCMV - Corner
@@ -3102,6 +3171,8 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	mcmvCable->getCollisionShape()->setMargin(margin);
 	mcmvCable->setCollisionParameters(3, 3, 0);
 	mcmvCable->setCollisionViscosity(50);
+	
+	pdemo->m_cable = mcmvCable;
 
 	// Register GIMPACT algorithm
 	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
