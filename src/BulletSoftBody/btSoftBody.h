@@ -314,6 +314,10 @@ public:
 	struct Node : Feature
 	{
 		btVector3 m_x;       // Position
+		btVector3 m_xOut;    // Narrow Position
+		btVector3 m_xStartOut;    // Narrow Position
+		btVector3 m_xStartRay;    // Narrow Position
+		btVector3 m_xEndRay;    // Narrow Position
 		btVector3 m_xn;      // Previous position from the last step, not the substep
 		int m_nbCollidingObjectPotential;  // Number of element in potential collision
 		int m_nbCollidingObjectInFrame;  // Number of element in collision

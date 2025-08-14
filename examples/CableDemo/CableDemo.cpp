@@ -32,6 +32,8 @@
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
 #include <iostream>
 #include <chrono>
+#include <deque>
+#include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h>
 
@@ -691,10 +693,10 @@ public:
 					{
 						int k = i > 5 ? 5 : i;
 						btRigidBody* rb = btRigidBody::upcast(m_dynamicsWorld->getCollisionObjectArray()[k]);
-						// if (i <= 4) rb->setAngularVelocity(btVector3(0, 0, 0.25));
+						// if (k < 5) rb->setAngularVelocity(btVector3(0,0,1));
 
 						fromPos.setY(9 - 2 * i);
-						toPos.setY(9 - 2 * i);
+						toPos.setY(11 - 2 * i);
 
 						if (fromPos.distance(toPos) < FLT_EPSILON) continue;
 						btVector3 rayDirection = (toPos - fromPos).normalized();
@@ -716,9 +718,14 @@ public:
 
 			if (m_currentDemoIndex == 27)
 			{
+				struct ContactNotInfo
+				{
+					btVector3 normal;
+				};
+				
 				btVector3 position = btVector3(posX, 0, 0);
 
-				for (int i = 0; i < 10; ++i)
+				for (int i = 0; i < 6; ++i)
 				{
 					int k = i > 5 ? 5 : i;
 					btRigidBody* rb = btRigidBody::upcast(m_dynamicsWorld->getCollisionObjectArray()[k]);
@@ -726,19 +733,75 @@ public:
 					position.setY((9 - posY) - 2 * i);
 					m_dynamicsWorld->getDebugDrawer()->drawSphere(position, margin, btVector3(1, 0, 0));
 
-					btSphereShape nodeShape(margin);
+					btSphereShape nodeShape(margin + FLT_EPSILON);
 					btCollisionObject tmp;
 					tmp.setCollisionShape(&nodeShape);
 					tmp.setWorldTransform(btTransform(btQuaternion::getIdentity(), position));
 
-					btCable::MyContactResultCallback result(0.0, &tmp, rb);
-					getSoftDynamicsWorld()->contactPairTest(&tmp, rb, result);
-					if (result.numContacts == 0) continue;
-
-					for(int i = 0; i < result.numContacts; ++i)
+					btCable::MyContactResultCallback firstResult(0.0, &tmp, rb);
+					getSoftDynamicsWorld()->contactPairTest(&tmp, rb, firstResult);
+					if (firstResult.numContacts == 0) continue;
+					
+					// Update data to redo the contactPairTest 		
+					int idxDeque = 0;
+					vector<std::tuple<btVector3, ContactNotInfo>> contactInfo;
+					for (int i = 0; i < firstResult.numContacts; i++)
 					{
-						m_dynamicsWorld->getDebugDrawer()->drawSphere(result.contacts[i].point + result.contacts[i].normal * margin, margin, btVector3(0, 0, 1));
+						ContactNotInfo contact;
+						contact.normal = firstResult.contacts[i].normal;
+						contactInfo.emplace_back(firstResult.contacts[i].point + contact.normal * (margin + FLT_EPSILON), contact);
 					}
+					nodeShape = btSphereShape(margin);
+					tmp.setCollisionShape(&nodeShape);
+
+					// Simulate collisions to get the best potential point
+					while (true)
+					{
+						auto contactData = contactInfo[idxDeque];
+						btVector3 outPosition = std::get<btVector3>(contactData);
+						
+						// Set the position to node collision object
+						tmp.setWorldTransform(btTransform(btQuaternion::getIdentity(), outPosition));
+
+						btCable::MyContactResultCallback loopResult(0.0, &tmp, rb);
+						getSoftDynamicsWorld()->contactPairTest(&tmp, rb, loopResult);
+
+						if (loopResult.numContacts == 0) idxDeque++;
+						else
+						{
+							for (int i = 0; i < loopResult.numContacts; i++)
+							{
+								ContactNotInfo contact;
+								contact.normal = loopResult.contacts[i].normal;
+								contactInfo.emplace_back(loopResult.contacts[i].point + loopResult.contacts[i].normal * (margin + FLT_EPSILON), contact);
+							}
+
+							contactInfo.erase(contactInfo.begin() + idxDeque);
+						}
+
+						if (idxDeque >= contactInfo.size()) break;		
+					}
+
+					// Sort and find the position closest to the current node
+					idxDeque = 0;
+					btVector3 bestOutPosition = std::get<btVector3>(contactInfo[idxDeque]);
+					btScalar bestDistancePosition = bestOutPosition.distance(position);
+					for (int idxOut = 1; idxOut < contactInfo.size(); ++idxOut)
+					{
+						btVector3 outPosition = std::get<btVector3>(contactInfo[idxOut]);
+						btScalar distance = outPosition.distance(position);
+						
+						if(distance < bestDistancePosition)
+						{
+							bestOutPosition = outPosition;
+							bestDistancePosition = distance;
+							idxDeque = idxOut;
+						}
+					}
+
+					// Update output structs with the best potential collision
+					ContactNotInfo bestContact = std::get<ContactNotInfo>(contactInfo[idxDeque]);
+					m_dynamicsWorld->getDebugDrawer()->drawSphere(bestOutPosition, margin, btVector3(0, 0, 1));
 				}
 			}
 
@@ -2794,7 +2857,8 @@ static void Init_TestClaw(CableDemo* pdemo)
 
 	btGImpactMeshShape* b2;
 	{
-		static const btVector3 kCubeVertsB[8] = {
+		static const btVector3 kCubeVertsB[8] = 
+		{
 			{-kHalfExtentsB.x(), -kHalfExtentsB.y(), -kHalfExtentsB.z()},  // 0
 			{kHalfExtentsB.x(), -kHalfExtentsB.y(), -kHalfExtentsB.z()},   // 1
 			{kHalfExtentsB.x(), kHalfExtentsB.y(), -kHalfExtentsB.z()},    // 2
@@ -2806,7 +2870,8 @@ static void Init_TestClaw(CableDemo* pdemo)
 		};
 
 		// 12 triangles (two per face)
-		static const unsigned int kCubeIdxB[36] = {
+		static const unsigned int kCubeIdxB[36] = 
+		{
 			0, 2, 1, 2, 0, 3,  // −Z
 			4, 5, 6, 6, 7, 4,  // +Z
 			0, 5, 4, 5, 0, 1,  // −Y
@@ -3031,7 +3096,8 @@ static void Init_MCMVCable(CableDemo* pdemo)
 		{
 			static const btVector3 kHalfExtents(2.5, 2, 0.5);
 
-			static const btVector3 kCubeVerts[8] = {
+			static const btVector3 kCubeVerts[8] = 
+			{
 				{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 0
 				{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 1
 				{kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},    // 2
@@ -3042,7 +3108,8 @@ static void Init_MCMVCable(CableDemo* pdemo)
 				{-kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}     // 7
 			};
 
-			static const unsigned int kCubeIdx[36] = {
+			static const unsigned int kCubeIdx[36] = 
+			{
 				0, 2, 1, 2, 0, 3,  // −Z
 				4, 5, 6, 6, 7, 4,  // +Z
 				0, 5, 4, 5, 0, 1,  // −Y
@@ -3078,15 +3145,16 @@ static void Init_MCMVCable(CableDemo* pdemo)
 
 			btTransform wallTransform = btTransform();
 			wallTransform.setIdentity();
-			wallTransform.setOrigin(btVector3(0, 2, 4));
-			//mcmvShape->addChildShape(wallTransform, wallBoxShape);
+			wallTransform.setOrigin(btVector3(0, 1, 4));
+			mcmvShape->addChildShape(wallTransform, wallBoxShape);
 		}
 
 		// Shape: MCMV - Corner
 		{
 			static const btVector3 kHalfExtents(2.5, 0.25, 0.25);
 
-			static const btVector3 kCubeVerts[6] = {
+			static const btVector3 kCubeVerts[6] = 
+			{
 				{-kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},   // 0
 				{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 1
 				{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 2
@@ -3095,11 +3163,13 @@ static void Init_MCMVCable(CableDemo* pdemo)
 				{kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}      // 5
 			};
 
-			static const unsigned int kCubeIdx[24] = {
+			static const unsigned int kCubeIdx[24] = 
+			{
 				0, 1, 2, 0, 2, 3,
 				0, 4, 1, 3, 2, 5,
 				1, 4, 5, 1, 5, 2,
-				3, 5, 4, 3, 4, 0};
+				3, 5, 4, 3, 4, 0
+			};
 
 			btIndexedMesh mesh;
 			mesh.m_numTriangles = 8;
@@ -3154,7 +3224,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 
 	/// Cable
 	// Resolution's cable
-	int resolution = 150;
+	int resolution = 200;
 	int iterations = 50;
 	btScalar margin = 0.01;
 	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
@@ -3169,7 +3239,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	mcmvCable->setCableRadius(margin);
 	mcmvCable->setCollisionMargin(margin);
 	mcmvCable->getCollisionShape()->setMargin(margin);
-	mcmvCable->setCollisionParameters(3, 3, 0);
+	mcmvCable->setCollisionParameters(5, 1, 0);
 	mcmvCable->setCollisionViscosity(50);
 	
 	pdemo->m_cable = mcmvCable;
@@ -3211,19 +3281,27 @@ static void Init_RayCast(CableDemo* pdemo)
 
 	// BoxShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
-		btBoxShape* shape = new btBoxShape(halfExtends);
-		shape->setMargin(0.0);
+		btBoxShape* shape1 = new btBoxShape(halfExtends);
+		shape1->setMargin(0.0);
 
-		btRigidBody* rb = pdemo->createRigidBody(10, trShape, shape);
+		btBoxShape* shape2 = new btBoxShape(halfExtends);
+		shape2->setMargin(0.0);
+		// trShape.setOrigin(position + btVector3(0, 0.495, 0));
+
+		btCompoundShape* shape = new btCompoundShape(false);
+		shape->setMargin(0.0);
+		shape->addChildShape(btTransform(btQuaternion(), btVector3(   0, 0.510, 0)), shape1);
+		// shape->addChildShape(btTransform(btQuaternion(), btVector3(-0.5, 0.005, 0)), shape2);
+
+		btRigidBody* rb = pdemo->createRigidBody(10, trShape, shape2);
 		rb->setGravity(btVector3(0, 0, 0));
 		rb->setSleepingThresholds(0, 0);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// SphereShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		btSphereShape* shape = new btSphereShape(halfExtend);
 		shape->setMargin(0.0);
@@ -3232,10 +3310,10 @@ static void Init_RayCast(CableDemo* pdemo)
 		rb->setGravity(btVector3(0, 0, 0));
 		rb->setSleepingThresholds(0, 0);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// CylinderShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		btCylinderShape* shape = new btCylinderShape(halfExtends);
 		shape->setMargin(0.0);
@@ -3244,10 +3322,10 @@ static void Init_RayCast(CableDemo* pdemo)
 		rb->setGravity(btVector3(0, 0, 0));
 		rb->setSleepingThresholds(0, 0);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// ConvexHullShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		btConvexHullShape* shape = new btConvexHullShape();
 		shape->setMargin(0.0);
@@ -3276,10 +3354,10 @@ static void Init_RayCast(CableDemo* pdemo)
 		rb->setGravity(btVector3(0, 0, 0));
 		rb->setSleepingThresholds(0, 0);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// GImpactShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		static const btVector3 kCubeVerts[8] = {
 			{-halfExtends.x(), -halfExtends.y(), -halfExtends.z()},  // 0
@@ -3322,40 +3400,40 @@ static void Init_RayCast(CableDemo* pdemo)
 		rb->setGravity(btVector3(0, 0, 0));
 		rb->setSleepingThresholds(0, 0);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// CompoundShape_BoxShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		btBoxShape* shape = new btBoxShape(halfExtends);
 		shape->setMargin(0.0);
 
 		compoundShape->addChildShape(trShape, shape);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// CompoundShape_SphereShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		btSphereShape* shape = new btSphereShape(halfExtend);
 		shape->setMargin(0.0);
 
 		compoundShape->addChildShape(trShape, shape);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// CompoundShape_CylinderShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		btCylinderShape* shape = new btCylinderShape(halfExtends);
 		shape->setMargin(0.0);
 
 		compoundShape->addChildShape(trShape, shape);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// CompoundShape_ConvexHullShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		btConvexHullShape* shape = new btConvexHullShape();
 		shape->setMargin(0.0);
@@ -3382,10 +3460,10 @@ static void Init_RayCast(CableDemo* pdemo)
 
 		compoundShape->addChildShape(btTransform::getIdentity(), shape);
 	}
+	position.setY(position.getY() - 2.0);
 
 	// CompoundShape_GImpactShape
 	trShape.setOrigin(position);
-	position.setY(position.getY() - 2.0);
 	{
 		static const btVector3 kCubeVerts[8] = {
 			{-halfExtends.x(), -halfExtends.y(), -halfExtends.z()},  // 0
@@ -3426,6 +3504,7 @@ static void Init_RayCast(CableDemo* pdemo)
 
 		compoundShape->addChildShape(trShape, shape);
 	}
+	position.setY(position.getY() - 2.0);
 
 	btRigidBody* rbCompound = pdemo->createRigidBody(10, btTransform::getIdentity(), compoundShape);
 	rbCompound->setGravity(btVector3(0, 0, 0));
@@ -3589,7 +3668,7 @@ static void Init_Collision(CableDemo* pdemo)
 		shape->setMargin(0.0);
 
 		trShape.setOrigin(btVector3(position.getX() - 0.5, position.getY() - 1, position.getZ()));
-		trShape.setRotation(btQuaternion(btVector3(0,0,1), -3.0 / 6.0));
+		// trShape.setRotation(btQuaternion(btVector3(0,0,1), -3.0 / 6.0));
 		compoundShape->addChildShape(trShape, shape);
 		trShape.setRotation(btQuaternion());
 	}
@@ -3696,7 +3775,7 @@ static void Init_Collision(CableDemo* pdemo)
 	SliderParams sliderStartingXRay("Position X", &pdemo->posX);
 	sliderStartingXRay.m_userPointer = pdemo;
 	sliderStartingXRay.m_minVal = 0;
-	sliderStartingXRay.m_maxVal = 4;
+	sliderStartingXRay.m_maxVal = 2;
 	sliderStartingXRay.m_callback = OnPosXChanged;
 
 	SliderParams sliderStartingYRay("Position Y", &pdemo->posY);
@@ -3708,7 +3787,7 @@ static void Init_Collision(CableDemo* pdemo)
 	SliderParams sliderMargin("Margin", &pdemo->margin);
 	sliderMargin.m_userPointer = pdemo;
 	sliderMargin.m_minVal = 0;
-	sliderMargin.m_maxVal = 1;
+	sliderMargin.m_maxVal = 0.2;
 	sliderMargin.m_callback = OnMarginChanged;
 
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStartingXRay);
