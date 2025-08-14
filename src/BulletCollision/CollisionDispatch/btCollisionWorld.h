@@ -209,6 +209,10 @@ public:
 		//@BP Mod - Custom flags, currently used to enable backface culling on tri-meshes, see btRaycastCallback.h. Apply any of the EFlags defined there on m_flags here to invoke.
 		unsigned int m_flags;
 
+		btVector3 m_rayFromWorld;  //used to calculate hitPointWorld from hitFraction
+		btVector3 m_rayToWorld;
+		bool m_updateRay = false;
+
 		virtual ~RayResultCallback()
 		{
 		}
@@ -240,13 +244,10 @@ public:
 	struct ClosestRayResultCallback : public RayResultCallback
 	{
 		ClosestRayResultCallback(const btVector3& rayFromWorld, const btVector3& rayToWorld)
-			: m_rayFromWorld(rayFromWorld),
-			  m_rayToWorld(rayToWorld)
 		{
+			m_rayFromWorld = rayFromWorld;
+			m_rayToWorld = rayToWorld;
 		}
-
-		btVector3 m_rayFromWorld;  //used to calculate hitPointWorld from hitFraction
-		btVector3 m_rayToWorld;
 
 		btVector3 m_hitNormalWorld;
 		btVector3 m_hitPointWorld;
@@ -275,9 +276,9 @@ public:
 	struct AllHitsRayResultCallback : public RayResultCallback
 	{
 		AllHitsRayResultCallback(const btVector3& rayFromWorld, const btVector3& rayToWorld)
-			: m_rayFromWorld(rayFromWorld),
-			  m_rayToWorld(rayToWorld)
 		{
+			m_rayFromWorld = rayFromWorld;
+			m_rayToWorld = rayToWorld;
 		}
 
 		btAlignedObjectArray<const btCollisionObject*> m_collisionObjects;

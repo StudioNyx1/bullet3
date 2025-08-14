@@ -42,7 +42,6 @@ void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId,
 	if ((m_to - m_from).normalized().dot(n) > 0.0) 
 		return;
 
-
 	btScalar distA = n.dot(m_from) - planeD;
 	btScalar distB = n.dot(m_to) - planeD;
 
@@ -55,7 +54,6 @@ void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId,
 
 	// distance along the segment to where we ENTER the slab
 	const btScalar denom = distA - distB;
-	if (btFabs(denom) < SIMD_EPSILON) return;
 
 	btScalar target = 0.0f;
 	if (distA > planeMargin)
@@ -63,8 +61,7 @@ void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId,
 	else if (distA < -planeMargin)
 		target = -planeMargin;
 
-
-	const btScalar distance = (distA - target) / denom;
+	const btScalar distance = denom > FLT_EPSILON ? (distA - target) / denom : denom;
 	//if (distance >= m_hitFraction) return;
 
 	// original inside-triangle tests
@@ -76,14 +73,17 @@ void btTriangleRaycastCallback::processTriangle(btVector3* triangle, int partId,
 	btVector3 v0p = v0 - point;
 	btVector3 v1p = v1 - point;
 	btVector3 cp0 = v0p.cross(v1p);
-	if (cp0.dot(n) < edge_tolerance) return;
+	if (abs(cp0.dot(n)) < edge_tolerance)
+		return;
 
 	btVector3 v2p = v2 - point;
 	btVector3 cp1 = v1p.cross(v2p);
-	if (cp1.dot(n) < edge_tolerance) return;
+	if (abs(cp1.dot(n)) < edge_tolerance)
+		return;
 
 	btVector3 cp2 = v2p.cross(v0p);
-	if (cp2.dot(n) < edge_tolerance) return;
+	if (abs(cp2.dot(n)) < edge_tolerance)
+		return;
 
 	// normalize for reporting
 	if (nLen > SIMD_EPSILON) n /= nLen;

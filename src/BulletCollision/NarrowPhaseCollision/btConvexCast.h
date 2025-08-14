@@ -51,7 +51,6 @@ public:
 	struct CastResult
 	{
 		//virtual bool	addRayResult(const btVector3& normal,btScalar	fraction) = 0;
-
 		virtual void DebugDraw(btScalar fraction) { (void)fraction; }
 		virtual void drawCoordSystem(const btTransform& trans) { (void)trans; }
 		virtual void reportFailure(int errNo, int numIterations)
@@ -71,6 +70,7 @@ public:
 		virtual ~CastResult(){};
 
 		btScalar originalDist = 0.0;
+		bool m_updateRay = false;
 		btTransform m_hitTransformA;
 		btTransform m_hitTransformB;
 		btVector3 m_normal;
@@ -92,8 +92,5 @@ public:
 		const btTransform& toB,
 		CastResult& result) = 0;	
 };
-
-
-
 
 #endif  //BT_CONVEX_CAST_H

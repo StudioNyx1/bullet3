@@ -27,13 +27,8 @@ subject to the following restrictions:
 #define MAX_ITERATIONS 32
 #endif
 
-btGjkConvexCast::btGjkConvexCast(const btConvexShape* convexA, const btConvexShape* convexB, btSimplexSolverInterface* simplexSolver, const btScalar margin)
-	: m_simplexSolver(simplexSolver),
-	  m_convexA(convexA),
-	  m_convexB(convexB)
-{
-	m_margin = margin;
-}
+btGjkConvexCast::btGjkConvexCast(const btConvexShape* convexA, const btConvexShape* convexB, btSimplexSolverInterface* simplexSolver)
+	: m_simplexSolver(simplexSolver), m_convexA(convexA), m_convexB(convexB) {}
 
 bool btGjkConvexCast::calcTimeOfImpact(
 	const btTransform& fromA,
@@ -157,19 +152,6 @@ bool btGjkConvexCast::calcTimeOfImpact(
 		if (n.dot(r) >= -result.m_allowedPenetration)
 			return false;
 
-		if (dist < 0.0)
-		{
-			if (dist >= -m_margin)
-			{
-				result.m_fraction = dist / r.length();
-				result.m_normal = n;
-				result.m_hitPoint = c;
-				return true;
-			}
-
-			return false;
-		}
-		
 		result.m_fraction = lambda;
 		result.m_normal = n;
 		result.m_hitPoint = c;
@@ -179,22 +161,15 @@ bool btGjkConvexCast::calcTimeOfImpact(
 	return false;
 }
 
-
-
-btGjkConvexCastCable::btGjkConvexCastCable(const btConvexShape* convexA, const btConvexShape* convexB, const btVector3 m_startNode0,
-										   const btVector3 m_startNode1,
-										   const btVector3 m_endNode0,
-										   const btVector3 m_endNode1, btSimplexSolverInterface* simplexSolver)
+btMarginGjkConvexCast::btMarginGjkConvexCast(const btConvexShape* convexA, const btConvexShape* convexB, btSimplexSolverInterface* simplexSolver, const btScalar margin)
 	: m_simplexSolver(simplexSolver),
-	  m_convexA(convexA),
-	  m_convexB(convexB),
-	  m_startNode0(m_startNode0),
-	  m_startNode1(m_startNode1),
-	  m_endNode0(m_endNode0),
-	  m_endNode1(m_endNode1)
+	m_convexA(convexA),
+	m_convexB(convexB)
 {
+	m_margin = margin;
 }
-bool btGjkConvexCastCable::calcTimeOfImpact(
+
+bool btMarginGjkConvexCast::calcTimeOfImpact(
 	const btTransform& fromA,
 	const btTransform& toA,
 	const btTransform& fromB,
@@ -203,11 +178,12 @@ bool btGjkConvexCastCable::calcTimeOfImpact(
 {
 	m_simplexSolver->reset();
 
-	/// compute linear velocity for this interval, to interpolate
-	//assume no rotation/angular velocity, assert here?
+	// compute linear velocity for this interval, to interpolate
+	// assume no rotation/angular velocity, assert here?
 	btVector3 linVelA, linVelB;
 	linVelA = toA.getOrigin() - fromA.getOrigin();
-	linVelB = btVector3(0, 0, 0);
+	linVelB = toB.getOrigin() - fromB.getOrigin();
+
 	btScalar radius = btScalar(0.001);
 	btScalar lambda = btScalar(0.);
 	btVector3 v(1, 0, 0);
@@ -216,45 +192,32 @@ bool btGjkConvexCastCable::calcTimeOfImpact(
 
 	btVector3 n;
 	n.setValue(btScalar(0.), btScalar(0.), btScalar(0.));
-	bool hasResult = false;
 	btVector3 c;
 	btVector3 r = (linVelA - linVelB);
 
 	btScalar lastLambda = lambda;
 
 	int numIter = 0;
-	//first solution, using GJK
 
 	btTransform identityTrans;
 	identityTrans.setIdentity();
 
 	btPointCollector pointCollector;
-	btPointCollector pointCollectorAfter;
-	btGjkEpaPenetrationDepthSolver epa = btGjkEpaPenetrationDepthSolver();
-	btGjkPairDetector gjk(m_convexA, m_convexB, m_simplexSolver, &epa);
-	btGjkPairDetector::ClosestPointInput input;
 
-	//we don't use margins during CCD
-	//gjk.setIgnoreMargin(true);
-	//gjkAfter.setIgnoreMargin(true);
+	btGjkPairDetector gjk(m_convexA, m_convexB, m_simplexSolver, 0);
+	btGjkPairDetector::ClosestPointInput input;
 
 	input.m_transformA = fromA;
 	input.m_transformB = fromB;
 	gjk.getClosestPoints(input, pointCollector, 0);
 
-	hasResult = pointCollector.m_hasResult;
-	c = pointCollector.m_pointInWorld;
-	btScalar originalDist;
-	btVector3 pointX = c;
-	if (hasResult)
+	if (pointCollector.m_hasResult)
 	{
-		originalDist = pointCollector.m_distance;
-		btScalar dist;
-		dist = pointCollector.m_distance;
+		btScalar dist = pointCollector.m_distance;
+		c = pointCollector.m_pointInWorld;
 		n = pointCollector.m_normalOnBInWorld;
-		result.originalDist = originalDist;
 
-		//not close enough
+		// not close enough
 		while (dist > radius)
 		{
 			numIter++;
@@ -271,58 +234,69 @@ bool btGjkConvexCastCable::calcTimeOfImpact(
 			lambda = lambda - dLambda;
 
 			if (lambda > btScalar(1.))
-			{
 				return false;
-			}
 
 			if (lambda < btScalar(0.))
-			{
 				return false;
-			}
 
 			//todo: next check with relative epsilon
 			if (lambda <= lastLambda)
 			{
 				return false;
+				//n.setValue(0,0,0);
 				break;
 			}
 			lastLambda = lambda;
 
+			//interpolate to next lambda
+			result.DebugDraw(lambda);
 			input.m_transformA.getOrigin().setInterpolate3(fromA.getOrigin(), toA.getOrigin(), lambda);
+			input.m_transformB.getOrigin().setInterpolate3(fromB.getOrigin(), toB.getOrigin(), lambda);
 
-			gjk.getClosestPoints(input, pointCollectorAfter, 0);
-
-			if (pointCollectorAfter.m_hasResult)
+			gjk.getClosestPoints(input, pointCollector, 0);
+			if (pointCollector.m_hasResult)
 			{
-				// Penetration case
-				if (pointCollectorAfter.m_distance < btScalar(0.))
+				if (pointCollector.m_distance < btScalar(0.))
 				{
 					result.m_fraction = lastLambda;
-					n = pointCollectorAfter.m_normalOnBInWorld;
+					n = pointCollector.m_normalOnBInWorld;
 					result.m_normal = n;
-					result.m_hitPoint = pointCollectorAfter.m_pointInWorld;
-					result.m_hitTransformA = input.m_transformA;
-					result.originalDist = pointCollectorAfter.m_distance;
+					result.m_hitPoint = pointCollector.m_pointInWorld;
 					return true;
 				}
-				// Update normale and contact point
-				c = pointCollectorAfter.m_pointInWorld;
-				n = pointCollectorAfter.m_normalOnBInWorld;
-				dist = pointCollectorAfter.m_distance;
+				c = pointCollector.m_pointInWorld;
+				n = pointCollector.m_normalOnBInWorld;
+				dist = pointCollector.m_distance;
+			}
+			else
+			{
+				//??
+				return false;
 			}
 		}
 
-		if (n.dot(r) >= 0 && (m_endNode0 - m_startNode0).dot(r) >= 0 && (m_endNode1 - m_startNode1).dot(r) >= 0)
+		btScalar dotNormalRay = n.dot(r);
+
+		if (dotNormalRay > 0) return false;
+
+		if (dist < -m_margin) return false;
+
+		if (dist < 0 && dist >= -m_margin)
 		{
-			return false;
-		}
+			result.m_fraction = 0.0;
+			result.m_normal = n;
+			result.m_hitPoint = c + n * m_margin;
+			result.m_updateRay = true;
+			result.m_hitTransformA.setOrigin(result.m_hitPoint);
+			result.m_hitTransformB.setOrigin(result.m_hitPoint);
+			return true;
+		}	
 
 		result.m_fraction = lambda;
 		result.m_normal = n;
 		result.m_hitPoint = c;
-		result.m_hitTransformA = input.m_transformA;
-
 		return true;
 	}
+
 	return false;
 }
