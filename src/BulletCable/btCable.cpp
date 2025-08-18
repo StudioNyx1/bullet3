@@ -880,109 +880,73 @@ bool btCable::aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 node
 
 // single‐threaded narrow phase
 void btCable::runNarrowPhase(std::vector<BroadPhasePair>& cands,
-	btAlignedObjectArray<int>* idxOut,
-	btAlignedObjectArray<NodePairNarrowPhase>* npOut)
+    btAlignedObjectArray<int>* idxOut,
+    btAlignedObjectArray<NodePairNarrowPhase>* npOut)
 {
-	for (BroadPhasePair& c : cands)
-	{
-		Node* node = c.node;
-		node->m_xOut = btVector3(0,0,0);
-		node->m_xStartOut = btVector3(0,0,0);
-		btRigidBody* rb = btRigidBody::upcast(c.body);
-		if (!rb) continue;
+    // Pre-allocate outputs
+    idxOut->reserve(idxOut->size() + cands.size());
+    npOut->reserve(npOut->size() + cands.size());
+    
+    // Reusable collision objects
+	btSphereShape nodeCollisionShape(1.0f); 
+    btCollisionObject nodeCollisionObject;
+    nodeCollisionObject.setCollisionShape(&nodeCollisionShape);
+    btTransform nodeTransform(btQuaternion::getIdentity());
 
-		btVector3 nodeVel = node->m_v;
-		btScalar margin = computeCollisionMargin(rb->getCollisionShape()) + FLT_EPSILON;
-		btScalar nodeRadius = margin;// margin + nodeVel.length() * m_sst.sdt;
-		btSphereShape nodeCollisionShape(nodeRadius);
+    for (BroadPhasePair& c : cands) {
+        Node* node = c.node;
+        node->m_xOut = btVector3(0,0,0);
+        node->m_xStartOut = btVector3(0,0,0);
+        
+        btRigidBody* rb = btRigidBody::upcast(c.body);
+        if (!rb) continue;
 
-		btCollisionObject nodeCollisionObject;
-		btVector3 rbVel = rb->getVelocityInLocalPoint(node->m_q - rb->getWorldTransform().getOrigin());
-		btVector3 nodePosition = node->m_x + nodeVel * m_sst.sdt;
-		btTransform nodeTransform(btQuaternion::getIdentity(), nodePosition);
+        // Get positions and margin
+        const btVector3 currentPos = node->m_x;
+        const btVector3 nextPos = currentPos + node->m_v * m_sst.sdt;
+        const btCollisionShape* colShape = rb->getCollisionShape();
+        const btScalar margin = computeCollisionMargin(colShape);
+        const btScalar safetyOffset = margin + FLT_EPSILON;
 
-		nodeCollisionObject.setCollisionShape(&nodeCollisionShape);
-		nodeCollisionObject.setWorldTransform(nodeTransform);
+    	btVector3 rbVel = rb->getVelocityInLocalPoint(node->m_x - rb->getWorldTransform().getOrigin());
+    	//const btVector3 invRelVel = -(node->m_x - node->m_q);
+        btVector3 safePosition = nextPos;  // Default to next position
 
-		MyContactResultCallback firstResult(0.0, &nodeCollisionObject, rb);
-		m_world->contactPairTest(&nodeCollisionObject, rb, firstResult);
+    	// Start ray from the position of the node minus the velocity of the object and node itself
+    	btVector3 rayStart = currentPos + rbVel;
+    	btCollisionWorld::AllHitsRayResultCallback result(rayStart, currentPos);
+		btCollisionWorld::rayTestSingleWithMargin(btTransform(btQuaternion(), rayStart), btTransform(btQuaternion(), currentPos), rb, rb->getCollisionShape(), rb->getWorldTransform(), result, safetyOffset);
+    	
+    	node->m_xStartOut = rayStart;
+    	
+    	if (!result.hasHit())
+    	{
+    		continue;
+    	}
+    	
+    	btVector3 normal = result.m_hitNormalWorld[0];
+    	safePosition = result.m_hitPointWorld[0];
+    	
+    	for (int i = 1; i < result.m_hitPointWorld.size(); ++i)
+    	{
+    		normal += result.m_hitNormalWorld[i]; 
+    		safePosition += normal * normal.dot(result.m_hitPointWorld[i] - safePosition);
+    	}
 
-		if (firstResult.numContacts == 0) continue;
+        // Output results
+        NodePairNarrowPhase pair;
+        pair.pair = &c;
+        pair.node = node;
+        pair.worldTransform = rb->getWorldTransform();
+        pair.xOut = safePosition;
+    	pair.normal = normal;
 
-		c.node->m_nbCollidingObjectPotential++;
+        node->m_xOut = safePosition;
+        node->m_xStartOut = rayStart;
 
-		// Build contact deque
-		size_t idxDeque = 0;
-		std::vector<std::pair<btVector3, ContactInfo>> contactInfo;
-		for (int i = 0; i < firstResult.numContacts; ++i)
-		{
-			const ContactInfo& contact = firstResult.contacts[i];
-			btVector3 offsetPos = contact.point + contact.normal * margin;
-			contactInfo.emplace_back(offsetPos, contact);
-		}
-
-		// Switch to minimal shape for further testing
-		nodeCollisionShape = btSphereShape(m_collisionMargin);
-		nodeCollisionObject.setCollisionShape(&nodeCollisionShape);
-
-		// Explore deeper contacts
-		while (idxDeque < contactInfo.size())
-		{
-			// Set the new position to the node sphere collision object
-			const auto& outPosition = contactInfo[idxDeque].first;
-			nodeTransform.setOrigin(outPosition);
-			nodeCollisionObject.setWorldTransform(nodeTransform);
-
-			// Simulate contacts to take the best one for ray casting
-			MyContactResultCallback loopResult(0.0, &nodeCollisionObject, rb);
-			m_world->contactPairTest(&nodeCollisionObject, rb, loopResult);
-
-			if (loopResult.numContacts == 0)
-			{
-				++idxDeque;
-			}
-			else
-			{
-				for (int i = 0; i < loopResult.numContacts; ++i)
-				{
-					const ContactInfo& contact = loopResult.contacts[i];
-					btVector3 offsetPos = contact.point + contact.normal * margin;
-					contactInfo.emplace_back(offsetPos, contact);
-				}
-				contactInfo.erase(contactInfo.begin() + idxDeque);
-			}
-		}
-
-		// Select the best contact point (closest to node->m_q)
-		size_t bestIdx = 0;
-		btScalar bestDistance = contactInfo[0].second.distance;
-		for (size_t i = 1; i < contactInfo.size(); ++i)
-		{
-			btScalar dist = contactInfo[i].second.distance;
-			if (dist > bestDistance)
-			{
-				bestDistance = dist;
-				bestIdx = i;
-			}
-		}
-		
-		// Set best result
-		const ContactInfo& bestContact = contactInfo[bestIdx].second;
-
-		NodePairNarrowPhase pair;
-		pair.pair = &c;
-		pair.node = node;
-		pair.worldTransform = rb->getWorldTransform();
-		pair.normal = bestContact.normal;
-		pair.distance = bestContact.distance;
-		pair.xOut = bestContact.point + bestContact.normal * margin;
-
-		node->m_xOut = pair.xOut;
-		node->m_xStartOut = nodePosition;
-
-		npOut->push_back(pair);
-		idxOut->push_back(node->index);
-	}
+    	npOut->push_back(pair);
+    	idxOut->push_back(node->index);
+    }
 }
 
 void btCable::detectCollisionsThreaded(

@@ -30,12 +30,15 @@
 #include "BulletDynamics/MLCPSolvers/btMLCPSolver.h"
 #include <BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolverMt.h>
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
+#include "BulletCollision/CollisionShapes/btMeshToSDF.h"
+
 #include <iostream>
 #include <chrono>
 #include <deque>
 #include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h>
+#include <BulletCollision/CollisionShapes/btSdfCollisionShape.h>
 
 // #include "BunnyMesh.h"
 
@@ -2786,12 +2789,12 @@ static void Init_TestClaw(CableDemo* pdemo)
 	// Resolution's cable
 	int resolution = 100;
 	int iterations = 80;
-	btScalar margin = 0.02;
+	btScalar margin = 0.05;
 
 	// compound
 	btTransform blocCompound = btTransform();
 	blocCompound.setIdentity();
-	blocCompound.setOrigin(btVector3(1.1, 5, -5));
+	blocCompound.setOrigin(btVector3(1.05, 5, -5));
 	btCompoundShape* compundShape = new btCompoundShape(false);
 
 	btVector3 kHalfExtentsA = btVector3(1, 1, 5);
@@ -2934,6 +2937,8 @@ static void Init_TestClaw(CableDemo* pdemo)
 
 	///register GIMPACT algorithm
 	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
+
+	pdemo->m_cable = cable;
 }
 
 static void Init_Growth(CableDemo* pdemo)
