@@ -30,7 +30,6 @@
 #include "BulletDynamics/MLCPSolvers/btMLCPSolver.h"
 #include <BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolverMt.h>
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
-#include "BulletCollision/CollisionShapes/btMeshToSDF.h"
 
 #include <iostream>
 #include <chrono>
