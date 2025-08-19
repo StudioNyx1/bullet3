@@ -880,7 +880,6 @@ bool btCable::aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 node
 	       nodeMinAabb.z() - margin > maxAabb.z() || nodeMaxAabb.z() + margin < minAabb.z();
 }
 
-// single‐threaded narrow phase
 void btCable::runNarrowPhase(std::vector<BroadPhasePair>& cands,
     btAlignedObjectArray<int>* idxOut,
     btAlignedObjectArray<NodePairNarrowPhase>* npOut)
@@ -897,64 +896,52 @@ void btCable::runNarrowPhase(std::vector<BroadPhasePair>& cands,
     for (BroadPhasePair& c : cands)
 	{
         Node* node = c.node;
+    	node->m_xOut = btVector3(0,0,0); // Reset drawing
         
         btRigidBody* rb = btRigidBody::upcast(c.body);
         if (!rb) continue;
 
 		// One contact
-		nodeTransform.setOrigin(node->m_x);
+    	btVector3 currentPos = node->m_x;
+		nodeTransform.setOrigin(currentPos);
 		btScalar margin = computeCollisionMargin(rb->getCollisionShape());
 		btScalar marginCollisionShape = margin + (node->m_v *  m_sst.sdt).length();
 		nodeCollisionShape = btSphereShape(marginCollisionShape);
 		nodeCollisionObject.setCollisionShape(&nodeCollisionShape);
 		nodeCollisionObject.setWorldTransform(nodeTransform);
 
+    	btVector3 rbVel = rb->getVelocityInLocalPoint(currentPos - rb->getWorldTransform().getOrigin());
+
 		MyContactResultCallback contactResult(0.0, &nodeCollisionObject, rb);
 		m_world->contactPairTest(&nodeCollisionObject, rb, contactResult);
 
-		if (contactResult.numContacts == 0) continue;
-
-		btVector3 hitContact = contactResult.contacts[0].point;
-		btVector3 normalContact = contactResult.contacts[0].normal;
-
-		for (int idxContact = 1; idxContact < contactResult.numContacts; ++idxContact)
+		if (contactResult.numContacts == 0)
 		{
-			ContactInfo ci = contactResult.contacts[idxContact];
-			hitContact += ci.point;
-			normalContact += ci.normal;
+			continue;
 		}
 
-		hitContact /= btScalar(contactResult.numContacts);
-		normalContact.normalize();
+    	// Calculate the average of the contact normals
+    	btVector3 normalContact = btVector3(0,0,0);
+    	for (int idxContact = 0; idxContact < contactResult.numContacts; ++idxContact)
+    	{
+    		
+    		normalContact += contactResult.contacts[idxContact].normal;
+    	}
+    	
+    	normalContact /= contactResult.numContacts;
+    	normalContact.normalize();
 
-		// One raycast
-		btVector3 rbVel = rb->getVelocityInLocalPoint(node->m_x - rb->getWorldTransform().getOrigin());
-		btVector3 rayStart = node->m_q + rbVel * m_sst.sdt;
-		btVector3 rayEnd = hitContact;
-		btCollisionWorld::AllHitsRayResultCallback rayResult(rayStart, rayEnd);
-		rayResult.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
-		rayResult.m_flags |= btTriangleRaycastCallback::kF_UseGjkConvexCastRaytest;
-		m_world->rayTestSingleWithMargin(btTransform(btQuaternion(), rayStart), btTransform(btQuaternion(), rayEnd), rb, rb->getCollisionShape(), rb->getWorldTransform(), rayResult, margin);
-
-		if (!rayResult.hasHit()) continue;
-
-		btVector3 hitRay = rayResult.m_hitPointWorld[0];
-		btVector3 normalRay = rayResult.m_hitNormalWorld[0];
-		for (int i = 1; i < rayResult.m_hitPointWorld.size(); ++i)
-		{
-			normalRay = rayResult.m_hitNormalWorld[i];
-			hitRay += normalRay * normalRay.dot(rayResult.m_hitPointWorld[i] - hitRay);
-		}
-
+    	// Make the ray start position be the former node position with the rigidbody velocity to make sure it's out of the shape
+		btVector3 out = node->m_q + rbVel * m_sst.sdt;
+    	node->m_xOut = out; // for drawing
+    	
         // Output results
         NodePairNarrowPhase pair;
         pair.pair = &c;
         pair.node = node;
+    	pair.xOut = out;
         pair.worldTransform = rb->getWorldTransform();
-        pair.xOut = hitRay;
-    	pair.normal = contactResult.numContacts == 1 ? normalRay : normalContact;
-
-        node->m_xOut = pair.xOut;
+    	pair.normal = normalContact;
 
     	npOut->push_back(pair);
     	idxOut->push_back(node->index);
@@ -1486,7 +1473,7 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 		node.m_n = state.normals[0];
 		node.collideInAllIteration = true;
 
-		node.m_xOut = state.hits[0];
+		//node.m_xOut = state.hits[0];
 	}
 
 	// Refresh ray start positions for the next solver step
