@@ -277,7 +277,9 @@ bool btMarginGjkConvexCast::calcTimeOfImpact(
 
 		btScalar dotNormalRay = n.dot(r);
 
-		if (dotNormalRay > 0) return false;
+		if (dotNormalRay >= 0.0) return false;
+
+		if (abs(dotNormalRay) < FLT_EPSILON) return false;
 
 		if (dist < -m_margin) return false;
 
