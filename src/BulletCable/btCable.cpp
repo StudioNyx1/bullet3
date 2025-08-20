@@ -24,6 +24,9 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	m_nodePos = new NodePos[worldInfo->maxNodeNumberPerCable]();
 	m_nodeData = new NodeData[worldInfo->maxNodeNumberPerCable]();
 
+	_indexNodeContact = btAlignedObjectArray<int>();
+	_nodePairContact = btAlignedObjectArray<NodePairNarrowPhase>();
+
 	for (int i = 0; i < this->m_nodes.size(); i++)
 	{
 		Node& node = m_nodes[i];
@@ -130,7 +133,7 @@ void btCable::endIterativeSolve()
 	updateNodeData();
 }
 
-void btCable::DetectPrepareContacts()
+void btCable::PrepareSolver()
 {
 	int i, ni;
 
@@ -202,12 +205,6 @@ void btCable::DetectPrepareContacts()
 		}
 		m_cpt++;
 	}
-	_indexNodeContact = btAlignedObjectArray<int>();
-	_nodePairContact = btAlignedObjectArray<NodePairNarrowPhase>();
-	if (useCollision)
-	{
-		detectCollisionsThreaded(&_indexNodeContact, &_nodePairContact);
-	}
 	
 	_impacted = false;
 }
@@ -215,6 +212,7 @@ void btCable::DetectPrepareContacts()
 void btCable::solveSingleCableIteration(int currentIter)
 {
 	bool lastStep = currentIter == m_cfg.piterations - 1;
+	bool shouldDetectCollision = currentIter == m_substepDelayCollision - 1;
 
 	updateNodeDeltaPos(currentIter);
 
@@ -232,8 +230,13 @@ void btCable::solveSingleCableIteration(int currentIter)
 		bendingConstraint();
 	}
 
-	if (useCollision && (currentIter % m_substepDelayCollision == 0 || lastStep))
+	if (useCollision && ((currentIter + 1) % m_substepDelayCollision == 0 || lastStep))
 	{
+		if (shouldDetectCollision)
+		{
+			detectCollisionsThreaded(&_indexNodeContact, &_nodePairContact);
+		}
+		
 		contactConstraint(&_nodePairContact, &_indexNodeContact);
 	}
 }
@@ -275,7 +278,6 @@ void btCable::EndConstraintsSolve()
 		m_world->getDispatcher()->releaseManifold(manifolds.at(i).manifold);
 		manifolds.removeAtIndex(i);
 
-
 		for (int i = 0; i < _nodePairContact.size(); i++)
 		{
 			NodePairNarrowPhase* nodePair = &_nodePairContact.at(i);
@@ -296,10 +298,10 @@ void btCable::EndConstraintsSolve()
 			newPoint.m_positionWorldOnB = pointB;
 			manifold->addManifoldPoint(newPoint, true);
 		}
-
-		_nodePairContact.clear();
-		_indexNodeContact.clear();
 	}
+
+	_nodePairContact.clear();
+	_indexNodeContact.clear();
 }
 
 void btCable::updateNodeData()
@@ -847,11 +849,12 @@ void btCable::runBroadPhase(std::vector<ObjData>& data, std::vector<BroadPhasePa
 		// static node box (no margin first)
 		btVector3 lo, hi;
 		setNodeBoundingBox(n->m_x, n->m_q, 0, &lo, &hi);
+		btVector3 zero = btVector3(0, 0, 0);
 
 		// test each object
 		for (const auto& od : data)
 		{
-			if (aabbTestMargin(nodeVel, od.objVelocity, lo, hi, od.minAabb, od.maxAabb)) continue;
+			if (aabbTestMargin(zero, zero, lo, hi, od.minAabb, od.maxAabb)) continue;
 		
 			BroadPhasePair bp;
 			bp.node = n;
@@ -873,7 +876,7 @@ void btCable::runBroadPhase(std::vector<ObjData>& data, std::vector<BroadPhasePa
 
 bool btCable::aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 nodeMinAabb, btVector3 nodeMaxAabb, btVector3 minAabb, btVector3 maxAabb)
 {
-	btScalar margin = m_collisionMargin + (objVel - nodeVel).length() * m_sst.sdt + 0.05;
+	btScalar margin = m_collisionMargin + (objVel - nodeVel).length() * m_sst.sdt;
 	// expand and test aabb
 	return nodeMinAabb.x() - margin > maxAabb.x() || nodeMaxAabb.x() + margin < minAabb.x() ||
 	       nodeMinAabb.y() - margin > maxAabb.y() || nodeMaxAabb.y() + margin < minAabb.y() ||
@@ -905,7 +908,8 @@ void btCable::runNarrowPhase(std::vector<BroadPhasePair>& cands,
     	btVector3 currentPos = node->m_x;
 		nodeTransform.setOrigin(currentPos);
 		btScalar margin = computeCollisionMargin(rb->getCollisionShape());
-		btScalar marginCollisionShape = margin + (node->m_v *  m_sst.sdt).length();
+    	btVector3 nodeVel = (currentPos - node->m_q) / m_sst.sdt;
+		btScalar marginCollisionShape = margin;// + (nodeVel *  m_sst.sdt).length();
 		nodeCollisionShape = btSphereShape(marginCollisionShape);
 		nodeCollisionObject.setCollisionShape(&nodeCollisionShape);
 		nodeCollisionObject.setWorldTransform(nodeTransform);
@@ -924,7 +928,6 @@ void btCable::runNarrowPhase(std::vector<BroadPhasePair>& cands,
     	btVector3 normalContact = btVector3(0,0,0);
     	for (int idxContact = 0; idxContact < contactResult.numContacts; ++idxContact)
     	{
-    		
     		normalContact += contactResult.contacts[idxContact].normal;
     	}
     	
@@ -956,7 +959,7 @@ void btCable::detectCollisionsThreaded(
 	if (objects.size() < 2)
 		return;
 
-	// find which objects we could hit
+	// Filter object we can't hit (disabled, wrong mask etc...)
 	std::vector<btCollisionObject*> potentials;
 	collectPotentials(objects, potentials);
 	
@@ -980,7 +983,7 @@ void btCable::detectCollisionsThreaded(
 
 void btCable::solveConstraints()
 {
-	DetectPrepareContacts();
+	PrepareSolver();
 
 	// Solve constraints
 	for (int i = 0; i < m_cfg.piterations; ++i)
@@ -1430,7 +1433,7 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 		btCollisionWorld::AllHitsRayResultCallback result(J.from, J.to);
 		result.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
 		result.m_flags |= btTriangleRaycastCallback::kF_UseGjkConvexCastRaytest;
-		m_world->rayTestSingleWithMargin(btTransform(btQuaternion(), J.from), btTransform(btQuaternion(), J.to), obj, obj->getCollisionShape(), obj->getWorldTransform(), result, J.margin);
+		btCollisionWorld::rayTestSingleWithMargin(btTransform(btQuaternion(), J.from), btTransform(btQuaternion(), J.to), obj, obj->getCollisionShape(), obj->getWorldTransform(), result, J.margin);
 
 		if (!result.hasHit())
 			continue;

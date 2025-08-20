@@ -109,7 +109,7 @@ void btDefaultSoftBodySolver::solveConstraintsOneCable(btScalar solverdt, btCabl
 
 	if (cable->isActive())
 	{
-		cable->DetectPrepareContacts();
+		cable->PrepareSolver();
 	}
 }
 // btDefaultSoftBodySolver::solveConstraints

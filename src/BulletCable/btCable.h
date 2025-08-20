@@ -361,7 +361,7 @@ public:
 
 	void ResetNodePosition(const int nodeIndex, const btVector3 position);
 
-	void DetectPrepareContacts();
+	void PrepareSolver();
 	
 	// Begin an iterative solve session for visual stepping
 	void beginIterativeSolve();
