@@ -2380,7 +2380,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	compoundCylShape->setMargin(0.0);
 
 	btTransform trCylinder = btTransform::getIdentity();
-	btCylinderShapeX* cylShape = new btCylinderShapeX(btVector3(1.5, 0.5, 0.5));
+	btCylinderShapeX* cylShape = new btCylinderShapeX(btVector3(4.0f, 0.5, 0.5));
 	cylShape->setMargin(0.0);
 
 	trCylinder.setOrigin(btVector3(-1, 0, 0));
@@ -2400,12 +2400,12 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	trClaw.setIdentity();
 	trClaw.setOrigin(btVector3(0, 7.5, 0));
 
-	// btRigidBody* claw = pdemo->createRigidBody(0, trClaw, cylShape, 159);
-	// claw->m_redirectionTarget = a18;
-	// a18->m_kinematicChildren.push_back(claw);
-	// claw->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 6.5, 0));
+	btRigidBody* claw = pdemo->createRigidBody(0, trClaw, cylShape, 159);
+	claw->m_redirectionTarget = a18;
+	a18->m_kinematicChildren.push_back(claw);
+	claw->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 6.5, 0));
 
-	btRigidBody* clawCC = pdemo->createCableRigidBody(0, trClaw, compoundCylShape, 123456);
+	btRigidBody* clawCC = pdemo->createCableRigidBody(0, trClaw, cylShape, 123456);
 	a18->m_cableCollision = clawCC;
 	clawCC->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 6.5, 0));
 	clawCC->m_redirectionTarget = a18;
@@ -2418,8 +2418,8 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	waypointPos.push_back(trAnchorUp.getOrigin());                    // Arrivée
 
 	// Resolution's cable
-	int resolution = 60;
-	int iterations = 20;
+	int resolution = 80;
+	int iterations = 40;
 	btScalar margin = 0.01;
 
 	// Cable
@@ -2432,9 +2432,9 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	cable->setUseCollision(true);
 	cable->setCollisionViscosity(20);
 	cable->setCollisionMargin(margin);
-	cable->setCollisionParameters(3, 3, 0);
+	cable->setCollisionParameters(5, 1, 0);
 	cable->setCollisionResponseActive(true);
-	cable->setCollisionStiffness(0, 10000, 0, 1);
+	cable->setCollisionStiffness(0, 500000, 0, 1);
 
 	//cable->setCollisionMode(1);
 
@@ -2443,6 +2443,8 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 		cable->m_anchors[i].BodyMassRatio = 0.000015;
 	}
 	pdemo->SetCameraPosition(btVector3(0, 10, 0));
+
+	pdemo->m_cable = cable;
 
 	///register GIMPACT algorithm
 	btGImpactCollisionAlgorithm::registerAlgorithm(pdemo->m_dispatcher);
@@ -3791,7 +3793,7 @@ static void Init_Collision(CableDemo* pdemo)
 	SliderParams sliderMargin("Margin", &pdemo->margin);
 	sliderMargin.m_userPointer = pdemo;
 	sliderMargin.m_minVal = 0;
-	sliderMargin.m_maxVal = 0.2;
+	sliderMargin.m_maxVal = 1;
 	sliderMargin.m_callback = OnMarginChanged;
 
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStartingXRay);
