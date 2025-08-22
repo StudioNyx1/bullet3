@@ -895,21 +895,21 @@ void btCable::runNarrowPhase(std::vector<BroadPhasePair>& cands,
     btCollisionObject nodeCollisionObject;
 	btTransform nodeTransform(btQuaternion::getIdentity());
 
-    for (BroadPhasePair& c : cands)
+	for (BroadPhasePair& c : cands)
 	{
-        Node* node = c.node;
-		btVector3 nodeVel = (node->m_x - node->m_q) / m_sst.sdt;
-    	node->m_xOut = btVector3(0,0,0); // Reset drawing
-        
-        btRigidBody* rb = btRigidBody::upcast(c.body);
-        if (!rb) continue;
-		btVector3 rbVel = rb->getVelocityInLocalPoint(node->m_x - rb->getWorldTransform().getOrigin());
+		Node* node = c.node;
+		btVector3 currentPos = node->m_x;
+
+		btRigidBody* rb = btRigidBody::upcast(c.body);
+		if (!rb) continue;
+		btVector3 rbVel = rb->getVelocityInLocalPoint(rb->getWorldTransform().inverse() * currentPos);
+
 
 		// One contact
-		nodeTransform.setOrigin(node->m_x);
+		nodeTransform.setOrigin(currentPos);
 		btScalar margin = computeCollisionMargin(rb->getCollisionShape());
-		// Take a big margin to a contact point
-		btScalar marginCollisionShape = 1.0; // margin + (nodeVel * m_sst.sdt).length();
+		btVector3 nodeVel = (currentPos - node->m_q) / m_sst.sdt;
+		btScalar marginCollisionShape = margin + ((rbVel - nodeVel) *  m_sst.sdt).length();
 		nodeCollisionShape = btSphereShape(marginCollisionShape);
 		nodeCollisionObject.setCollisionShape(&nodeCollisionShape);
 		nodeCollisionObject.setWorldTransform(nodeTransform);
@@ -918,52 +918,33 @@ void btCable::runNarrowPhase(std::vector<BroadPhasePair>& cands,
 		m_world->contactPairTest(&nodeCollisionObject, rb, contactResult);
 		if (contactResult.numContacts == 0) continue;
 		
-    	// Calculate the average of the contact normals
-    	btVector3 normalContact = btVector3(0,0,0);
-    	for (int idxContact = 0; idxContact < contactResult.numContacts; ++idxContact)
-    	{
-    		normalContact += contactResult.contacts[idxContact].normal;
-    	}  	
-    	normalContact /= contactResult.numContacts;
-    	normalContact.normalize();
-
-		btVector3 xOut = contactResult.contacts[0].point;
-		btVector3 normal = contactResult.contacts[0].normal;
-
-		// One ray
-		// set the starting far from the node position
-		btVector3 startRay = node->m_x + normalContact;
-		btVector3 endRay = node->m_x;
-		btCollisionWorld::AllHitsRayResultCallback rayResult(startRay, endRay);
-		m_world->rayTestSingleWithMargin(btTransform(btQuaternion(), startRay), btTransform(btQuaternion(), endRay),
-			rb, rb->getCollisionShape(), rb->getWorldTransform(), rayResult, m_collisionMargin);
-		if (rayResult.hasHit())
+		// Calculate the average of the contact normals
+		btVector3 normalContact = contactResult.contacts[0].normal;
+		btVector3 hitContact = contactResult.contacts[0].point;
+		for (int idxContact = 1; idxContact < contactResult.numContacts; ++idxContact)
 		{
-			btVector3 xOut = rayResult.m_hitPointWorld[0];
-			btVector3 normal = rayResult.m_hitNormalWorld[0];
-
-			for (int i = 0; i < rayResult.m_hitPointWorld.size(); ++i)
-			{
-				if (xOut.distance(node->m_x) < rayResult.m_hitPointWorld[i].distance(node->m_x))
-				{
-					xOut = rayResult.m_hitPointWorld[i];
-					normal = rayResult.m_hitNormalWorld[i];
-				}
-			}
+			hitContact += contactResult.contacts[idxContact].point;
+			normalContact += contactResult.contacts[idxContact].normal;
 		}
-    	
-        // Output results
-        NodePairNarrowPhase pair;
-        pair.pair = &c;
-        pair.node = node;
-    	pair.xOut = xOut;
-        pair.worldTransform = rb->getWorldTransform();
-    	pair.normal = normalContact;
+		hitContact /= contactResult.numContacts;
+		normalContact.normalize();
 
-		node->m_xOut = xOut;
-    	npOut->push_back(pair);
-    	idxOut->push_back(node->index);
-    }
+		// Make the ray start position be the former node position with the rigidbody velocity to make sure it's out of the shape
+		btVector3 out = hitContact + normalContact * ((rbVel - nodeVel) * m_sst.sdt).length();
+		node->m_xOut = out; // for drawing
+		node->m_xOutNormal = normalContact; // for drawing
+
+		// Output results
+		NodePairNarrowPhase pair;
+		pair.pair = &c;
+		pair.node = node;
+		pair.xOut = out;
+		pair.worldTransform = rb->getWorldTransform();
+		pair.normal = normalContact;
+
+		npOut->push_back(pair);
+		idxOut->push_back(node->index);
+	}
 }
 
 void btCable::detectCollisionsThreaded(
@@ -1042,6 +1023,8 @@ void btCable::updateNodeDeltaPos(int iteration)
 	for (int i = 0; i < m_nodes.size(); i++)
 	{
 		node = &m_nodes.at(i);
+		node->m_xOut = btVector3(0, 0, 0); // Reset drawing
+		node->m_xOutNormal = btVector3(0, 0, 0); // Reset drawing
 		deltaPos = (node->m_x - node->posPreviousIteration).length();
 		if (deltaPos > 0.0001 || iteration == 0 || node->m_battach != 0)
 		{
@@ -1429,8 +1412,8 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 		btScalar margin = computeCollisionMargin(pair->pair->body->getCollisionShape());
 
 		// Move back the starting point with the normal
-		fromRayPos += normal * margin;
-		toRayPos   -= normal * margin;
+		// fromRayPos += normal * margin;
+		// toRayPos   -= normal * margin;
 
 		// Move back the starting point with the ray
 		// fromRayPos -= rayDirection * margin;
@@ -1482,8 +1465,7 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>* nodeP
 		node.m_x = state.hits[0];
 		node.m_n = state.normals[0];
 		node.collideInAllIteration = true;
-
-		//node.m_xOut = state.hits[0];
+		// node.m_xOut = state.hits[0];
 	}
 
 	// Refresh ray start positions for the next solver step
