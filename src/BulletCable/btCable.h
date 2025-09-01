@@ -109,8 +109,10 @@ public :
 	struct NodePairNarrowPhase
 	{
 		Node* node;
-		btVector3 xOut;
+		btVector3 hitPoint;
 		btVector3 normal;
+		btScalar timeOfImpact;
+		btScalar margin;
 		btScalar distance;
 		BroadPhasePair* pair;
 		btTransform worldTransform;
@@ -298,7 +300,8 @@ private:
 	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink) ;
 	void anchorConstraint(bool& impacted);
 
-	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase>*nodePairContact, btAlignedObjectArray<int>*indexNodeContact);
+	void contactConstraint();
+	void applyImpulseOnNode(int nodeIndex, btVector3& impulse);
 	btVector3 calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
 	btScalar computeCollisionMargin(const btCollisionShape* shape) const;
 	void resetManifoldLifeTime();
@@ -307,15 +310,13 @@ private:
 
 	btScalar getLinkRestLength(int index);
 
-	void detectCollisionsThreaded(btAlignedObjectArray<int> * bt_aligned_objects, btAlignedObjectArray<NodePairNarrowPhase> * node_pair_contact);
+	void detectCollisionsThreaded();
 
 	void collectPotentials(btCollisionObjectArray &collisionObjectArray, std::vector<btCollisionObject*>& out) const;
 	void buildObjData(const std::vector<btCollisionObject*>& pots,
 			  std::vector<ObjData>& out) const;
-	void runBroadPhase(std::vector<ObjData>& data, std::vector<BroadPhasePair>* candidates);	
-	void runNarrowPhase(std::vector<BroadPhasePair>& cands,
-			    btAlignedObjectArray<int>* indexNodeContact,
-			    btAlignedObjectArray<NodePairNarrowPhase>* nodePairContact);
+	void runBroadPhase();	
+	void runNarrowPhase();
 	bool aabbTestMargin(  btVector3 nodeVel,btVector3 objVel,btVector3 nodeMinAabb,btVector3 nodeMaxAabb,btVector3 minAabb,btVector3 maxAabb);
 
 	// Internal: run one 'constraint/projection' iteration of your existing cable solver
@@ -336,7 +337,7 @@ private:
 
 	IterativeSolveState m_iter;
 
-	btAlignedObjectArray<int> _indexNodeContact;
+	btAlignedObjectArray<BroadPhasePair> _candidates;
 	btAlignedObjectArray<NodePairNarrowPhase> _nodePairContact;
 	bool _impacted = false;
 

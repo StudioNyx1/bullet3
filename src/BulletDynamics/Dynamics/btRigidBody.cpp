@@ -78,6 +78,7 @@ void btRigidBody::setupRigidBody(const btRigidBody::btRigidBodyConstructionInfo&
 		m_worldTransform = constructionInfo.m_startWorldTransform;
 	}
 
+	m_previousWorldTransform = m_worldTransform;
 	m_interpolationWorldTransform = m_worldTransform;
 	m_interpolationLinearVelocity.setValue(0, 0, 0);
 	m_interpolationAngularVelocity.setValue(0, 0, 0);
@@ -562,6 +563,7 @@ void btRigidBody::setCenterOfMassTransform(const btTransform& xform)
 	}
 	m_interpolationLinearVelocity = getLinearVelocity();
 	m_interpolationAngularVelocity = getAngularVelocity();
+	m_previousWorldTransform = m_worldTransform;
 	m_worldTransform = xform;
 	updateInertiaTensor();
 }

@@ -301,21 +301,16 @@ public:
 		btVector3 m_normal;
 	};
 	
-	struct CollisionState {
-		btVector3					posBefore;
-		int                   		hitCount         = 0;
-		btScalar              		topMargin        = 0;
-		std::array<btVector3, 4>	normals;
-		std::array<btVector3, 4>	hits;
-		bool                   		collided         = false;
-		bool                   		everCollided     = false;
-	};
-	
 	struct Node : Feature
 	{
 		btVector3 m_x;       // Position
 		btVector3 m_xOut;    // Narrow Position
-		btVector3 m_xOutNormal;    // Narrow Position
+		btVector3 m_xOutNormal;    // Narrow normal
+		btVector3 m_xStartOut;    // Narrow Position
+		btVector3 m_xStartRay;
+		btVector3 m_xEndRay;
+		btScalar m_xOutMargin;    // Pair test margin
+		btScalar m_SplineEval;    // Eval of the collision response spline when an impulse is calculated
 		btVector3 m_xn;      // Previous position from the last step, not the substep
 		int m_nbCollidingObjectPotential;  // Number of element in potential collision
 		int m_nbCollidingObjectInFrame;  // Number of element in collision
@@ -342,8 +337,6 @@ public:
 		int m_maxSizeMovingAverage;
 		btVector3* m_movingAverage;
 		int m_indexMovingAverage;
-
-		CollisionState m_collisionState;
 	};
 
 	/* SumForces of a node*/
