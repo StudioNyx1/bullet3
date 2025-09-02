@@ -310,8 +310,6 @@ private:
 
 	btScalar getLinkRestLength(int index);
 
-	void detectCollisionsThreaded();
-
 	void collectPotentials(btCollisionObjectArray &collisionObjectArray, std::vector<btCollisionObject*>& out) const;
 	void buildObjData(const std::vector<btCollisionObject*>& pots,
 			  std::vector<ObjData>& out) const;

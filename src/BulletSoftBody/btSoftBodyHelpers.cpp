@@ -279,14 +279,13 @@ void btSoftBodyHelpers::Draw(btSoftBody* psb,
 					continue;
 				
 				idraw->drawSphere(n.m_xOut, psb->getCollisionShape()->getMargin() * 1.1, btVector3(1, 0, 0));
-				//idraw->drawSphere(n.m_xOut, n.m_xOutMargin, btVector3(1, 0, 1));
-				idraw->drawLine(n.m_xOut, n.m_xOut + n.m_xOutNormal, btVector3(1, 0, 0));
-
-				idraw->drawSphere(n.m_xStartOut, psb->getCollisionShape()->getMargin(), btVector3(0, 1, 0));
+				// idraw->drawSphere(n.m_xOut, n.m_xOutMargin, btVector3(1, 0, 1));
+				// idraw->drawLine(n.m_xOut, n.m_xOut + n.m_xOutNormal, btVector3(1, 0, 0));
+				// idraw->drawSphere(n.m_xStartOut, psb->getCollisionShape()->getMargin(), btVector3(0, 1, 0));
 				// idraw->drawSphere(n.m_xNarrow, psb->getCollisionShape()->getMargin(), btVector3(0, 1, 0));
 				// idraw->drawSphere(n.m_xStartRay, 0.0005, btVector3(0, 0.8, 0.2));
 				// idraw->drawSphere(n.m_xEndRay, 0.0005, btVector3(0, 0.2, 0.8));
-				idraw->drawLine(n.m_xStartRay, n.m_xEndRay, btVector3(0, 0, 1));
+				// idraw->drawLine(n.m_xStartRay, n.m_xEndRay, btVector3(0, 0, 1));
 				// idraw->drawLine(n.m_xOut, n.m_xOut + n.m_normalOut, btVector3(0, 0, 1));
 			}
 		}
