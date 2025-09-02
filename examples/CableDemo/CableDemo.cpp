@@ -483,8 +483,8 @@ public:
 		btCable* cable = (btCable*)getSoftDynamicsWorld()->getSoftBodyArray()[0];
 
 		btScalar density = 1027;
-		btScalar radius = cable->getCableData().radius;
-		btScalar coefficient = cable->getCableData().normalDragCoefficient;
+		btScalar radius = cable->getCableData()->radius;
+		btScalar coefficient = cable->getCableData()->normalDragCoefficient;
 
 		for (int i = 1; i < cable->m_nodes.size() - 1; ++i)
 		{
@@ -997,7 +997,7 @@ public:
 
 		// Add cable to the world
 		getSoftDynamicsWorld()->addSoftBody(cable, 8, 8);
-		cable->setCollisionParameters(1, 1, 0);
+		cable->setCollisionParameters(2, 4);
 		return cable;
 	}
 
@@ -1051,7 +1051,7 @@ public:
 		cable->m_cfg.piterations = iteration;
 		cable->m_cfg.kAHR = 1;
 
-		cable->setCollisionParameters(1, 1, 0);
+		cable->setCollisionParameters(2, 4);
 		// Add cable to the world
 		getSoftDynamicsWorld()->addSoftBody(cable);
 
@@ -1181,7 +1181,7 @@ static void Init_Nodes(CableDemo* pdemo)
 		btVector3 anchorPositionPhysic = positionPhysic + btVector3(0, 0.5, 0);
 
 		btCable* cable = pdemo->createCable(resolution, iteration, resolution, anchorPositionKinematic, anchorPositionPhysic, physic, kinematic);
-		cable->setCollisionParameters(1, 1, 0);
+		cable->setCollisionParameters(2, 4);
 	}
 }
 
@@ -1233,7 +1233,7 @@ static void Init_Weigths(CableDemo* pdemo)
 		btVector3 anchorPositionPhysic = positionPhysic + btVector3(0, 0.5, 0);
 
 		btCable* cable = pdemo->createCable(resolution, iteration, 200, anchorPositionKinematic, anchorPositionPhysic, physic, kinematic);
-		cable->setCollisionParameters(1, 1, 0);
+		cable->setCollisionParameters(1, 2);
 
 		cable->m_anchors[0].BodyMassRatio = 1;
 		cable->m_anchors[1].BodyMassRatio = 1;
@@ -1394,7 +1394,7 @@ static void Init_CableBending(CableDemo* pdemo)
 	cable->setUseBending(true);
 	cable->setUseHydroAero(false);
 	cable->setUseCollision(true);
-	cable->setCollisionParameters(3, 3, 0);
+	cable->setCollisionParameters(3, 6);
 	cable->setCableRadius(0.005);
 	cable->setCollisionMargin(0.01);
 	cable->setBendingStiffness(0.4);
@@ -1741,7 +1741,7 @@ static void Init_TestCollisionFreeCableWithStaticCube(CableDemo* pdemo)
 	cable->setUseLRA(false);
 	cable->getCollisionShape()->setMargin(0.01);
 	cable->setCollisionMargin(0.01);
-	cable->setCollisionParameters(1, 1, 0);
+	cable->setCollisionParameters(1, 2);
 
 	pdemo->SetCameraPosition(btVector3(0, 10, 0));
 }
@@ -1876,7 +1876,7 @@ static void Init_TestCableCollisionMt(CableDemo* pdemo)
 	cable->setUseCollision(true);
 	cable->setUseLRA(false);
 	cable->getCollisionShape()->setMargin(0.005);
-	cable->setCollisionParameters(1, 1, 0);
+	cable->setCollisionParameters(1,2);
 	cable->setCollisionMargin(0.005);
 	pdemo->SetCameraPosition(btVector3(0, 10, 0));
 
@@ -1885,7 +1885,7 @@ static void Init_TestCableCollisionMt(CableDemo* pdemo)
 	cable2->setUseCollision(true);
 	cable2->setUseLRA(false);
 	cable2->getCollisionShape()->setMargin(0.005);
-	cable2->setCollisionParameters(1, 1, 0);
+	cable2->setCollisionParameters(1, 2);
 	cable2->setCollisionMargin(0.005);
 
 	btCable* cable3 = pdemo->createCable(resolution, iteration, 1.61, anchorPositionKinematic3, anchorPositionPhysic3, physic, kinematic);
@@ -1893,7 +1893,7 @@ static void Init_TestCableCollisionMt(CableDemo* pdemo)
 	cable3->setUseCollision(true);
 	cable3->setUseLRA(false);
 	cable3->getCollisionShape()->setMargin(0.005);
-	cable3->setCollisionParameters(1, 1, 0);
+	cable3->setCollisionParameters(1, 2);
 	cable3->setCollisionMargin(0.005);
 
 	btCable* cable4 = pdemo->createCable(resolution, iteration, 1.61, anchorPositionKinematic4, anchorPositionPhysic4, physic, kinematic);
@@ -1901,7 +1901,7 @@ static void Init_TestCableCollisionMt(CableDemo* pdemo)
 	cable4->setUseCollision(true);
 	cable4->setUseLRA(false);
 	cable4->getCollisionShape()->setMargin(0.005);
-	cable4->setCollisionParameters(1, 1, 0);
+	cable4->setCollisionParameters(1, 2);
 	cable4->setCollisionMargin(0.005);
 }
 
@@ -2041,7 +2041,7 @@ static void Init_TestSupportA18(CableDemo* pdemo)
 	cable->setCollisionViscosity(51);
 	// cable->setCollisionViscosity(100);
 	cable->setCollisionStiffness(0, 1000, 0, 1);
-	cable->setCollisionParameters(3, 3, 0);
+	cable->setCollisionParameters(3, 6);
 
 	cable->m_anchors[0].BodyMassRatio = 0.1;
 	cable->m_anchors[1].BodyMassRatio = 0.1;
@@ -2102,7 +2102,7 @@ static void Init_Test1000Nodes(CableDemo* pdemo)
 	cable->setUseCollision(false);
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setUseLRA(false);
-	cable->setCollisionParameters(1, 1, 0);
+	cable->setCollisionParameters(1, 2);
 	cable->setCollisionMargin(margin);
 	pdemo->SetCameraPosition(btVector3(0, 0.5, 5));
 }
@@ -2289,7 +2289,7 @@ static void Init_TestCollisionCableSphere(CableDemo* pdemo)
 	cable->setUseLRA(true);
 	cable->setCollisionViscosity(50);
 	cable->setCollisionStiffness(0, 1000000000, 0, 1);
-	cable->setCollisionParameters(3, 3, 0);
+	cable->setCollisionParameters(3, 6);
 	cable->setCollisionMargin(margin);
 	pdemo->SetCameraPosition(btVector3(0, 3.5, 0));
 }
@@ -2432,7 +2432,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	cable->setUseCollision(true);
 	cable->setCollisionViscosity(20);
 	cable->setCollisionMargin(margin);
-	cable->setCollisionParameters(5, 1, 0);
+	cable->setCollisionParameters(5, 10);
 	cable->setCollisionResponseActive(true);
 	cable->setCollisionStiffness(0, 500000, 0, 1);
 
@@ -2529,7 +2529,7 @@ static void Init_TestCollisionCableConvexHullOnMeshSphere(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(margin / 2.0);
 	cable->setUseLRA(true);
 	cable->setCollisionMargin(margin);
-	cable->setCollisionParameters(1, 1, 0);
+	cable->setCollisionParameters(1, 2);
 
 	pdemo->SetCameraPosition(btVector3(0, 0.5, 0));
 
@@ -2618,7 +2618,7 @@ static void Init_TestCollisionRingBox(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setCollisionMargin(margin);
 	cable->setUseLRA(true);
-	cable->setCollisionParameters(1, 3, 0);
+	cable->setCollisionParameters(2, 6);
 	pdemo->SetCameraPosition(btVector3(0, -3, 0));
 }
 
@@ -2706,7 +2706,7 @@ static void Init_TestCollisionRingSphere(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setCollisionMargin(margin);
 	cable->setUseLRA(true);
-	cable->setCollisionParameters(1, 5, 0);
+	cable->setCollisionParameters(2, 6);
 	pdemo->SetCameraPosition(btVector3(0, -3, 0));
 }
 
@@ -2776,7 +2776,7 @@ static void Init_TestCollisionOn1Node(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setCollisionMargin(margin);
 	cable->setUseLRA(true);
-	cable->setCollisionParameters(1, 1, 0);
+	cable->setCollisionParameters(1, 2);
 	cable->setCollisionViscosity(100);
 	//cable->setCollisionStiffness(100, 10000, 0, 0.01);
 
@@ -2932,7 +2932,7 @@ static void Init_TestClaw(CableDemo* pdemo)
 	cable->setCableRadius(margin);
 	cable->setCollisionViscosity(100);
 	cable->setCollisionMargin(margin);
-	cable->setCollisionParameters(3, 3, 0);
+	cable->setCollisionParameters(3, 6);
 	// cable->setCollisionStiffness(0, 1000, 0, 1);
 	cable->getCollisionShape()->setMargin(margin);
 
@@ -2985,7 +2985,7 @@ static void Init_Growth(CableDemo* pdemo)
 	btVector3 anchorPositionPhysic = positionPhysic + btVector3(0, 0.5, 0);
 
 	btCable* cable = pdemo->createCable(resolution, iteration, 25, anchorPositionKinematic, anchorPositionPhysic, physic, kinematic);
-	cable->setCollisionParameters(1, 1, 0);
+	cable->setCollisionParameters(1, 2);
 }
 
 static void Init_DetachA18(CableDemo* pdemo)
@@ -3022,7 +3022,7 @@ static void Init_DetachA18(CableDemo* pdemo)
 	cable->setUseCollision(true);
 	cable->setCableRadius(margin);
 	cable->setCollisionMargin(margin);
-	cable->setCollisionParameters(3, 3, 0);
+	cable->setCollisionParameters(3, 6);
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setCollisionViscosity(0);
 
@@ -3245,7 +3245,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	mcmvCable->setCableRadius(margin);
 	mcmvCable->setCollisionMargin(margin);
 	mcmvCable->getCollisionShape()->setMargin(margin);
-	mcmvCable->setCollisionParameters(5, 1, 0);
+	mcmvCable->setCollisionParameters(5, 10);
 	mcmvCable->setCollisionViscosity(50);
 	
 	pdemo->m_cable = mcmvCable;

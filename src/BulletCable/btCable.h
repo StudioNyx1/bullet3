@@ -275,10 +275,10 @@ private:
 	btScalar m_collisionSleepingThreshold = 0.0;
 
 	// number of iteration step between each iteration of the collision constraint
-	int m_substepDelayCollision = 1;
+	int m_substepDelayCollisionSolver = 1;
 
 	// number of iteration of the resolution on multi-collision node
-	int m_subIterationCollision = 1;
+	int m_substepDelayCollisionNarrow = 1;
 
 	// Node forces members
 	bool useHydroAero = true;
@@ -423,7 +423,7 @@ public:
 	void setUseCollision(bool active);
 	bool getUseCollision();
 
-	void setCollisionParameters(int substepDelayCollision, int subIterationCollision, btScalar sleepingThreshold);
+	void setCollisionParameters(int substepSolverCollisionDelay, int substepNarrowCollisionDelay);
 
 	bool getUseHydroAero();
 	void setUseHydroAero(bool active);

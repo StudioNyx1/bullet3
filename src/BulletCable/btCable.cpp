@@ -219,8 +219,9 @@ void btCable::PrepareSolver()
 void btCable::solveSingleCableIteration(int currentIter)
 {
 	bool lastStep = currentIter == m_cfg.piterations - 1;
-	bool runCollisionDetection = (currentIter + 1) % (m_substepDelayCollision * 3) == 0;
-	bool runContactConstraint = (currentIter + 1) % m_substepDelayCollision == 0 || lastStep;
+	bool runBending = (currentIter + 1) % 2 == 0 || lastStep;
+	bool runCollisionDetection = (currentIter + 1) % m_substepDelayCollisionNarrow == 0 || lastStep;
+	bool runContactConstraint  = (currentIter + 1) % m_substepDelayCollisionSolver == 0 || lastStep;
 
 	updateNodeDeltaPos(currentIter);
 
@@ -233,7 +234,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 		LRAConstraint();
 	}
 		
-	if (useBending && (currentIter % 2 == 0 || lastStep))
+	if (useBending && runBending)
 	{
 		bendingConstraint();
 	}
@@ -1595,7 +1596,7 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node*
 	{
 		if (!spline) return btVector3(0, 0, 0);
 
-		penetrationDistance *= 1.0 / m_substepDelayCollision;
+		penetrationDistance *= 1.0 / m_substepDelayCollisionSolver;
 		btScalar k = spline->eval(penetrationDistance);
 		n->m_SplineEval = k;
 		if (isnan(k))
@@ -1605,7 +1606,7 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node*
 		btScalar responseVector = -k * penetrationDistance + viscosityCoef * vRelativeOnNormal;
 
 		const btVector3 impulse = ((responseVector * normal) - (tangentDir * jt * m_sst.isdt)) * dt;
-		return impulse * m_substepDelayCollision;
+		return impulse * m_substepDelayCollisionSolver;
 	}
 
 	return btVector3(0, 0, 0);
@@ -1823,11 +1824,10 @@ void btCable::setTotalMass(btScalar mass, bool fromfaces)
 	}
 }
 
-void btCable::setCollisionParameters(int substepDelayCollision, int subIterationCollision, btScalar collisionSleepingThreshold)
+void btCable::setCollisionParameters(int substepSolverCollisionDelay, int substepNarrowCollisionDelay)
 {
-	m_substepDelayCollision = substepDelayCollision;
-	m_subIterationCollision = subIterationCollision;
-	m_collisionSleepingThreshold = collisionSleepingThreshold;
+	m_substepDelayCollisionSolver = substepSolverCollisionDelay;
+	m_substepDelayCollisionNarrow = substepNarrowCollisionDelay;
 }
 
 void btCable::setCollisionMargin(float colMargin)
