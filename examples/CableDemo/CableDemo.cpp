@@ -1541,7 +1541,7 @@ static void Init_CableHydro(CableDemo* pdemo)
 	cable->setCableNormalDragCoefficient(1.2f);
 	cable->setCableRadius(0.0048f);
 
-	b3Printf("Cable length :%f - Total cable mass: %f - DragCoefficient:%f - Radius:%f ", cableLength, cableTotalMass, cable->getCableData().normalDragCoefficient, cable->getCableData().radius);
+	b3Printf("Cable length :%f - Total cable mass: %f - DragCoefficient:%f - Radius:%f ", cableLength, cableTotalMass, cable->getCableData()->normalDragCoefficient, cable->getCableData()->radius);
 }
 
 static void Init_CableForceUp(CableDemo* pdemo)
