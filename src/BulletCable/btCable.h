@@ -301,7 +301,6 @@ private:
 	void anchorConstraint(bool& impacted);
 
 	void contactConstraint();
-	void applyImpulseOnNode(int nodeIndex, btVector3& impulse);
 	btVector3 calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
 	btScalar computeCollisionMargin(const btCollisionShape* shape) const;
 	void resetManifoldLifeTime();

@@ -1729,7 +1729,7 @@ static void Init_TestCollisionFreeCableWithStaticCube(CableDemo* pdemo)
 	btTransform wallCableCollisionLocalTransfom = btTransform();
 	wallCableCollisionLocalTransfom.setIdentity();
 
-	btRigidBody* wall = pdemo->createRigidBody(0, transformWall, new btBoxShape(btVector3(0.5, 0.5, 0.5)));
+	btRigidBody* wall = pdemo->createCableRigidBody(0, transformWall, new btBoxShape(btVector3(0.5, 0.5, 0.5)));
 	wall->getCollisionShape()->setMargin(0);
 
 	// Anchor's positions
@@ -2258,7 +2258,7 @@ static void Init_TestCollisionCableSphere(CableDemo* pdemo)
 	t.setIdentity();
 	t.setOrigin(btVector3(0, 4, 0));
 
-	btRigidBody* spheres = pdemo->createRigidBody(100000, t, compound);
+	btRigidBody* spheres = pdemo->createCableRigidBody(100000, t, compound);
 	spheres->setSleepingThresholds(0, 0);
 
 	btVector3 groundPos = btVector3(0, -15, 0);
@@ -2585,7 +2585,7 @@ static void Init_TestCollisionRingBox(CableDemo* pdemo)
 	ringShape->addChildShape(boxPositionC, c);
 	ringShape->addChildShape(boxPositionD, d);
 
-	btRigidBody* ring = pdemo->createRigidBody(100, pos, ringShape);
+	btRigidBody* ring = pdemo->createCableRigidBody(100, pos, ringShape);
 	ring->updateInertiaTensor();
 
 	btVector3 groundPos = btVector3(0, -10, 0);
@@ -2673,7 +2673,7 @@ static void Init_TestCollisionRingSphere(CableDemo* pdemo)
 	a18shape->addChildShape(spherePositionC, c);
 	a18shape->addChildShape(spherePositionD, d);
 
-	btRigidBody* box = pdemo->createRigidBody(100, pos, a18shape);
+	btRigidBody* box = pdemo->createCableRigidBody(100, pos, a18shape);
 	box->updateInertiaTensor();
 
 	btVector3 groundPos = btVector3(0, -10, 0);
@@ -2753,7 +2753,7 @@ static void Init_TestCollisionOn1Node(CableDemo* pdemo)
 	compoundCubes->addChildShape(transformCubeA, cubeShape);
 	compoundCubes->addChildShape(transformCubeB, cubeShape);
 
-	btRigidBody* obj = pdemo->createRigidBody(100, t, compoundCubes);
+	btRigidBody* obj = pdemo->createCableRigidBody(100, t, compoundCubes);
 	obj->setFriction(1);
 
 	btTransform transformRight = btTransform();
@@ -2795,7 +2795,7 @@ static void Init_TestClaw(CableDemo* pdemo)
 	// compound
 	btTransform blocCompound = btTransform();
 	blocCompound.setIdentity();
-	blocCompound.setOrigin(btVector3(1.05, 5, -5));
+	blocCompound.setOrigin(btVector3(1.05, 5, -15));
 	btCompoundShape* compundShape = new btCompoundShape(false);
 
 	btVector3 kHalfExtentsA = btVector3(1, 1, 5);
@@ -2904,12 +2904,13 @@ static void Init_TestClaw(CableDemo* pdemo)
 		b2->setMargin(0.0);
 	}
 
-	btQuaternion rotation = btQuaternion(btVector3(0, 1, 0), SIMD_PI * 0.45);
+	btQuaternion rotation = btQuaternion(0, 0, 0);
 	y.setRotation(rotation);
 	compundShape->addChildShape(y, b1);
 
 	btRigidBody* obj = pdemo->createCableRigidBody(100, blocCompound, compundShape);
-	obj->setGravity(btVector3(0, 0, 5));
+	obj->setGravity(btVector3(0, 0, 10));
+	//obj->setAngularVelocity(btVector3(0, 5, 0));
 
 	btTransform LestTransform = btTransform();
 	LestTransform.setIdentity();
@@ -3152,6 +3153,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 			btTransform wallTransform = btTransform();
 			wallTransform.setIdentity();
 			wallTransform.setOrigin(btVector3(0, 1, 4));
+			//wallTransform.setRotation(btQuaternion(0, 10, 0));
 			mcmvShape->addChildShape(wallTransform, wallBoxShape);
 		}
 
@@ -3245,7 +3247,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	mcmvCable->setCableRadius(margin);
 	mcmvCable->setCollisionMargin(margin);
 	mcmvCable->getCollisionShape()->setMargin(margin);
-	mcmvCable->setCollisionParameters(5, 10);
+	mcmvCable->setCollisionParameters(5, 5);
 	mcmvCable->setCollisionViscosity(50);
 	
 	pdemo->m_cable = mcmvCable;

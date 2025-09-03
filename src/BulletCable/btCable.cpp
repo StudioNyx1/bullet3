@@ -219,8 +219,9 @@ void btCable::PrepareSolver()
 void btCable::solveSingleCableIteration(int currentIter)
 {
 	bool lastStep = currentIter == m_cfg.piterations - 1;
+	bool firstStep = currentIter == 0;
 	bool runBending = (currentIter + 1) % 2 == 0 || lastStep;
-	bool runCollisionDetection = (currentIter + 1) % m_substepDelayCollisionNarrow == 0 || lastStep;
+	bool runCollisionDetection = firstStep || (currentIter + 1) % m_substepDelayCollisionNarrow == 0 || lastStep;
 	bool runContactConstraint  = (currentIter + 1) % m_substepDelayCollisionSolver == 0 || lastStep;
 
 	updateNodeDeltaPos(currentIter);
@@ -816,7 +817,7 @@ void btCable::buildObjData(const std::vector<btCollisionObject*>& pots, std::vec
 		btVector3 mi, ma;
 		co->getCollisionShape()->getAabb(co->getWorldTransform(), mi, ma);
 		btVector3 velB = co->getInterpolationLinearVelocity();
-		velB = btVector3(0, 0, 0);
+		//velB = btVector3(0, 0, 0);
 		out.emplace_back(ObjData { co, mi, ma, velB });
 	}
 }
@@ -879,12 +880,13 @@ void btCable::runBroadPhase()
 		// static node box (no margin first)
 		btVector3 lo, hi;
 		setNodeBoundingBox(n->m_x, n->m_q, 0, &lo, &hi);
+		btVector3 nodeVel = (n->m_x - n->m_q) / m_sst.sdt;
 		btVector3 zero = btVector3(0, 0, 0);
 
 		// test each object
 		for (const auto& od : objData)
 		{
-			if (aabbTestMargin(zero, zero, lo, hi, od.minAabb, od.maxAabb)) continue;
+			if (aabbTestMargin(nodeVel, od.objVelocity, lo, hi, od.minAabb, od.maxAabb)) continue;
 		
 			BroadPhasePair bp;
 			bp.node = n;
@@ -958,14 +960,6 @@ void btCable::runNarrowPhase()
         btVector3 rbAngularVel = rb->getAngularVelocity();
         btVector3 rbVel = rbLinearVel + rbAngularVel.cross(currentPos - rbPrevTransform.getOrigin());
         
-        // Calculate relative velocity
-        btVector3 relVel = nodeVel - rbVel;
-		// TODO @BenH.
-		if (relVel.length2() < FLT_EPSILON)
-		{
-			continue;
-		}
-        
         btVector3 normalContact;
         btVector3 hitContact;
         bool foundCollision = false;
@@ -976,7 +970,84 @@ void btCable::runNarrowPhase()
 
 		btVector3 rayEnd;
 		btTransform rbTransformAtTime;
-        
+
+		//Single sweep in relative motion
+		// Relative-motion single sweep against rb fixed at rbPrevTransform
+		btVector3 nodeStart = prevPos;
+		btVector3 nodeEnd   = currentPos;
+  
+		// Compute the motion of the rigid body's material point that coincides with nodeStart at t0
+		btVector3 pLocal      = rbPrevTransform.inverse() * nodeStart;
+		btVector3 rbPointEnd  = rbTransform * pLocal;
+		btVector3 deltaNode   = nodeEnd - nodeStart;
+		btVector3 deltaRbPt   = rbPointEnd - nodeStart;
+		btVector3 relEnd      = nodeStart + (deltaNode - deltaRbPt);
+  
+		// Skip if motion is negligible
+		btVector3 sweepDelta = relEnd - nodeStart;
+  
+		if (sweepDelta.length2() < FLT_EPSILON)
+		{
+			continue;
+		}
+  
+		btTransform fromTransform(btQuaternion::getIdentity(), nodeStart);
+		btTransform toTransform(btQuaternion::getIdentity(), relEnd);
+  
+		btCollisionWorld::ClosestConvexResultCallback callback(nodeStart, relEnd);
+        callback.m_collisionFilterGroup = rb->getBroadphaseHandle()->m_collisionFilterMask;
+        callback.m_collisionFilterMask  = rb->getBroadphaseHandle()->m_collisionFilterGroup;
+  
+        btTransform rbStatic = rbPrevTransform;
+  
+        btCollisionWorld::objectQuerySingle(
+            &nodeCollisionShape, fromTransform, toTransform,
+            rb, rb->getCollisionShape(), rbStatic,
+            callback, btScalar(0.0f)
+        );
+  
+        if (callback.hasHit())
+        {
+        	foundCollision = true;
+   //      	fromTransform.setOrigin(callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON));
+   //      	toTransform.setOrigin(callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON));
+	  //
+   //      	btCollisionWorld::ClosestConvexResultCallback second(fromTransform.getOrigin(), toTransform.getOrigin());
+   //      	callback.m_collisionFilterGroup = rb->getBroadphaseHandle()->m_collisionFilterMask;
+   //      	callback.m_collisionFilterMask  = rb->getBroadphaseHandle()->m_collisionFilterGroup;
+   //      	
+   //      	btCollisionWorld::objectQuerySingle(
+			// 	&nodeCollisionShape, fromTransform, toTransform,
+			// 	rb, rb->getCollisionShape(), rbStatic,
+			// 	second, btScalar(0.0f)
+			// );
+	  //
+   //      	if (second.hasHit())
+   //      	{
+   //      		callback = second;
+   //      	}
+  
+        	// Compute contact data
+        	normalContact = callback.m_hitNormalWorld;
+        	hitContact = callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON);
+        	toi = callback.m_closestHitFraction;
+  
+        	// Penetration estimate along the remaining travel (conservative)
+        	btVector3 centerAtHit = nodeStart.lerp(relEnd, callback.m_closestHitFraction);
+        	penetration = (relEnd - centerAtHit).dot(normalContact);
+  
+        	btVector3 startPos = rbPrevTransform.getOrigin();
+        	btVector3 endPos   = rbTransform.getOrigin();
+        	rbTransformAtTime.setOrigin(lerp(startPos, endPos, toi));
+  
+        	btQuaternion startRot = rbPrevTransform.getRotation();
+        	btQuaternion endRot   = rbTransform.getRotation();
+        	btQuaternion rot      = slerp(startRot, endRot, toi);
+  
+        	rbTransformAtTime.setRotation(rot);
+        }
+
+		/*
         // Determine the number of iterations based on relative speed
         int maxIterations = 16; // Base number of iterations
 		btScalar timeStep = 1.0f / maxIterations;
@@ -999,20 +1070,20 @@ void btCable::runNarrowPhase()
         	btQuaternion startRot = rbPrevTransform.getRotation();
         	btQuaternion endRot = rbTransform.getRotation();
         	rbTransformAtTime.setRotation(slerp(startRot, endRot, t));
-
+  
         	rayStart = nodePosAtTime;
         	rayEnd = nextNodePos;
-
+  
         	// Skip if ray is too short
-        	btScalar rayLength = (rayEnd - rayStart).length();
+        	btScalar rayLength = (rayEnd - rayStart).length2();
         	if (rayLength < FLT_EPSILON)
         	{
         		continue;
         	}
-
+  
         	btTransform fromTransform(btQuaternion::getIdentity(), rayStart);
         	btTransform toTransform = btTransform(btQuaternion::getIdentity(), rayEnd);
-
+  
         	btCollisionWorld::ClosestConvexResultCallback callback(rayStart, rayEnd);
         	callback.m_collisionFilterGroup = rb->getBroadphaseHandle()->m_collisionFilterMask;
         	callback.m_collisionFilterMask = rb->getBroadphaseHandle()->m_collisionFilterGroup;
@@ -1024,18 +1095,25 @@ void btCable::runNarrowPhase()
             if (callback.hasHit()) 
             {
                 foundCollision = true;
+  
+            	// In case of compounds or corners, do another detection to get out 
+            	btCollisionWorld::objectQuerySingle(&nodeCollisionShape, fromTransform, toTransform,
+											  rb, rb->getCollisionShape(), rbTransformAtTime,
+											  callback, btScalar(0.0));
+            	
 				normalContact = callback.m_hitNormalWorld;
                 hitContact = callback.m_hitPointWorld + normalContact * margin;
-            	toi = t + callback.m_closestHitFraction * timeStep;
-
+            	toi = t + callback.m_closestHitFraction;// * timeStep;
+  
             	btVector3 centerAtHit = lerp(rayStart, rayEnd, callback.m_closestHitFraction);
-            	btScalar penetrationDepth = (rayEnd - centerAtHit).dot(normalContact);
-            	if (penetrationDepth < FLT_EPSILON)
-            		penetrationDepth = 0.0f;
-
+            	penetration = (rayEnd - centerAtHit).dot(normalContact);
+            	if (penetration < FLT_EPSILON)
+            		penetration = 0.0f;
+  
             	break;
             }
         }
+        */
         
         if (!foundCollision) 
         {
@@ -1444,76 +1522,19 @@ void btCable::contactConstraint()
 		int nIdx = pair->node->index;
 		Node* node = &m_nodes[nIdx];
 
-		// Calculate node velocity at TOI
-		// TODO: Calculate the velocities at TOI instead of during the whole frame
-		btVector3 nodeVel = (node->m_x - node->m_q) / m_sst.sdt;
-		
-		// Compute separation impulse at time of impact (TOI) and apply it
-		btTransform& rbTransformAtTOI = pair->worldTransform;
-		btVector3 comAtTOI = rbTransformAtTOI.getOrigin();
+		//node->m_x = pair->hitPoint; // debug, causes nodes to stick to their collision point
 
-		// Leverage arm from COM to contact point
-		btVector3 rB = pair->hitPoint - comAtTOI;
+		btVector3 n = pair->normal;
+		btVector3 x = node->m_x;
+		btVector3 p = pair->hitPoint;
 
-		btVector3 vB = btVector3(0, 0, 0);
-		btVector3 wB = btVector3(0, 0, 0);
-		
-		if (rb)
-		{
-			vB = rb->getLinearVelocity();
-			wB = rb->getAngularVelocity();
-		}
+		// Signed distance of the node center to the contact plane (positive = outside, negative = penetrating)
+		btScalar signedToPlane = (x - p).dot(n);
+		btScalar penetration = -signedToPlane;
 
-		// Contact point velocity on the rigid body
-		btVector3 vContactB = vB + wB.cross(rB);
-
-		// Relative velocity (node w.r.t. rigid contact point)
-		btVector3 vRel = nodeVel - vContactB;
-		btScalar  vRelN = vRel.dot(pair->normal);
-
-		// Baumgarte bias term to push out penetration this step
-		btScalar bias = pair->distance / m_sst.sdt;
-
-		// Effective mass along the contact normal
-		btScalar invMassNode = node->m_im;
-		btScalar invMassB = btScalar(0);
-		btMatrix3x3 invInertiaWorld; invInertiaWorld.setZero();
-
-		if (rb)
-		{
-			invMassB = rb->getInvMass();
-
-			// Build inverse inertia in world at TOI orientation
-			btVector3 invI_local = rb->getInvInertiaDiagLocal();
-			btMatrix3x3 invI_local_diag(
-				invI_local.x(), 0, 0,
-				0, invI_local.y(), 0,
-				0, 0, invI_local.z());
-			btMatrix3x3 R = rbTransformAtTOI.getBasis();
-			invInertiaWorld = R * invI_local_diag * R.transpose();
-		}
-
-		btVector3 rn = rB.cross(pair->normal);
-		btVector3 i_rn = invInertiaWorld * rn;
-		btScalar  kB = (i_rn.cross(rB)).dot(pair->normal);
-		btScalar denom = invMassNode + invMassB + kB;
-
-		btVector3 J(0, 0, 0);
-		if (denom > btScalar(0))
-		{
-			// Normal impulse (no pulling)
-			btScalar jn = -(vRelN + bias) / denom;
-			if (jn < btScalar(0)) jn = btScalar(0);
-			J = pair->normal * jn;
-
-			// Apply to node: convert impulse to a force over the remaining time after TOI
-			// Effective application time: remaining part of the frame after the impact
-			btScalar dtApply = (1.0f - pair->timeOfImpact) * m_sst.sdt;
-			btVector3 force = J / dtApply;
-
-			// Accumulate force to be integrated into positions in the next solveConstraints pass
-			addForce(force, nIdx);
-		}
+		btScalar corr = penetration;
+		node->m_x = x + n * corr;
+		node->m_n = pair->normal;
 
 		if (rb && impulseCompute)
 		{
