@@ -935,7 +935,6 @@ void btCable::runNarrowPhase()
     // Reusable collision objects
     btSphereShape nodeCollisionShape(m_collisionMargin);
     btCollisionObject nodeCollisionObject;
-    btTransform nodeTransform(btQuaternion::getIdentity());
 
 	for (int i = 0; i < _candidates.size(); i++ )
     {
@@ -951,14 +950,6 @@ void btCable::runNarrowPhase()
         // Get transform of the rigid body
         btTransform rbTransform = rb->getWorldTransform();
         btTransform rbPrevTransform = rb->getPreviousWorldTransform();
-        
-        // Calculate node velocity
-        btVector3 nodeVel = (currentPos - prevPos) / m_sst.sdt;
-        
-        // Calculate rigid body velocity at the node's position
-        btVector3 rbLinearVel = rb->getLinearVelocity();
-        btVector3 rbAngularVel = rb->getAngularVelocity();
-        btVector3 rbVel = rbLinearVel + rbAngularVel.cross(currentPos - rbPrevTransform.getOrigin());
         
         btVector3 normalContact;
         btVector3 hitContact;
@@ -1009,111 +1000,58 @@ void btCable::runNarrowPhase()
         if (callback.hasHit())
         {
         	foundCollision = true;
-   //      	fromTransform.setOrigin(callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON));
-   //      	toTransform.setOrigin(callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON));
-	  //
-   //      	btCollisionWorld::ClosestConvexResultCallback second(fromTransform.getOrigin(), toTransform.getOrigin());
-   //      	callback.m_collisionFilterGroup = rb->getBroadphaseHandle()->m_collisionFilterMask;
-   //      	callback.m_collisionFilterMask  = rb->getBroadphaseHandle()->m_collisionFilterGroup;
-   //      	
-   //      	btCollisionWorld::objectQuerySingle(
-			// 	&nodeCollisionShape, fromTransform, toTransform,
-			// 	rb, rb->getCollisionShape(), rbStatic,
-			// 	second, btScalar(0.0f)
-			// );
-	  //
-   //      	if (second.hasHit())
-   //      	{
-   //      		callback = second;
-   //      	}
+        	fromTransform.setOrigin(callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON));
+        	toTransform.setOrigin(callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON));
+	  
+        	btCollisionWorld::ClosestConvexResultCallback second(fromTransform.getOrigin(), toTransform.getOrigin());
+        	callback.m_collisionFilterGroup = rb->getBroadphaseHandle()->m_collisionFilterMask;
+        	callback.m_collisionFilterMask  = rb->getBroadphaseHandle()->m_collisionFilterGroup;
+        	
+        	btCollisionWorld::objectQuerySingle(
+				&nodeCollisionShape, fromTransform, toTransform,
+				rb, rb->getCollisionShape(), rbStatic,
+				second, 0.0f
+			);
+	  
+        	if (second.hasHit())
+        	{
+        		callback = second;
+        	}
   
-        	// Compute contact data
-        	normalContact = callback.m_hitNormalWorld;
-        	hitContact = callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON);
-        	toi = callback.m_closestHitFraction;
-  
-        	// Penetration estimate along the remaining travel (conservative)
-        	btVector3 centerAtHit = nodeStart.lerp(relEnd, callback.m_closestHitFraction);
-        	penetration = (relEnd - centerAtHit).dot(normalContact);
-  
+        	// Build rb transform at TOI (interpolate pose)
         	btVector3 startPos = rbPrevTransform.getOrigin();
         	btVector3 endPos   = rbTransform.getOrigin();
         	rbTransformAtTime.setOrigin(lerp(startPos, endPos, toi));
-  
+
         	btQuaternion startRot = rbPrevTransform.getRotation();
         	btQuaternion endRot   = rbTransform.getRotation();
         	btQuaternion rot      = slerp(startRot, endRot, toi);
-  
         	rbTransformAtTime.setRotation(rot);
-        }
 
-		/*
-        // Determine the number of iterations based on relative speed
-        int maxIterations = 16; // Base number of iterations
-		btScalar timeStep = 1.0f / maxIterations;
-        
-        for (int iterations = 0; iterations < maxIterations; iterations++) 
-        {
-        	btScalar t = iterations * timeStep;
-        	btScalar nextT = (iterations + 1) * timeStep;
-            
-        	// Calculate positions
-        	btVector3 nodePosAtTime = prevPos + nodeVel * t * m_sst.sdt;
-        	btVector3 nextNodePos = prevPos + nodeVel * nextT * m_sst.sdt;
-            
-            // Interpolate rigid body transform using actual motion
-        	btVector3 startPos = rbPrevTransform.getOrigin();
-        	btVector3 endPos = rbTransform.getOrigin();
-            rbTransformAtTime.setOrigin(lerp(startPos, endPos, t));
-        	
-            // Interpolate rotation using slerp
-        	btQuaternion startRot = rbPrevTransform.getRotation();
-        	btQuaternion endRot = rbTransform.getRotation();
-        	rbTransformAtTime.setRotation(slerp(startRot, endRot, t));
-  
-        	rayStart = nodePosAtTime;
-        	rayEnd = nextNodePos;
-  
-        	// Skip if ray is too short
-        	btScalar rayLength = (rayEnd - rayStart).length2();
-        	if (rayLength < FLT_EPSILON)
-        	{
-        		continue;
-        	}
-  
-        	btTransform fromTransform(btQuaternion::getIdentity(), rayStart);
-        	btTransform toTransform = btTransform(btQuaternion::getIdentity(), rayEnd);
-  
-        	btCollisionWorld::ClosestConvexResultCallback callback(rayStart, rayEnd);
-        	callback.m_collisionFilterGroup = rb->getBroadphaseHandle()->m_collisionFilterMask;
-        	callback.m_collisionFilterMask = rb->getBroadphaseHandle()->m_collisionFilterGroup;
-            
-        	btCollisionWorld::objectQuerySingle(&nodeCollisionShape, fromTransform, toTransform,
-											  rb, rb->getCollisionShape(), rbTransformAtTime,
-											  callback, btScalar(0.0));
-        	        
-            if (callback.hasHit()) 
-            {
-                foundCollision = true;
-  
-            	// In case of compounds or corners, do another detection to get out 
-            	btCollisionWorld::objectQuerySingle(&nodeCollisionShape, fromTransform, toTransform,
-											  rb, rb->getCollisionShape(), rbTransformAtTime,
-											  callback, btScalar(0.0));
-            	
-				normalContact = callback.m_hitNormalWorld;
-                hitContact = callback.m_hitPointWorld + normalContact * margin;
-            	toi = t + callback.m_closestHitFraction;// * timeStep;
-  
-            	btVector3 centerAtHit = lerp(rayStart, rayEnd, callback.m_closestHitFraction);
-            	penetration = (rayEnd - centerAtHit).dot(normalContact);
-            	if (penetration < FLT_EPSILON)
-            		penetration = 0.0f;
-  
-            	break;
-            }
+        	// Convert hit point and normal from rbPrevTransform world frame -> rb local
+        	btVector3 hitWorld_prev = callback.m_hitPointWorld;
+        	btVector3 nWorld_prev   = callback.m_hitNormalWorld.normalized();
+
+        	btTransform rbStatic = rbPrevTransform;
+        	btVector3 pLocal = rbStatic.inverse() * hitWorld_prev;
+
+        	// For pure rotation/rigid transform, local normal = R^T * n
+        	btMatrix3x3 Rprev = rbStatic.getBasis();
+        	btVector3 nLocal = (Rprev.transpose() * nWorld_prev).normalized();
+
+        	// Transform to world at time-of-impact
+        	btVector3 hitWorld_t = rbTransformAtTime * pLocal;
+        	btMatrix3x3 Rtoi = rbTransformAtTime.getBasis();
+        	btVector3 nWorld_t = (Rtoi * nLocal).normalized();
+
+        	// Store contact data at time-of-impact; push out by node margin
+        	normalContact = nWorld_t;
+        	hitContact    = hitWorld_t + nWorld_t * (m_collisionMargin + FLT_EPSILON);
+
+        	// Conservative remaining-trajectory penetration estimate along the normal
+        	btVector3 centerAtHitRel = nodeStart.lerp(relEnd, callback.m_closestHitFraction);
+        	penetration = (relEnd - centerAtHitRel).dot(nWorld_t);
         }
-        */
         
         if (!foundCollision) 
         {
@@ -1518,6 +1456,10 @@ void btCable::contactConstraint()
 		NodePairNarrowPhase* pair = &_nodePairContact.at(i);
 		btCollisionObject* obj = pair->pair->body;
 		btRigidBody* rb = btRigidBody::upcast(obj);
+		while (rb->m_redirectionTarget)
+		{
+			rb = rb->m_redirectionTarget;
+		}
 		
 		int nIdx = pair->node->index;
 		Node* node = &m_nodes[nIdx];
@@ -1533,8 +1475,6 @@ void btCable::contactConstraint()
 		btScalar penetration = -signedToPlane;
 
 		btScalar corr = penetration;
-		node->m_x = x + n * corr;
-		node->m_n = pair->normal;
 
 		if (rb && impulseCompute)
 		{
@@ -1542,6 +1482,9 @@ void btCable::contactConstraint()
 			btVector3 imp = calculateBodyImpulse(rb, m_collisionMargin, node, pair->normal, pair->hitPoint);
 			rb->applyRedirectionImpulse(imp, pair->hitPoint);
 		}
+
+		node->m_x = x + n * corr;
+		node->m_n = pair->normal;
 
 		// Refresh hit positions for the next solver step
 		pair->hitPoint = node->m_x;
