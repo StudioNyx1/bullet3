@@ -178,12 +178,12 @@ void btRigidBody::saveKinematicState(btScalar timeStep)
 
 	//if we use motionstate to synchronize world transforms, get the new kinematic/animated world transform
 	if (getMotionState()) getMotionState()->getWorldTransform(m_worldTransform);
-	m_startStepWorldTransform = m_worldTransform;
 }
 
 void btRigidBody::syncKinematicState()
 {
-	m_interpolationWorldTransform = m_startStepWorldTransform;
+	m_interpolationWorldTransform = m_previousWorldTransform;
+	m_previousWorldTransform = m_worldTransform;
 	m_interpolationLinearVelocity = m_linearVelocity;
 	m_interpolationAngularVelocity = m_angularVelocity;
 }

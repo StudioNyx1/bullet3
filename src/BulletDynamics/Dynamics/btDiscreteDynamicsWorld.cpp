@@ -44,7 +44,6 @@ subject to the following restrictions:
 
 #include "BulletDynamics/Dynamics/btActionInterface.h"
 #include "BulletSoftBody/btSoftRigidDynamicsWorld.h"
-#include "LinearMath/btQuickprof.h"
 #include "LinearMath/btMotionState.h"
 
 #include "LinearMath/btSerializer.h"
@@ -386,7 +385,9 @@ void btDiscreteDynamicsWorld::synchronizeSingleMotionState(btRigidBody* body)
 			*/
 
 			// We take the the world transform because the predicted one doesn't evolve with the softbody's solver
-			body->getMotionState()->setWorldTransform(body->getWorldTransform());
+			btTransform worldTransform = body->getWorldTransform();
+			body->getMotionState()->setWorldTransform(worldTransform);
+			body->setPreviousWorldTransform(worldTransform);
 		}
 	}
 }
@@ -399,10 +400,8 @@ void btDiscreteDynamicsWorld::synchronizeMotionStates()
 		//iterate  over all collision objects
 		for (int i = 0; i < m_collisionObjects.size(); i++)
 		{
-			btCollisionObject* colObj = m_collisionObjects[i];
-			btRigidBody* body = btRigidBody::upcast(colObj);
-			if (body)
-				synchronizeSingleMotionState(body);
+			btRigidBody* body = btRigidBody::upcast(m_collisionObjects[i]);
+			if (body) synchronizeSingleMotionState(body);
 		}
 	}
 	else
@@ -411,8 +410,7 @@ void btDiscreteDynamicsWorld::synchronizeMotionStates()
 		for (int i = 0; i < m_nonStaticRigidBodies.size(); i++)
 		{
 			btRigidBody* body = m_nonStaticRigidBodies[i];
-			if (body->isActive())
-				synchronizeSingleMotionState(body);
+			if (body->isActive()) synchronizeSingleMotionState(body);
 		}
 	}
 }

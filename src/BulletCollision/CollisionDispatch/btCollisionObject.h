@@ -50,15 +50,14 @@ ATTRIBUTE_ALIGNED16(class)
 btCollisionObject
 {
 protected:
-	btTransform m_worldTransform;
-	btTransform m_startStepWorldTransform;
 
-	///m_interpolationWorldTransform is used for CCD and interpolation
-	///it can be either previous or future (predicted) transform
-	btTransform m_interpolationWorldTransform;
+	btTransform m_worldTransform;
 	btTransform m_previousWorldTransform;
-	//those two are experimental: just added for bullet time effect, so you can still apply impulses (directly modifying velocities)
-	//without destroying the continuous interpolated motion (which uses this interpolation velocities)
+
+	// m_interpolationWorldTransform is used for CCD and interpolation: it can be either previous or future (predicted) transform
+	// m_interpolationLinearVelocity and m_interpolationAngularVelocity: just added for bullet time effect, so you can still apply impulses (directly modifying velocities)
+	// without destroying the continuous interpolated motion (which uses this interpolation velocities)
+	btTransform m_interpolationWorldTransform;
 	btVector3 m_interpolationLinearVelocity;
 	btVector3 m_interpolationAngularVelocity;
 
@@ -399,6 +398,11 @@ public:
 	const btTransform& getWorldTransform() const
 	{
 		return m_worldTransform;
+	}
+
+	void setPreviousWorldTransform(const btTransform& worldTrans)
+	{
+		m_previousWorldTransform = worldTrans;
 	}
 
 	void setWorldTransform(const btTransform& worldTrans)
