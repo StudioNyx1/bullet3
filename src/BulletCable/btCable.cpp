@@ -999,24 +999,7 @@ void btCable::runNarrowPhase()
   
         if (callback.hasHit())
         {
-        	foundCollision = true;
-        	fromTransform.setOrigin(callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON));
-        	toTransform.setOrigin(callback.m_hitPointWorld + normalContact * (m_collisionMargin + FLT_EPSILON));
-	  
-        	btCollisionWorld::ClosestConvexResultCallback second(fromTransform.getOrigin(), toTransform.getOrigin());
-        	callback.m_collisionFilterGroup = rb->getBroadphaseHandle()->m_collisionFilterMask;
-        	callback.m_collisionFilterMask  = rb->getBroadphaseHandle()->m_collisionFilterGroup;
-        	
-        	btCollisionWorld::objectQuerySingle(
-				&nodeCollisionShape, fromTransform, toTransform,
-				rb, rb->getCollisionShape(), rbStatic,
-				second, 0.0f
-			);
-	  
-        	if (second.hasHit())
-        	{
-        		callback = second;
-        	}
+	        foundCollision = true;
   
         	// Build rb transform at TOI (interpolate pose)
         	btVector3 startPos = rbPrevTransform.getOrigin();
@@ -1032,17 +1015,12 @@ void btCable::runNarrowPhase()
         	btVector3 hitWorld_prev = callback.m_hitPointWorld;
         	btVector3 nWorld_prev   = callback.m_hitNormalWorld.normalized();
 
-        	btTransform rbStatic = rbPrevTransform;
-        	btVector3 pLocal = rbStatic.inverse() * hitWorld_prev;
-
-        	// For pure rotation/rigid transform, local normal = R^T * n
-        	btMatrix3x3 Rprev = rbStatic.getBasis();
-        	btVector3 nLocal = (Rprev.transpose() * nWorld_prev).normalized();
+        	rbStatic = rbPrevTransform;
+        	pLocal = rbStatic.inverse() * hitWorld_prev;
 
         	// Transform to world at time-of-impact
         	btVector3 hitWorld_t = rbTransformAtTime * pLocal;
-        	btMatrix3x3 Rtoi = rbTransformAtTime.getBasis();
-        	btVector3 nWorld_t = (Rtoi * nLocal).normalized();
+        	btVector3 nWorld_t = (rbTransformAtTime.getBasis() * (rbPrevTransform.getBasis().transpose() * nWorld_prev)).normalized();
 
         	// Store contact data at time-of-impact; push out by node margin
         	normalContact = nWorld_t;
@@ -1050,7 +1028,9 @@ void btCable::runNarrowPhase()
 
         	// Conservative remaining-trajectory penetration estimate along the normal
         	btVector3 centerAtHitRel = nodeStart.lerp(relEnd, callback.m_closestHitFraction);
-        	penetration = (relEnd - centerAtHitRel).dot(nWorld_t);
+        	btVector3 remaining = relEnd - centerAtHitRel;
+        	penetration = remaining.dot(nWorld_t);
+        	penetration = btMax<btScalar>(0, penetration);
         }
         
         if (!foundCollision) 
