@@ -187,6 +187,7 @@ public:
 	void resetInterpolationWorldTransform()
 	{
 		m_interpolationWorldTransform = m_worldTransform;
+		m_previousWorldTransform = m_worldTransform;
 		m_interpolationLinearVelocity = btVector3(0,0,0);
 		m_interpolationAngularVelocity = btVector3(0, 0, 0);
 	}

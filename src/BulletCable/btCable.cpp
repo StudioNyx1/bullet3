@@ -145,12 +145,12 @@ void btCable::PrepareSolver()
 		node.m_nbCollidingObjectPotential = 0;
 
 		// Reset drawings
-		node.m_xOut = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
-		node.m_xStartOut = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
-		node.m_xOutNormal = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
-		node.m_xOutMargin = FLT_MAX;
-		node.m_xStartRay = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
-		node.m_xEndRay = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
+		// node.m_xOut = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
+		// node.m_xStartOut = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
+		// node.m_xOutNormal = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
+		// node.m_xOutMargin = FLT_MAX;
+		// node.m_xStartRay = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
+		// node.m_xEndRay = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
 	}
 
 	// Prepare links
@@ -420,6 +420,8 @@ void btCable::ResetNodePosition(const int nodeIndex, const btVector3 position)
 	m_nodes[nodeIndex].m_x = position;
 	m_nodes[nodeIndex].m_q = position;
 	m_nodes[nodeIndex].m_xn = position;
+	m_nodes[nodeIndex].m_v = btVector3(0, 0, 0);
+	m_nodes[nodeIndex].m_vn = btVector3(0, 0, 0);
 }
 
 void btCable::predictMotion(btScalar dt)
@@ -1002,6 +1004,7 @@ void btCable::runNarrowPhase()
 	        foundCollision = true;
   
         	// Build rb transform at TOI (interpolate pose)
+			// toi = 1.0 - callback.m_closestHitFraction;
         	btVector3 startPos = rbPrevTransform.getOrigin();
         	btVector3 endPos   = rbTransform.getOrigin();
         	rbTransformAtTime.setOrigin(lerp(startPos, endPos, toi));
@@ -1039,11 +1042,11 @@ void btCable::runNarrowPhase()
         }
 
 		// Debug
-		node->m_xOut = hitContact;
-		node->m_xOutMargin = margin;
-		node->m_xStartOut = prevPos;
-		node->m_xStartRay = rayStart;
-		node->m_xEndRay = rayEnd;
+		// node->m_xOut = hitContact;
+		// node->m_xOutMargin = margin;
+		// node->m_xStartOut = prevPos;
+		// node->m_xStartRay = rayStart;
+		// node->m_xEndRay = rayEnd;
 
     	// Output results
     	NodePairNarrowPhase pair;
@@ -1431,6 +1434,10 @@ void btCable::contactConstraint()
 	int nbContactPairPotential = _nodePairContact.size();
 	if (nbContactPairPotential == 0) return;
 
+	btSphereShape nodeShape = btSphereShape(m_collisionMargin);
+	btCollisionObject nodeCollision = btCollisionObject();
+	btTransform nodeTransform = btTransform::getIdentity();
+
 	for (int i = 0; i < nbContactPairPotential; ++i) 
 	{
 		NodePairNarrowPhase* pair = &_nodePairContact.at(i);
@@ -1464,11 +1471,26 @@ void btCable::contactConstraint()
 		}
 
 		node->m_x = x + n * corr;
-		node->m_n = pair->normal;
 
-		// Refresh hit positions for the next solver step
-		pair->hitPoint = node->m_x;
-		pair->normal = node->m_n;
+		// Create a SphereShape to simulate the collision between the node and a rigidbody
+		nodeTransform.setOrigin(node->m_x);
+		nodeCollision.setWorldTransform(nodeTransform);
+		nodeCollision.setCollisionShape(&nodeShape);
+		
+		btTransform currentRbTr(obj->getWorldTransform());
+		obj->setWorldTransform(pair->worldTransform);
+		
+		// Simulate the collision
+		MyContactResultCallback result(0, &nodeCollision, obj);
+		m_world->contactPairTest(&nodeCollision, obj, result);
+		
+		if (result.m_connected)
+		{
+			node->m_x = result.contactPoint + result.contactNorm * (m_collisionMargin + FLT_EPSILON);
+			pair->normal = result.contactNorm;
+		}
+		
+		obj->setWorldTransform(currentRbTr);
 	}
 }
 

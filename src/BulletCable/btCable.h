@@ -145,87 +145,74 @@ public :
 		btScalar distance;
 	};
 
-	struct MyContactResultCallback : btCollisionWorld::ContactResultCallback
+	struct MyContactResultCallback : public btCollisionWorld::ContactResultCallback
 	{
+		bool m_connected;
+		btScalar minDist = FLT_MAX;
 		btScalar m_margin;
+		btVector3 contactPoint;
+		btVector3 contactNorm;
+
 		btCollisionObject* A;
 		btCollisionObject* B;
 
-		std::vector<ContactInfo> contacts;
-		int numContacts = 0;
+		MyContactResultCallback(btScalar pMargin, btCollisionObject* pA, btCollisionObject* pB) : m_connected(false), m_margin(pMargin), A(pA), B(pB) {}
 
-		MyContactResultCallback(btScalar pMargin,
-		                        btCollisionObject* pA,
-		                        btCollisionObject* pB) : m_margin(pMargin), A(pA), B(pB)
-		{
-			contacts.reserve(4);
-		}
-
-		/// This is called for *each* contact point Bullet finds.
-		btScalar addSingleResult(btManifoldPoint& cp,
-		                                 const btCollisionObjectWrapper* colliderA, int partId0, int index0,
-		                                 const btCollisionObjectWrapper* colliderB, int partId1, int index1) override
+		virtual btScalar addSingleResult(btManifoldPoint& cp, const btCollisionObjectWrapper* colliderA, int partId0, int index0, const btCollisionObjectWrapper* colliderB, int partId1, int index1)
 		{
 			btScalar dist = cp.getDistance();
-			// outside your tolerance → ignore
-			if (dist > m_margin)
-				return 1.0;
-
-			// Determine ordering (which wrapper corresponds to A and B)
-			bool orderIsAB = (colliderA->m_collisionObject == A && colliderB->m_collisionObject == B);
-
-			if (orderIsAB)
+			// Filter back face depending on collider order
+			bool orderIsAB = false;
+			if (colliderA->m_collisionObject == A && colliderB->m_collisionObject == B)
 			{
-				// Back-face culling on triangle shapes
-				if (colliderB->m_shape->getShapeType() == TRIANGLE_SHAPE_PROXYTYPE)
-				{
-					const btTriangleShape* tri = static_cast<const btTriangleShape*>(colliderB->getCollisionShape());
-					btVector3 triNormal;
-					tri->calcNormal(triNormal);
+				orderIsAB = true;
+			}
+			else  // A and B are inverted
+			{
+				orderIsAB = false;
+			}
 
-					// cp.m_normalWorldOnB points *out* of B
-					// hit on the back side → skip
-					if (triNormal.dot(cp.m_normalWorldOnB) < 0)
-						return 1.0;
+			// Triangle Shape ?
+			bool isTriangleShape = colliderB->m_shape->getShapeType() == TRIANGLE_SHAPE_PROXYTYPE;
+			// Back face ?
+			if (isTriangleShape)
+			{
+				const btTriangleShape* triangleShape = (const btTriangleShape*)(colliderB->getCollisionShape());
+				btVector3 triangleNormal;
+				triangleShape->calcNormal(triangleNormal);
+				if (triangleNormal.dot(cp.m_normalWorldOnB) < 0)
+				{
+					// Back face is touched, filter it out or handle accordingly
+					return 1.0;
 				}
 			}
-			else
-			{
-				// Back-face culling on triangle shapes
-				if (colliderA->m_shape->getShapeType() == TRIANGLE_SHAPE_PROXYTYPE)
-				{
-					const btTriangleShape* tri = static_cast<const btTriangleShape*>(colliderA->getCollisionShape());
-					btVector3 triNormal;
-					tri->calcNormal(triNormal);
 
-					// cp.m_normalWorldOnB points *out* of B
-					// hit on the back side → skip
-					if (triNormal.dot(-cp.m_normalWorldOnB) < 0)
-						return 1.0;
+			if (dist <= m_margin)
+			{
+				//cout << "dist: " << dist << endl;
+				m_connected = true;
+				if (dist < minDist)
+				{
+					// A=A, B=B
+					// A is the node, B is the target collider
+					if (orderIsAB)
+					{
+						contactPoint = cp.getPositionWorldOnB();
+						contactNorm = cp.m_normalWorldOnB;
+					}
+					// A and B are inverted
+					else
+					{
+						contactPoint = cp.getPositionWorldOnA();
+						contactNorm = -cp.m_normalWorldOnB;
+					}
+					minDist = dist;
 				}
 			}
-			
-			// assemble contact info
-			ContactInfo info;
-			if (orderIsAB)
-			{
-				info.point   = cp.getPositionWorldOnB();
-				info.normal  = cp.m_normalWorldOnB;
-			} 
-			else
-			{
-				info.point   = cp.getPositionWorldOnA();
-				info.normal  = -cp.m_normalWorldOnB;
-			}
-
-			info.distance = dist;
-
-			contacts.push_back(info);
-			numContacts++;
-			
 			return 1.0;
 		}
 	};
+
 
 private:
 	// Growing state for Unity control
