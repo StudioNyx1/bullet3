@@ -133,7 +133,9 @@ public:
 			renderSingleFrame();
 			return;
 		}
-
+		
+		current_ticks = clock();
+		
 		// Normal simulation path
 		m_dynamicsWorld->stepSimulation(dt, subStep, fixedTimeStep);
 		
@@ -742,17 +744,16 @@ public:
 
 					btCable::MyContactResultCallback firstResult(0.0, &tmp, rb);
 					getSoftDynamicsWorld()->contactPairTest(&tmp, rb, firstResult);
-					if (firstResult.numContacts == 0) continue;
+					if (firstResult.m_connected == 0) continue;
 					
 					// Update data to redo the contactPairTest 		
 					int idxDeque = 0;
 					vector<std::tuple<btVector3, ContactNotInfo>> contactInfo;
-					for (int i = 0; i < firstResult.numContacts; i++)
-					{
-						ContactNotInfo contact;
-						contact.normal = firstResult.contacts[i].normal;
-						contactInfo.emplace_back(firstResult.contacts[i].point + contact.normal * (margin + FLT_EPSILON), contact);
-					}
+
+					ContactNotInfo contact;
+					contact.normal = firstResult.contactNorm;
+					contactInfo.emplace_back(firstResult.contactPoint + contact.normal * (margin + FLT_EPSILON), contact);
+					
 					nodeShape = btSphereShape(margin);
 					tmp.setCollisionShape(&nodeShape);
 
@@ -768,15 +769,12 @@ public:
 						btCable::MyContactResultCallback loopResult(0.0, &tmp, rb);
 						getSoftDynamicsWorld()->contactPairTest(&tmp, rb, loopResult);
 
-						if (loopResult.numContacts == 0) idxDeque++;
+						if (!loopResult.m_connected) idxDeque++;
 						else
 						{
-							for (int i = 0; i < loopResult.numContacts; i++)
-							{
-								ContactNotInfo contact;
-								contact.normal = loopResult.contacts[i].normal;
-								contactInfo.emplace_back(loopResult.contacts[i].point + loopResult.contacts[i].normal * (margin + FLT_EPSILON), contact);
-							}
+							ContactNotInfo contact;
+							contact.normal = loopResult.contactNorm;
+							contactInfo.emplace_back(loopResult.contactPoint + loopResult.contactNorm * (margin + FLT_EPSILON), contact);
 
 							contactInfo.erase(contactInfo.begin() + idxDeque);
 						}
@@ -873,8 +871,6 @@ public:
 
 				nbDelta += 1;
 			}
-
-			current_ticks = clock();
 
 			if (m_currentDemoIndex == 21)  // Cable hydro force
 			{
@@ -2240,7 +2236,8 @@ static void Init_TestCollisionCableSphere(CableDemo* pdemo)
 	*/
 
 	// Shape
-	btCollisionShape* shape = new btBoxShape(btVector3(1, 1, 1));
+	//btCollisionShape* shape = new btBoxShape(btVector3(1, 1, 1));
+	btCollisionShape* shape = new btSphereShape(1);
 	btCompoundShape* compound = new btCompoundShape();
 
 	btTransform localA = btTransform();
@@ -2288,7 +2285,7 @@ static void Init_TestCollisionCableSphere(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setUseLRA(true);
 	cable->setCollisionViscosity(50);
-	cable->setCollisionStiffness(0, 1000000000, 0, 1);
+	cable->setCollisionStiffness(0, 100000, 0, 1);
 	cable->setCollisionParameters(3, 6);
 	cable->setCollisionMargin(margin);
 	pdemo->SetCameraPosition(btVector3(0, 3.5, 0));
@@ -2434,7 +2431,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	cable->setCollisionMargin(margin);
 	cable->setCollisionParameters(5, 10);
 	cable->setCollisionResponseActive(true);
-	cable->setCollisionStiffness(0, 500000, 0, 1);
+	cable->setCollisionStiffness(0, 50000, 0, 1);
 
 	//cable->setCollisionMode(1);
 
@@ -2909,7 +2906,7 @@ static void Init_TestClaw(CableDemo* pdemo)
 	compundShape->addChildShape(y, b1);
 
 	btRigidBody* obj = pdemo->createCableRigidBody(100, blocCompound, compundShape);
-	obj->setGravity(btVector3(0, 0, 10));
+	obj->setGravity(btVector3(0, 0, 100));
 	//obj->setAngularVelocity(btVector3(0, 5, 0));
 
 	btTransform LestTransform = btTransform();
