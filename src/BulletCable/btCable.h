@@ -70,7 +70,7 @@ class btCable : public btSoftBody
 
 	btAlignedObjectArray<CableManifolds> manifolds;
 
-public :
+public:
 	struct CableData
 	{
 		float radius;
@@ -122,24 +122,24 @@ public :
 		bool haveManifoldsRegister = false;
 	};
 
-	struct RayJob 
+	struct RayJob
 	{
-		int                    nodeIdx;
-		NodePairNarrowPhase*   pair;
-		int                    rayIdx;
-		btVector3			   from;
-		btVector3			   to;
-		btScalar               margin;
+		int nodeIdx;
+		NodePairNarrowPhase* pair;
+		int rayIdx;
+		btVector3 from;
+		btVector3 to;
+		btScalar margin;
 	};
 
-	struct ObjData 
+	struct ObjData
 	{
 		btCollisionObject* obj;
-		btVector3          minAabb, maxAabb;
-		btVector3          objVelocity;
+		btVector3 minAabb, maxAabb;
+		btVector3 objVelocity;
 	};
 
-	struct ContactInfo 
+	struct ContactInfo
 	{
 		btVector3 point;
 		btVector3 normal;
@@ -214,7 +214,6 @@ public :
 		}
 	};
 
-
 private:
 	// Growing state for Unity control
 	// 0: cable length isn't changing
@@ -285,7 +284,7 @@ private:
 
 	void predictMotion(btScalar dt) override;
 	void solveConstraints() override;
-	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink) ;
+	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
 	void anchorConstraint(bool& impacted);
 
 	void contactConstraint();
@@ -297,12 +296,12 @@ private:
 
 	btScalar getLinkRestLength(int index);
 
-	void collectPotentials(btCollisionObjectArray &collisionObjectArray, std::vector<btCollisionObject*>& out) const;
+	void collectPotentials(btCollisionObjectArray& collisionObjectArray, std::vector<btCollisionObject*>& out) const;
 	void buildObjData(const std::vector<btCollisionObject*>& pots,
-			  std::vector<ObjData>& out) const;
-	void runBroadPhase();	
+					  std::vector<ObjData>& out) const;
+	void runBroadPhase();
 	void runNarrowPhase();
-	bool aabbTestMargin(  btVector3 nodeVel,btVector3 objVel,btVector3 nodeMinAabb,btVector3 nodeMaxAabb,btVector3 minAabb,btVector3 maxAabb);
+	bool aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 nodeMinAabb, btVector3 nodeMaxAabb, btVector3 minAabb, btVector3 maxAabb);
 
 	// Internal: run one 'constraint/projection' iteration of your existing cable solver
 	void solveSingleCableIteration(int currentIter);
@@ -311,9 +310,9 @@ private:
 
 	struct IterativeSolveState
 	{
-		bool     active = false;
-		int      total = 0;
-		int      current = 0;
+		bool active = false;
+		int total = 0;
+		int current = 0;
 
 		// Add caches you may need across iterations here (e.g., predicted positions)
 		// Example:
@@ -353,7 +352,7 @@ public:
 	void ResetNodePosition(const int nodeIndex, const btVector3 position);
 
 	void PrepareSolver();
-	
+
 	// Begin an iterative solve session for visual stepping
 	void beginIterativeSolve();
 
@@ -365,8 +364,8 @@ public:
 
 	// Query helpers
 	bool isIterativeSolveActive() const { return m_iter.active; }
-	int  currentIteration() const { return m_iter.current; }
-	int  totalIterations() const { return m_iter.total; }
+	int currentIteration() const { return m_iter.current; }
+	int totalIterations() const { return m_iter.total; }
 
 	enum CableState
 	{
@@ -494,7 +493,7 @@ public:
 	void synchNodesInfos();
 	void setMaxTension(btScalar maxTension);
 
-	bool shouldTestObject(btCollisionObject*colObj) const;
+	bool shouldTestObject(btCollisionObject* colObj) const;
 
 #pragma endregion
 };
