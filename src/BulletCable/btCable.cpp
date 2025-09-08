@@ -420,8 +420,6 @@ void btCable::ResetNodePosition(const int nodeIndex, const btVector3 position)
 	m_nodes[nodeIndex].m_x = position;
 	m_nodes[nodeIndex].m_q = position;
 	m_nodes[nodeIndex].m_xn = position;
-	m_nodes[nodeIndex].m_v = btVector3(0, 0, 0);
-	m_nodes[nodeIndex].m_vn = btVector3(0, 0, 0);
 }
 
 void btCable::predictMotion(btScalar dt)
@@ -877,13 +875,12 @@ void btCable::runBroadPhase()
 	{
 		int tid = omp_get_thread_num();
 		Node* n = &m_nodes[i];
-		n->m_xOut = btVector3(0, 0, 0);
 
 		// static node box (no margin first)
 		btVector3 lo, hi;
 		setNodeBoundingBox(n->m_x, n->m_q, 0, &lo, &hi);
 		btVector3 nodeVel = (n->m_x - n->m_q) / m_sst.sdt;
-		btVector3 zero = btVector3(0, 0, 0);
+		//btVector3 zero = btVector3(0, 0, 0);
 
 		// test each object
 		for (const auto& od : objData)
