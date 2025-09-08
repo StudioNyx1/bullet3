@@ -9,9 +9,8 @@
 #include <BulletCollision/GImpact/btGImpactShape.h>
 #include <BulletSoftBody/btSoftRigidDynamicsWorld.h>
 #include <BulletCollision/CollisionShapes/btSphereShape.h>
-#include <BulletCollision/NarrowPhaseCollision/btRaycastCallback.h>
 
-btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m) : btSoftBody(worldInfo, node_count, x, m)
+btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m) : btSoftBody(worldInfo, node_count, x, m), _nodeContactSphere(m_collisionMargin)
 {
 	m_world = world;
 	m_solverSubStep = worldInfo->numIteration;
@@ -62,6 +61,12 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	}
 
 	m_gravity = worldInfo->m_gravity;
+
+	// Cached objects used for contact solving
+	_nodeContactSphere.setUnscaledRadius(m_collisionMargin);
+	_nodeContactObject = btCollisionObject();
+	_nodeContactTransform = btTransform::getIdentity();
+	_nodeContactObject.setCollisionShape(&_nodeContactSphere);
 }
 
 void btCable::updateLength(btScalar dt)
@@ -930,10 +935,6 @@ void btCable::runNarrowPhase()
 	{
 		return;
 	}
-    
-    // Reusable collision objects
-    btSphereShape nodeCollisionShape(m_collisionMargin);
-    btCollisionObject nodeCollisionObject;
 
 	for (int i = 0; i < _candidates.size(); i++ )
     {
@@ -956,9 +957,8 @@ void btCable::runNarrowPhase()
 		btScalar toi = 1.0f; // Time of impact
 		btScalar penetration = 0.0f;
 
-		btVector3 rayStart = prevPos;
-
-		btVector3 rayEnd;
+		// btVector3 rayStart = prevPos;
+		// btVector3 rayEnd;
 		btTransform rbTransformAtTime;
 
 		//Single sweep in relative motion
@@ -991,7 +991,7 @@ void btCable::runNarrowPhase()
         btTransform rbStatic = rbPrevTransform;
   
         btCollisionWorld::objectQuerySingle(
-            &nodeCollisionShape, fromTransform, toTransform,
+            &_nodeContactSphere, fromTransform, toTransform,
             rb, rb->getCollisionShape(), rbStatic,
             callback, btScalar(0.0f)
         );
@@ -1001,7 +1001,6 @@ void btCable::runNarrowPhase()
 	        foundCollision = true;
   
         	// Build rb transform at TOI (interpolate pose)
-			// toi = 1.0 - callback.m_closestHitFraction;
         	btVector3 startPos = rbPrevTransform.getOrigin();
         	btVector3 endPos   = rbTransform.getOrigin();
         	rbTransformAtTime.setOrigin(lerp(startPos, endPos, toi));
@@ -1431,15 +1430,13 @@ void btCable::contactConstraint()
 	int nbContactPairPotential = _nodePairContact.size();
 	if (nbContactPairPotential == 0) return;
 
-	btSphereShape nodeShape = btSphereShape(m_collisionMargin);
-	btCollisionObject nodeCollision = btCollisionObject();
-	btTransform nodeTransform = btTransform::getIdentity();
-
 	for (int i = 0; i < nbContactPairPotential; ++i) 
 	{
 		NodePairNarrowPhase* pair = &_nodePairContact.at(i);
 		btCollisionObject* obj = pair->pair->body;
 		btRigidBody* rb = btRigidBody::upcast(obj);
+
+		// Get the top rigidBody which contains the mass of the object (otherwise there will be no impulse)
 		while (rb->m_redirectionTarget)
 		{
 			rb = rb->m_redirectionTarget;
@@ -1462,7 +1459,6 @@ void btCable::contactConstraint()
 
 		if (rb && impulseCompute)
 		{
-			//@Unsure : Apply the response parameters on the reversed node impulse instead of calculating a new one
 			btVector3 imp = calculateBodyImpulse(rb, m_collisionMargin, node, pair->normal, pair->hitPoint);
 			rb->applyRedirectionImpulse(imp, pair->hitPoint);
 		}
@@ -1470,16 +1466,15 @@ void btCable::contactConstraint()
 		node->m_x = x + n * corr;
 
 		// Create a SphereShape to simulate the collision between the node and a rigidbody
-		nodeTransform.setOrigin(node->m_x);
-		nodeCollision.setWorldTransform(nodeTransform);
-		nodeCollision.setCollisionShape(&nodeShape);
+		_nodeContactTransform.setOrigin(node->m_x);
+		_nodeContactObject.setWorldTransform(_nodeContactTransform);
 		
 		btTransform currentRbTr(obj->getWorldTransform());
 		obj->setWorldTransform(pair->worldTransform);
 		
 		// Simulate the collision
-		MyContactResultCallback result(0, &nodeCollision, obj);
-		m_world->contactPairTest(&nodeCollision, obj, result);
+		MyContactResultCallback result(0, &_nodeContactObject, obj);
+		m_world->contactPairTest(&_nodeContactObject, obj, result);
 		
 		if (result.m_connected)
 		{
@@ -1796,6 +1791,9 @@ void btCable::setCollisionParameters(int substepSolverCollisionDelay, int subste
 void btCable::setCollisionMargin(float colMargin)
 {
 	this->m_collisionMargin = colMargin;
+
+	_nodeContactSphere.setUnscaledRadius(colMargin);
+	_nodeContactObject.setCollisionShape(&_nodeContactSphere);
 }
 
 float btCable::getCollisionMargin()

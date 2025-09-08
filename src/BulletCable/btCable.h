@@ -9,6 +9,7 @@
 #include "BulletCollision/CollisionShapes/btTriangleShape.h"
 #include "BulletCollision/CollisionDispatch/btCollisionWorld.h"
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
+#include "BulletCollision/CollisionShapes/btSphereShape.h"
 
 #include <vector>
 #include <BulletCollision/CollisionShapes/btCompoundShape.h>
@@ -324,6 +325,11 @@ private:
 	btAlignedObjectArray<BroadPhasePair> _candidates;
 	btAlignedObjectArray<NodePairNarrowPhase> _nodePairContact;
 	bool _impacted = false;
+
+	// Cached object used to resolve contacts
+	btSphereShape _nodeContactSphere;
+	btCollisionObject _nodeContactObject;
+	btTransform _nodeContactTransform;
 
 public:
 	btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m);
