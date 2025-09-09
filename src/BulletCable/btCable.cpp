@@ -1454,34 +1454,37 @@ void btCable::contactConstraint()
 		btScalar signedToPlane = (x - p).dot(n);
 		btScalar penetration = -signedToPlane;
 
-		btScalar corr = penetration;
-
-		if (rb && impulseCompute)
+		if (penetration > 0.0)
 		{
-			btVector3 imp = calculateBodyImpulse(rb, m_collisionMargin, node, pair->normal, pair->hitPoint);
-			rb->applyRedirectionImpulse(imp, pair->hitPoint);
+			pair->hitPoint = x + n * penetration;
+
+			// Create a SphereShape to simulate the collision between the node and a rigidbody
+			_nodeContactTransform.setOrigin(pair->hitPoint);
+			_nodeContactObject.setWorldTransform(_nodeContactTransform);
+
+			// Simulate the collision			
+			btTransform currentRbTr(obj->getWorldTransform());
+			obj->setWorldTransform(pair->worldTransform);
+			MyContactResultCallback result(0, &_nodeContactObject, obj);
+			m_world->contactPairTest(&_nodeContactObject, obj, result);
+			if (result.m_connected)
+			{
+				// Update the pair for the next step
+				pair->hitPoint = result.contactPoint + result.contactNorm * (m_collisionMargin + FLT_EPSILON);
+				pair->normal = result.contactNorm;
+			}
+			obj->setWorldTransform(currentRbTr);
+
+			if (rb && impulseCompute)
+			{
+				btVector3 imp = calculateBodyImpulse(rb, m_collisionMargin, node, pair->normal, pair->hitPoint);
+				rb->applyRedirectionImpulse(imp, pair->hitPoint);
+			}
+
+			// Update the node position at last
+			node->m_x = pair->hitPoint;
 		}
-
-		node->m_x = x + n * corr;
-
-		// Create a SphereShape to simulate the collision between the node and a rigidbody
-		_nodeContactTransform.setOrigin(node->m_x);
-		_nodeContactObject.setWorldTransform(_nodeContactTransform);
-
-		btTransform currentRbTr(obj->getWorldTransform());
-		obj->setWorldTransform(pair->worldTransform);
-
-		// Simulate the collision
-		MyContactResultCallback result(0, &_nodeContactObject, obj);
-		m_world->contactPairTest(&_nodeContactObject, obj, result);
-
-		if (result.m_connected)
-		{
-			node->m_x = result.contactPoint + result.contactNorm * (m_collisionMargin + FLT_EPSILON);
-			pair->normal = result.contactNorm;
-		}
-
-		obj->setWorldTransform(currentRbTr);
+	
 	}
 }
 
