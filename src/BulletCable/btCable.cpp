@@ -1490,7 +1490,7 @@ void btCable::contactConstraint()
 
 btScalar btCable::computeCollisionMargin(const btCollisionShape* shape) const
 {
-	return shape->getShapeType() == SPHERE_SHAPE_PROXYTYPE ? m_collisionMargin + 0.001 : m_collisionMargin + shape->getMargin();
+	return m_collisionMargin + shape->getMargin();
 }
 
 btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition)
