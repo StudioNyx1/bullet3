@@ -1543,6 +1543,7 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node*
 			btScalar distanceTot = penetrationMax - penetrationMin;
 			btScalar ratio = (penetrationDistance - penetrationMin) / distanceTot;
 			k = Lerp(this->collisionStiffnessMin, this->collisionStiffnessMax, ratio);
+			n->m_SplineEval = k;
 		}
 
 		btScalar responseVector = -k * penetrationDistance + viscosityCoef * vRelativeOnNormal;
