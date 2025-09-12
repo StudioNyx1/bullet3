@@ -871,10 +871,6 @@ void btCable::runBroadPhase()
 	btAlignedObjectArray<btAlignedObjectArray<BroadPhasePair>> threadBuckets;
 	threadBuckets.resize(omp_get_max_threads());
 
-	// Notify the dispatcher to pass into threaded mode
-	btCollisionDispatcherMt* disp = static_cast<btCollisionDispatcherMt*>(m_world->getDispatcher());
-	disp->m_batchUpdating = true;
-
 #pragma omp parallel for schedule(static, 1)
 	for (int i = 0; i < nodeCount; ++i)
 	{
@@ -901,9 +897,6 @@ void btCable::runBroadPhase()
 			threadBuckets[tid].push_back(bp);
 		}
 	}
-
-	// Notify the dispatcher that we don't use threads anymore
-	disp->m_batchUpdating = false;
 
 	// merge results
 	for (int i = 0; i < threadBuckets.size(); ++i)
