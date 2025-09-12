@@ -121,6 +121,7 @@ void btRigidBody::updateKinematicChildren(btScalar timeStep)
 	for (int i = 0; i < m_kinematicChildren.size(); ++i)
 	{
 		btRigidBody* kinematic = m_kinematicChildren[i];
+		if (!kinematic->isStaticOrKinematicObject()) continue;
 
 		// World transform kinematic = WordlTransform Parent * LocalTransform Kinematic	
 		btTransform res = getWorldTransform() * kinematic->m_localTransform;
