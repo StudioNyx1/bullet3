@@ -1269,6 +1269,7 @@ void btDiscreteDynamicsWorld::predictUnconstraintMotion(btScalar timeStep)
 			// body->applyDamping(timeStep);
 
 			body->predictIntegratedTransform(timeStep, body->getInterpolationWorldTransform());
+			body->updateKinematicChildrenInterpolated(timeStep);
 		}
 	}
 }

@@ -245,6 +245,7 @@ public:
 	}
 
 	void updateKinematicChildren(btScalar timeStep);
+	void updateKinematicChildrenInterpolated(btScalar timeStep);
 
 	void updateCableCollision(btScalar timeStep);
 

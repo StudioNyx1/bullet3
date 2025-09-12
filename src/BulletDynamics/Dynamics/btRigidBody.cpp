@@ -134,6 +134,22 @@ void btRigidBody::updateKinematicChildren(btScalar timeStep)
 	}
 }
 
+void btRigidBody::updateKinematicChildrenInterpolated(btScalar timeStep)
+{
+	for (int i = 0; i < m_kinematicChildren.size(); ++i)
+	{
+		btRigidBody* kinematic = m_kinematicChildren[i];
+		if (!kinematic->isStaticOrKinematicObject()) continue;
+
+		// World transform kinematic = WordlTransform Parent * LocalTransform Kinematic	
+		btTransform res = getInterpolationWorldTransform() * kinematic->m_localTransform;
+		kinematic->setInterpolationWorldTransform(res);
+
+		// Care: can lead to infinite loop
+		kinematic->updateKinematicChildrenInterpolated(timeStep);
+	}
+}
+
 void btRigidBody::updateCableCollision(btScalar timeStep)
 {
 	if (m_cableCollision != NULL)
