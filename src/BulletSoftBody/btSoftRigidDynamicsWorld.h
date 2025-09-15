@@ -44,7 +44,7 @@ protected:
 
 	virtual void internalSingleStepSimulation(btScalar timeStep);
 
-	void updateCableCollisionObjects();
+	void updateCableCollisionColliders(btScalar timeStep);
 
 	void solveSoftBodiesConstraints(btScalar timeStep);
 

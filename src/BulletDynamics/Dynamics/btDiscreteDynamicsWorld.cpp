@@ -1213,11 +1213,7 @@ void btDiscreteDynamicsWorld::integrateTransforms(btScalar timeStep)
 	{
 		btCollisionObject* co = getCollisionObjectArray()[i];
 		btRigidBody* rb = btRigidBody::upcast(co);
-		if (rb)
-		{
-			rb->updateKinematicChildren(timeStep);
-			rb->updateCableCollision(timeStep);
-		}
+		if (rb) rb->updateKinematicChildren(timeStep);	
 	}
 
 	///this should probably be switched on by default, but it is not well tested yet

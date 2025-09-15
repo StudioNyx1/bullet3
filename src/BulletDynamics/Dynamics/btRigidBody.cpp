@@ -154,12 +154,14 @@ void btRigidBody::updateCableCollision(btScalar timeStep)
 {
 	if (m_cableCollision != NULL)
 	{
-		m_cableCollision->setInterpolationWorldTransform(m_cableCollision->getWorldTransform());
-
 		// World transform kinematic = WordlTransform Parent * LocalTransform Kinematic
 		btTransform res = getWorldTransform() * m_cableCollision->m_localTransform;
+		m_cableCollision->setInterpolationWorldTransform(m_cableCollision->getWorldTransform());
 		m_cableCollision->setWorldTransform(res);
 		m_cableCollision->getMotionState()->setWorldTransform(res);
+
+		m_cableCollision->setLinearVelocity(m_linearVelocity);
+		m_cableCollision->setAngularVelocity(m_angularVelocity);
 	}
 }
 
