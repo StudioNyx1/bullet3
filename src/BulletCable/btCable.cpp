@@ -1490,8 +1490,6 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node*
 {
 	// a = node
 	// b = body
-	btScalar viscosityCoef = this->collisionViscosity;
-	btScalar dt = this->m_sst.sdt;
 	btTransform wtr = obj->getWorldTransform();
 
 	btScalar ima = n->m_im;
@@ -1502,7 +1500,7 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node*
 	// bodyToNodeVector
 	btVector3 ra = hitPosition - wtr.getOrigin();
 	btVector3 vBody = obj->getVelocityInLocalPoint(ra);
-	btVector3 vNode = (n->m_x - n->m_q) / dt;
+	btVector3 vNode = (n->m_x - n->m_q) / m_sst.sdt;
 	btVector3 vRelative = vNode - vBody;
 	btScalar vRelativeOnNormal = btDot(vRelative, normal);
 
@@ -1518,52 +1516,34 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node*
 
 	btVector3 deltaPosNode = hitPosition - n->m_x;
 	btScalar penetrationDistance = deltaPosNode.dot(normal);
+
+	btScalar k = 0.0;
 	if (collisionMode == CollisionMode::Linear)
 	{
-		btScalar k;
-
 		if (penetrationDistance < penetrationMin)
-		{
-			return btVector3{0, 0, 0};
-		}
-
-		if (penetrationDistance > penetrationMax)
-		{
-			k = this->collisionStiffnessMax;
-		}
-		else
-		{
-			btScalar distanceTot = penetrationMax - penetrationMin;
-			btScalar ratio = (penetrationDistance - penetrationMin) / distanceTot;
-			k = Lerp(this->collisionStiffnessMin, this->collisionStiffnessMax, ratio);
-			n->m_SplineEval = k;
-		}
-
-		btScalar responseVector = -k * penetrationDistance + viscosityCoef * vRelativeOnNormal;
-
-		const btVector3 impulse = ((responseVector * normal) - (tangentDir * jt * m_sst.isdt)) * dt;
-		return impulse;
-	}
-
-	if (collisionMode == CollisionMode::Curve)
-
-	{
-		if (!spline) return btVector3(0, 0, 0);
-
-		penetrationDistance *= 1.0 / m_substepDelayCollisionSolver;
-		btScalar k = spline->eval(penetrationDistance);
-		n->m_SplineEval = k;
-		if (isnan(k))
-		{
 			return btVector3(0, 0, 0);
-		}
-		btScalar responseVector = -k * penetrationDistance + viscosityCoef * vRelativeOnNormal;
 
-		const btVector3 impulse = ((responseVector * normal) - (tangentDir * jt * m_sst.isdt)) * dt;
-		return impulse * m_substepDelayCollisionSolver;
+		btScalar distanceTot = penetrationMax - penetrationMin;
+		btScalar ratio = (penetrationDistance - penetrationMin) / distanceTot;
+		k = Lerp(this->collisionStiffnessMin, this->collisionStiffnessMax, min(1.0, ratio));
+		// k = totalMass / imb * (penetrationDistance / m_collisionMargin);
+	}
+	else if (collisionMode == CollisionMode::Curve)
+	{
+		if (!spline) 
+			return btVector3(0, 0, 0);
+
+		k = spline->eval(penetrationDistance);
+
+		if (isnan(k))
+			return btVector3(0, 0, 0);
 	}
 
-	return btVector3(0, 0, 0);
+	n->m_SplineEval = k;
+	btScalar responseVector = -k * penetrationDistance + collisionViscosity * vRelativeOnNormal;
+
+	const btVector3 impulse = ((responseVector * normal) - (tangentDir * jt * m_sst.isdt)) * m_sst.sdt;
+	return impulse;
 }
 
 void btCable::distanceConstraintLock(int limMin, int limMax)
