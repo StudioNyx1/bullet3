@@ -34,8 +34,10 @@ class btCable : public btSoftBody
 {
 	enum class CollisionMode
 	{
-		Linear = 0,
-		Curve
+		Base = 0, // No additional coefficient applied
+		Linear,	// Linear coefficient depending on penetration
+		Curve, // depending on user given curve
+		Auto
 	};
 
 	//

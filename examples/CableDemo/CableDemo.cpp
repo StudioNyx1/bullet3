@@ -2036,7 +2036,7 @@ static void Init_TestSupportA18(CableDemo* pdemo)
 	cable->setCollisionResponseActive(true);
 	cable->setCollisionViscosity(51);
 	// cable->setCollisionViscosity(100);
-	cable->setCollisionStiffness(0, 1000, 0, 1);
+	//cable->setCollisionStiffness(0, 1000, 0, 1);
 	cable->setCollisionParameters(3, 6);
 
 	cable->m_anchors[0].BodyMassRatio = 0.1;
@@ -2285,7 +2285,7 @@ static void Init_TestCollisionCableSphere(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setUseLRA(true);
 	cable->setCollisionViscosity(50);
-	cable->setCollisionStiffness(0, 100000, 0, 1);
+	//cable->setCollisionStiffness(0, 100000, 0, 1);
 	cable->setCollisionParameters(3, 6);
 	cable->setCollisionMargin(margin);
 	pdemo->SetCameraPosition(btVector3(0, 3.5, 0));
@@ -2430,8 +2430,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	cable->setCollisionViscosity(20);
 	cable->setCollisionMargin(margin);
 	cable->setCollisionParameters(5, 10);
-	cable->setCollisionResponseActive(true);
-	cable->setCollisionStiffness(0, 50000, 0, 1);
+	//cable->setCollisionStiffness(0, 50000, 0, 1);
 
 	//cable->setCollisionMode(1);
 
@@ -2907,6 +2906,7 @@ static void Init_TestClaw(CableDemo* pdemo)
 
 	btRigidBody* obj = pdemo->createCableRigidBody(100, blocCompound, compundShape);
 	obj->setGravity(btVector3(0, 0, 100));
+	//obj->setAngularFactor(btVector3(0, 0, 0));
 	//obj->setAngularVelocity(btVector3(0, 5, 0));
 
 	btTransform LestTransform = btTransform();

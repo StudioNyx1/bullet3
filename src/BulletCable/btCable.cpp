@@ -1477,7 +1477,6 @@ void btCable::contactConstraint()
 			// Update the node position at last
 			node->m_x = pair->hitPoint;
 		}
-	
 	}
 }
 
@@ -1492,57 +1491,86 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node*
 	// b = body
 	btTransform wtr = obj->getWorldTransform();
 
-	btScalar ima = n->m_im;
-	btScalar imb = obj->getInvMass();
-	if (imb == 0) return btVector3(0, 0, 0);
-	btScalar totalMass = ima + imb;
+	btScalar ima = n->m_im;          // inverse mass of node
+	btScalar imb = obj->getInvMass(); // inverse mass of body
+	if (imb == 0) return btVector3{0, 0, 0};
 
-	// bodyToNodeVector
-	btVector3 ra = hitPosition - wtr.getOrigin();
-	btVector3 vBody = obj->getVelocityInLocalPoint(ra);
+	// bodyToNodeVector (relative to body COM)
+	btVector3 rB = hitPosition - wtr.getOrigin();
+
+	// Velocities at contact
+	btVector3 vBody = obj->getVelocityInLocalPoint(rB);
 	btVector3 vNode = (n->m_x - n->m_q) / m_sst.sdt;
 	btVector3 vRelative = vNode - vBody;
-	btScalar vRelativeOnNormal = btDot(vRelative, normal);
 
-	// Friction value
-	btVector3 vRelativeTangent = vRelative - (normal * vRelativeOnNormal);
-	btVector3 tangentDir = vRelativeTangent.normalized();
+	btScalar vRel_n = btDot(vRelative, normal);
 
-	int frictionCoef = obj->getFriction() * getFriction();
+	// Tangent direction (handle degenerate case)
+	btVector3 vRel_t = vRelative - normal * vRel_n;
+	btScalar vRel_t_len2 = vRel_t.length2();
+	btVector3 tangentDir = (vRel_t_len2 > SIMD_EPSILON) ? (vRel_t / btSqrt(vRel_t_len2)) : btVector3{0, 0, 0};
 
-	// Part of vRelativeOnTangentDir
-	btScalar jt = -vRelative.dot(tangentDir) * frictionCoef;
-	jt = jt / totalMass;
-
+	// Penetration along normal (node relative to hit point)
 	btVector3 deltaPosNode = hitPosition - n->m_x;
 	btScalar penetrationDistance = deltaPosNode.dot(normal);
 
-	btScalar k = 0.0;
-	if (collisionMode == CollisionMode::Linear)
-	{
-		if (penetrationDistance < penetrationMin)
-			return btVector3(0, 0, 0);
+	// Effective mass along a direction dir: K = ima + imb + dir · ((rB × dir) × (invInertB * (rB × dir)))
+	btMatrix3x3 invInertB = obj->getInvInertiaTensorWorld();
+	auto effectiveMass = [&](const btVector3& dir) -> btScalar {
+		btVector3 rBxDir = rB.cross(dir);
+		btVector3 Iinv_rBxDir = invInertB * rBxDir;
+		btScalar ang = dir.dot(rBxDir.cross(Iinv_rBxDir));
+		return ima + imb + ang;
+	};
 
+	// Friction coefficient
+	btScalar mu = obj->getFriction() * getFriction();
+
+	btScalar Kn = effectiveMass(normal);
+	if (Kn <= SIMD_EPSILON) return btVector3{0, 0, 0};
+
+	// Normal impulse (non-negative)
+	btScalar jn = -vRel_n / Kn;
+	jn = btMax(btScalar(0), jn);
+
+	// Tangent impulse with Coulomb clamp
+	btScalar jt = 0;
+	if (tangentDir.fuzzyZero() == false)
+	{
+		btScalar Kt = effectiveMass(tangentDir);
+		if (Kt > SIMD_EPSILON)
+		{
+			btScalar vRel_t_scalar = vRelative.dot(tangentDir);
+			jt = -vRel_t_scalar / Kt;
+			btScalar jt_max = mu * jn;
+			btClamp(jt, -jt_max, jt_max);
+		}
+	}
+
+	// Total impulse
+	btVector3 impulse = -(normal * jn + tangentDir * jt) / m_sst.sdt;
+
+	btScalar k = 1.0f;
+	if (collisionMode == CollisionMode::Linear && penetrationDistance > penetrationMin)
+	{
 		btScalar distanceTot = penetrationMax - penetrationMin;
 		btScalar ratio = (penetrationDistance - penetrationMin) / distanceTot;
-		k = Lerp(this->collisionStiffnessMin, this->collisionStiffnessMax, min(1.0, ratio));
-		// k = totalMass / imb * (penetrationDistance / m_collisionMargin);
+		k = Lerp(this->collisionStiffnessMin, this->collisionStiffnessMax, min(1.0, ratio));		
 	}
-	else if (collisionMode == CollisionMode::Curve)
+	else if (collisionMode == CollisionMode::Curve && spline)
 	{
-		if (!spline) 
-			return btVector3(0, 0, 0);
-
 		k = spline->eval(penetrationDistance);
 
 		if (isnan(k))
-			return btVector3(0, 0, 0);
+			k = 1.0f;		
+	}
+	else if (collisionMode == CollisionMode::Auto)
+	{
+		// k = totalMass / imb * (penetrationDistance / m_collisionMargin);
 	}
 
-	n->m_SplineEval = k;
-	btScalar responseVector = -k * penetrationDistance + collisionViscosity * vRelativeOnNormal;
-
-	const btVector3 impulse = ((responseVector * normal) - (tangentDir * jt * m_sst.isdt)) * m_sst.sdt;
+	n->m_SplineEval = k;	
+	impulse *= k; // Apply coefficient
 	return impulse;
 }
 
