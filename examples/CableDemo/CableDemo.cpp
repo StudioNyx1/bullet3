@@ -4004,6 +4004,57 @@ static void Init_FixedJoint(CableDemo* pdemo)
 	btFixedConstraint* fixed = pdemo->createFixedConstraint(*rod, *cube, frameA, frameB, 256);
 }
 
+static void Init_ImpulseAnchor(CableDemo* pdemo)
+{
+	// Shape
+	btCollisionShape* updownBoxShape = new btBoxShape(btVector3(0.4, 0.1, 0.1));
+	btCollisionShape* lefrightBoxShape = new btBoxShape(btVector3(0.1, 0.4, 0.1));
+	btTransform upBoxTransform(btMatrix3x3::getIdentity(), btVector3(0,0.3,0));
+	btTransform downBoxTransform(btMatrix3x3::getIdentity(), btVector3(0,-0.3,0));
+	btTransform leftBoxTransform(btMatrix3x3::getIdentity(), btVector3(-0.3,0,0));
+	btTransform rightBoxTransform(btMatrix3x3::getIdentity(), btVector3(0.3, 0, 0));
+
+	btCompoundShape* ringShape = new btCompoundShape(false);
+	ringShape->addChildShape(upBoxTransform, updownBoxShape);
+	ringShape->addChildShape(downBoxTransform, updownBoxShape);
+	ringShape->addChildShape(leftBoxTransform, lefrightBoxShape);
+	ringShape->addChildShape(rightBoxTransform, lefrightBoxShape);
+
+	// Masses
+	btScalar massRingLest(10);
+	btScalar massRingA18(704);
+
+	// Transform
+	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 10, 0));
+	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, 5, 0));
+	btTransform transformRingA18(btQuaternion(btVector3(0,1,0), 3.14/2.0), btVector3(0, 5-0.3, 0));
+
+	// RB
+	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(0), transformAttachPoint, new btBoxShape(btVector3(0,0,0)));
+	btRigidBody* ringLest = pdemo->createRigidBody(massRingLest, transformRingLest, ringShape);
+	ringLest->setSleepingThresholds(0, 0);
+	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
+	ringA18->setSleepingThresholds(0, 0);
+	
+	// Cable's Waypoints
+	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
+	waypointPos.push_back(transformRingLest.getOrigin() + btVector3(0,0.3,0));
+	waypointPos.push_back(transformAttachPoint.getOrigin());
+
+	// Joint
+	// btTransform framePivot = btTransform::getIdentity();
+	// framePivot.setOrigin(btVector3(0, -4.7, 0));
+	// btTransform frameWorld = attachPoint->getWorldTransform() * framePivot;
+	// btTransform frameA = attachPoint->getWorldTransform().inverse() * frameWorld;
+	// btTransform frameB = ringLest->getWorldTransform().inverse() * frameWorld;
+	// btFixedConstraint* fixed = pdemo->createFixedConstraint(*attachPoint, *ringLest, frameA, frameB, 256);
+
+	// Cable
+	btCable* cable = pdemo->createCableWaypoint(50, 100, 10, waypointPos, ringLest, attachPoint, true, true);
+	cable->setUseLRA(true);
+	cable->getCollisionShape()->setMargin(margin);
+}
+
 void (*demofncs[])(CableDemo*) =
 	{
 		Init_CableForceDown,
@@ -4033,7 +4084,8 @@ void (*demofncs[])(CableDemo*) =
 		Init_BallJoint,
 		Init_FixedJoint,
 		Init_RayCast,
-		Init_Collision
+		Init_Collision,
+		Init_ImpulseAnchor
 };
 
 ////////////////////////////////////
