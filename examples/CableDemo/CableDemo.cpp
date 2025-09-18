@@ -4033,6 +4033,8 @@ static void Init_ImpulseAnchor(CableDemo* pdemo)
 	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(0), transformAttachPoint, new btBoxShape(btVector3(0,0,0)));
 	btRigidBody* ringLest = pdemo->createRigidBody(massRingLest, transformRingLest, ringShape);
 	ringLest->setSleepingThresholds(0, 0);
+	ringLest->updateMassAtImpact(true, massRingLest, 1000, 0.001, 1);
+
 	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
 	ringA18->setSleepingThresholds(0, 0);
 	
@@ -4053,6 +4055,8 @@ static void Init_ImpulseAnchor(CableDemo* pdemo)
 	btCable* cable = pdemo->createCableWaypoint(50, 100, 10, waypointPos, ringLest, attachPoint, true, true);
 	cable->setUseLRA(true);
 	cable->getCollisionShape()->setMargin(margin);
+	// cable->m_anchors[0].BodyMassRatio = 0.7;
+	// cable->m_anchors[1].BodyMassRatio = 0.7;
 }
 
 void (*demofncs[])(CableDemo*) =
