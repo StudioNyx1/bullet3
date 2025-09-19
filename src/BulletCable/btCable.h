@@ -464,6 +464,8 @@ public:
 	void* getCableNodesPos();
 
 	int getCableState();
+	
+	int getCollisionMode();
 
 	void appendNode(const btVector3& x, btScalar m) override;
 
