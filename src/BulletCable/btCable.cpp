@@ -1564,10 +1564,6 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node*
 		if (isnan(k))
 			k = 1.0f;		
 	}
-	else if (collisionMode == CollisionMode::Auto)
-	{
-		// k = totalMass / imb * (penetrationDistance / m_collisionMargin);
-	}
 
 	n->m_SplineEval = k;	
 	impulse *= k; // Apply coefficient
