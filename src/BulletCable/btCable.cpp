@@ -1740,6 +1740,11 @@ int btCable::getCableState()
 	return (int)cableState;
 }
 
+int btCable::getCollisionMode()
+{
+	return (int)collisionMode;
+}
+
 void btCable::appendNode(const btVector3& x, btScalar m)
 {
 	if (m_nodes.capacity() == m_nodes.size())
