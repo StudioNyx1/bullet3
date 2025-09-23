@@ -331,7 +331,7 @@ void btCable::EndConstraintsSolve()
 		}
 	}
 
-	removeAllBackupNodes();
+	//removeAllBackupNodes();
 	_nodePairContact.clear();
 }
 
@@ -1085,20 +1085,6 @@ void btCable::runNarrowPhase()
 
 void btCable::addBackupNodes()
 {
-    // Precompute thresholds
-    const btScalar rest  = 2.0f * m_defaultRestLength;
-    const btScalar rest2 = rest * rest;
-
-    // Local helper: find link for a node (scans only original list span)
-    auto findLinkOf = [this](const Node* target) -> btLink<Node*>*
-    {
-        for (btLink<Node*>* cur = m_linkedList.getHead(); cur && !cur->isTail(); cur = cur->getNext())
-        {
-            if (cur->getValue() == target) return cur;
-        }
-        return nullptr;
-    };
-
     // Local helpers: insert one link adjacent to another (no-op on null)
     auto insertAfterInList = [](btLink<Node*>* link, Node* inserted)
     {
@@ -1114,6 +1100,11 @@ void btCable::addBackupNodes()
         newLink->setValue(inserted);
         newLink->insertBefore(link);
     };
+	
+	// if(_nodePairContact.size() == 0)
+	// {
+	// 	removeAllBackupNodes();
+	// }
 
     // Iterate original contact pairs, but do not re-walk newly created links.
     for (int i = 0, nPairs = _nodePairContact.size(); i < nPairs; ++i)
@@ -1121,7 +1112,7 @@ void btCable::addBackupNodes()
         NodePairNarrowPhase* pair = &_nodePairContact.at(i);
         Node* n = pair->node;
 
-        btLink<Node*>* linkN = findLinkOf(n);
+        btLink<Node*>* linkN = m_linkedList.findByValue(n);
         if (!linkN) continue;
 
         // Previous neighbor gap handling (n_prev -> n)
@@ -1131,44 +1122,48 @@ void btCable::addBackupNodes()
             Node* a = linkPrev->getValue();
             Node* b = linkN->getValue(); // n
 
-            if (btDistance2(a->m_x, b->m_x) > rest2)
-            {
-                const btScalar dist = btDistance(a->m_x, b->m_x);
-                int segments = (int)ceil(dist / rest);
-                if (segments < 1) segments = 1;
-                int inserts = segments - 1;
+        	Link currentLink = m_links.at(b->index - 1);
+        	btScalar rest = currentLink.m_rl;
+        	btScalar restThreshold = 2 * rest;
             	
-                if (inserts > 0)
-                {
-                    // Insert nodes just before linkN, from closest to a to closest to b
-                    for (int j = 1; j <= inserts; ++j)
-                    {
-                        Node* spare = acquireSecondaryNode();
-                        if (!spare) break;
+        	btScalar dist = btDistance(a->m_x, b->m_x);
+        	if(dist > restThreshold)
+        	{
+        		int segments = (int)ceil(dist / rest);
+        		if (segments < 1) segments = 1;
+        		int inserts = segments - 1;
+            	
+        		if (inserts > 0)
+        		{
+        			// Insert nodes just before linkN, from closest to a to closest to b
+        			for (int j = 1; j <= inserts; ++j)
+        			{
+        				Node* spare = acquireSecondaryNode();
+        				if (!spare) break;
 
-                        const btScalar t  = btScalar(j) / btScalar(segments);
-                        const btScalar it = btScalar(1) - t;
-                    	btVector3 bPos = t * b->m_x;
-                    	btVector3 aPos = it * a->m_x;
+        				const btScalar t  = btScalar(j) / btScalar(segments);
+        				const btScalar it = btScalar(1) - t;
+        				btVector3 bPos = t * b->m_x;
+        				btVector3 aPos = it * a->m_x;
 
-                        spare->m_x = aPos + bPos;
-                        spare->m_v = it * a->m_v + t * b->m_v;
-                    	spare->m_q = spare->m_x - b->m_v * m_sst.sdt;
+        				spare->m_x = aPos + bPos;
+        				spare->m_v = it * a->m_v + t * b->m_v;
+        				spare->m_q = spare->m_x - b->m_v * m_sst.sdt;
 
-                    	_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), spare->m_x));
-						MyContactResultCallback callback(m_collisionMargin, &_nodeContactObject, pair->pair->body);
+        				_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), spare->m_x));
+        				MyContactResultCallback callback(m_collisionMargin, &_nodeContactObject, pair->pair->body);
 
-                    	m_world->contactPairTest(&_nodeContactObject, pair->pair->body, callback);
+        				m_world->contactPairTest(&_nodeContactObject, pair->pair->body, callback);
 
-                    	if (callback.m_connected)
-                    	{
-                    		spare->m_x = callback.contactPoint + callback.contactNorm * (m_collisionMargin + FLT_EPSILON);
-                    	}
+        				if (callback.m_connected)
+        				{
+        					spare->m_x = callback.contactPoint + callback.contactNorm * (m_collisionMargin + FLT_EPSILON);
+        				}
 
-                        insertBeforeInList(linkN, spare);
-                    }
-                }
-            }
+        				insertBeforeInList(linkN, spare);
+        			}
+        		}
+        	}
         }
 
         // Next neighbor gap handling (n -> n_next)
@@ -1178,9 +1173,13 @@ void btCable::addBackupNodes()
             Node* a = linkN->getValue(); // n
             Node* b = linkNext->getValue();
 
-            if (btDistance2(a->m_x, b->m_x) > rest2)
-            {
-                const btScalar dist = btDistance(a->m_x, b->m_x);
+        	Link currentLink = m_links.at(a->index - 1);
+        	btScalar rest = currentLink.m_rl;
+        	btScalar restThreshold = 2 * rest;
+        	btScalar dist = btDistance(a->m_x, b->m_x);
+
+            if (dist > restThreshold)
+            {                
                 int segments = (int)ceil(dist / rest);
                 if (segments < 1) segments = 1;
                 int inserts = segments - 1;

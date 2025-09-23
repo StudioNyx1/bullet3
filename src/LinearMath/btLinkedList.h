@@ -1,5 +1,6 @@
 #ifndef BT_LINKEDLIST_H
 #define BT_LINKEDLIST_H
+#include <unordered_map>
 
 template <typename T>
 class btLink
@@ -56,29 +57,50 @@ public:
 	btLink<T> *getHead() const { return m_head.getNext(); }
 	btLink<T> *getTail() const { return m_tail.getPrev(); }
 
-	void addHead(btLink<T> *link) { link->insertAfter(&m_head); }
-	void addTail(btLink<T> *link) { link->insertBefore(&m_tail); }
+	void addHead(btLink<T> *link) { link->insertAfter(&m_head); onNodeInserted(link); }
+	void addTail(btLink<T> *link) { link->insertBefore(&m_tail); onNodeInserted(link); }
 
 	// Create a node from a value and insert it.
 	btLink<T>* addHead(const T& value)
 	{
-		btLink<T>* node = new btLink<T>(); // next/prev set later by insertAfter
+		btLink<T>* node = new btLink<T>();
 		node->setValue(value);
 		node->insertAfter(&m_head);
+		onNodeInserted(node);
 		return node;
 	}
 
 	btLink<T>* addTail(const T& value)
 	{
-		btLink<T>* node = new btLink<T>(); // next/prev set later by insertBefore
+		btLink<T>* node = new btLink<T>();
 		node->setValue(value);
 		node->insertBefore(&m_tail);
+		onNodeInserted(node);
 		return node;
+	}
+
+	// Use this instead of calling node->remove() directly.
+	void remove(btLink<T>* node) {
+		onNodeRemoved(node);
+		node->remove();
+	}
+
+	btLink<T>* findByValue(const T& value) const {
+		auto it = m_index.find(value);
+		return it == m_index.end() ? nullptr : it->second;
 	}
 
 private:
 	btLink<T> m_head;
 	btLink<T> m_tail;
+
+	unordered_map<T, btLink<T>*> m_index;
+
+	void onNodeInserted(btLink<T>* n) { m_index.emplace(n->getValue(), n); }
+	void onNodeRemoved(btLink<T>* n) {
+		auto it = m_index.find(n->getValue());
+		if (it != m_index.end() && it->second == n) m_index.erase(it);
+	}
 };
 
 #endif  //BT_LINKEDLIST_H

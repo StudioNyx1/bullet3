@@ -323,6 +323,7 @@ private:
 			node.m_x.setZero();
 			node.m_q.setZero();
 			node.m_v.setZero();
+			node.m_im = 1;
 			node.isSecondary = true;
 			node.m_material  = m_materials[0]; // ensure valid at init time
 		}
