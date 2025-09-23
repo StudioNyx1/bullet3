@@ -10,6 +10,7 @@
 #include "BulletCollision/CollisionDispatch/btCollisionWorld.h"
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
 #include "BulletCollision/CollisionShapes/btSphereShape.h"
+#include "LinearMath/btLinkedList.h"
 
 #include <vector>
 #include <BulletCollision/CollisionShapes/btCompoundShape.h>
@@ -242,6 +243,95 @@ private:
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
 
+	struct NodePoolEntry {
+		Node node;
+		int nextFree; // -1 if in-use
+	};
+	btAlignedObjectArray<NodePoolEntry> m_secondaryPool;
+	int m_secondaryFreeHead = -1;
+
+	// Acquire a free node from the pool (returns nullptr if none).
+	Node* acquireSecondaryNode()
+	{
+		if (m_secondaryFreeHead < 0) return nullptr;
+
+		const int idx = m_secondaryFreeHead;
+		NodePoolEntry& entry = m_secondaryPool[idx];
+
+		// pop from free list
+		m_secondaryFreeHead = entry.nextFree;
+
+		// mark used
+		entry.nextFree = -1;
+
+		Node* n = &entry.node;
+
+		// reassert pool metadata and reset fields to safe defaults
+		n->poolIndex   = idx;
+		n->isSecondary = true;
+
+		// Optional resets to avoid stale state
+		n->index = -1;
+		n->m_q = n->m_x;
+		n->m_v.setZero();
+
+		return n;
+	}
+
+	// Release a node back to the pool (caller ensures it's from pool).
+	void releaseSecondaryNode(Node* n)
+	{
+		if (!n) return;
+
+		// Verify this node is from our pool and has a valid index
+		if (!n->isSecondary || n->poolIndex < 0) return;
+
+		const int idx = n->poolIndex;
+		NodePoolEntry& entry = m_secondaryPool[idx];
+
+		// Double-free guard: only release if currently in-use (nextFree == -1)
+		if (entry.nextFree != -1) return;
+
+		// Optional: clear node state to catch accidental use-after-free
+		n->index = -1;
+		n->m_v.setZero();
+		n->m_x.setZero();
+		n->m_q.setZero();
+
+		// push back to free list
+		entry.nextFree = m_secondaryFreeHead;
+		m_secondaryFreeHead = idx;
+
+		// Mark as not currently checked-out
+		n->poolIndex = -1;
+	}
+
+	// Initialize/resize pool to hold at least 'count' spare nodes. Call during setup.
+	void btCable::initSecondaryPool(int count)
+	{
+		m_secondaryPool.resize(count);
+		for (int i = 0; i < count; ++i)
+		{
+			// mark free and record owning index
+			m_secondaryPool[i].nextFree = (i + 1 < count) ? (i + 1) : -1;
+
+			// initialize node defaults
+			Node& node = m_secondaryPool[i].node;
+			node.poolIndex   = i;
+			node.isSecondary    = true;
+			node.index       = -1;
+			node.m_x.setZero();
+			node.m_q.setZero();
+			node.m_v.setZero();
+			node.isSecondary = true;
+			node.m_material  = m_materials[0]; // ensure valid at init time
+		}
+		m_secondaryFreeHead = (count > 0) ? 0 : -1;
+	}
+	
+	btLinkedList<Node*> m_linkedList; // Links the cable nodes to potential backup nodes
+	btAlignedObjectArray<Node> m_bridges;
+
 	MonotonicSpline1D* spline;
 
 	// Node forces members
@@ -302,6 +392,10 @@ private:
 					  std::vector<ObjData>& out) const;
 	void runBroadPhase();
 	void runNarrowPhase();
+	void addBackupNodes();
+	void removeBackupNodes();
+	void removeAllBackupNodes();
+	void integrateSecondaryVelocity();
 	bool aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 nodeMinAabb, btVector3 nodeMaxAabb, btVector3 minAabb, btVector3 maxAabb);
 
 	// Internal: run one 'constraint/projection' iteration of your existing cable solver
@@ -367,6 +461,8 @@ public:
 	bool isIterativeSolveActive() const { return m_iter.active; }
 	int currentIteration() const { return m_iter.current; }
 	int totalIterations() const { return m_iter.total; }
+
+	btLinkedList<Node*> getLinkedList() { return m_linkedList; }
 
 	enum CableState
 	{

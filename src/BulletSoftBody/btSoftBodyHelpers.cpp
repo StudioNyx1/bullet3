@@ -288,6 +288,30 @@ void btSoftBodyHelpers::Draw(btSoftBody* psb,
 				// idraw->drawLine(n.m_xStartRay, n.m_xEndRay, btVector3(0, 0, 1));
 				// idraw->drawLine(n.m_xOut, n.m_xOut + n.m_normalOut, btVector3(0, 0, 1));
 			}
+			
+			btCable *cable = (btCable *)psb;
+			if (cable != nullptr)
+			{
+				btLink<btSoftBody::Node*> *cur = cable->getLinkedList().getHead();
+				while (cur && !cur->isTail())
+				{
+					btSoftBody::Node *n = cur->getValue();
+					
+					if (!n->isSecondary)
+					{
+						cur = cur->getNext();
+						continue;
+					}
+					
+					if (0 == (n->m_material->m_flags & btSoftBody::fMaterial::DebugDraw))
+					{
+						cur = cur->getNext();
+						continue;
+					}
+					idraw->drawSphere(n->m_x, psb->getCollisionShape()->getMargin(), btVector3(0, 1, 0));
+					cur = cur->getNext();
+				}
+			}
 		}
 		/* Links	*/
 		
