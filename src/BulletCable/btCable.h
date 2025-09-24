@@ -328,7 +328,7 @@ private:
 			node.m_x.setZero();
 			node.m_q.setZero();
 			node.m_v.setZero();
-			node.m_im = 1;
+			node.m_im = 1000;
 			node.isSecondary = true;
 			node.m_material  = m_materials[0]; // ensure valid at init time
 		}
@@ -398,6 +398,8 @@ private:
 					  std::vector<ObjData>& out) const;
 	void runBroadPhase();
 	void runNarrowPhase();
+	Node* createPreparedSpare(Node* a, Node* b, int j, int segments, NodePairNarrowPhase* pair);
+	void insertInterpolatedNodes(btLink<Node*>* anchor, Node* a, Node* b, btScalar rest, NodePairNarrowPhase* pair, bool insertAfter);
 	void addBackupNodes();
 	void removeBackupNodes();
 	void removeAllBackupNodes();
