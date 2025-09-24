@@ -385,7 +385,7 @@ private:
 	void anchorConstraint(bool& impacted);
 
 	void contactConstraint();
-	btVector3 calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition);
+	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
 	btScalar computeCollisionMargin(const btCollisionShape* shape) const;
 	void resetManifoldLifeTime();
 
