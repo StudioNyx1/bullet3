@@ -189,11 +189,16 @@ public:
 				}
 			}
 
-			if (dist <= m_margin)
+			if (dist <= btScalar(0) || (dist > btScalar(0) && dist <= m_margin))
 			{
+				// Compute an always-negative "effectiveDist" to store in minDist
+				// - If penetrating, use actual dist (negative or zero).
+				// - If just near-contact (positive dist), convert to a small negative proxy.
+				btScalar effectiveDist = dist <= btScalar(0) ? dist : -dist;
+				
 				//cout << "dist: " << dist << endl;
 				m_connected = true;
-				if (dist < minDist)
+				if (effectiveDist < minDist)
 				{
 					// A=A, B=B
 					// A is the node, B is the target collider
@@ -208,7 +213,7 @@ public:
 						contactPoint = cp.getPositionWorldOnA();
 						contactNorm = -cp.m_normalWorldOnB;
 					}
-					minDist = dist;
+					minDist = effectiveDist;
 				}
 			}
 			return 1.0;
