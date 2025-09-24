@@ -1470,7 +1470,7 @@ void btCable::contactConstraint()
 
 			if (rb && impulseCompute)
 			{
-				btVector3 imp = calculateBodyImpulse(rb, m_collisionMargin, node, pair->normal, pair->hitPoint);
+				btVector3 imp = calculateBodyImpulse(rb, node, pair->normal, pair->hitPoint);
 				rb->applyRedirectionImpulse(imp, pair->hitPoint);
 			}
 
@@ -1485,7 +1485,7 @@ btScalar btCable::computeCollisionMargin(const btCollisionShape* shape) const
 	return m_collisionMargin + shape->getMargin();
 }
 
-btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, btScalar margin, Node* n, btVector3 normal, btVector3 hitPosition)
+btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition)
 {
 	// a = node
 	// b = body
