@@ -334,8 +334,77 @@ private:
 		}
 		m_secondaryFreeHead = (count > 0) ? 0 : -1;
 	}
+
+	// Remove a contiguous run of links between two primary nodes (used before re-inserting subdivided edges)
+	void removeLinkBetween(Node* left, Node* right)
+	{
+		btLink<Link*>* cur = m_linkedListLinks.getHead();
+		bool inRange = false;
+		while (cur && !cur->isTail())
+		{
+			btLink<Link*>* next = cur->getNext();
+			Link* e = cur->getValue();
+			if (!inRange)
+			{
+				if (e->m_n[0] == left) inRange = true;
+			}
+			if (inRange)
+			{
+				Link* toDel = e;
+				m_linkedListLinks.remove(cur);
+				onLinkRemoved(toDel);
+				delete cur;
+
+				if (toDel->m_n[1] == right) break;
+			}
+			cur = next;
+		}
+	}
+
+	void addLinkBetweenConsecutiveNodes(Node* left, Node* right, btScalar restLength = 0)
+	{
+		Link* l = new Link();
+		l->m_n[0] = left;
+		l->m_n[1] = right;
+		l->m_rl = restLength;
+		l->m_material = m_materials[0];
+		m_linkedListLinks.addTail(l);
+		onLinkInserted(l);
+	}
+
+	void btCable::onLinkInserted(Link* L)
+	{
+		if (!L) return;
+		Node* u = L->m_n[0];
+		Node* v = L->m_n[1];
+		// Assume order u -> v in the list
+		m_nodeAdj[u].right = L;
+		m_nodeAdj[v].left  = L;
+	}
+
+	void btCable::onLinkRemoved(Link* L)
+	{
+		if (!L) return;
+		Node* u = L->m_n[0];
+		Node* v = L->m_n[1];
+
+		auto iu = m_nodeAdj.find(u);
+		if (iu != m_nodeAdj.end() && iu->second.right == L) iu->second.right = nullptr;
+
+		auto iv = m_nodeAdj.find(v);
+		if (iv != m_nodeAdj.end() && iv->second.left == L) iv->second.left = nullptr;
+	}
 	
 	btLinkedList<Node*> m_linkedList; // Links the cable nodes to potential backup nodes
+	btLinkedList<Link*> m_linkedListLinks; // Links the cable nodes to potential backup nodes
+	struct LinkAdj {
+		Link* left = nullptr;   // link to previous node (prev -> this)
+		Link* right = nullptr;  // link to next node (this -> next)
+	};
+
+	// Fast node->adjacent-links lookup
+	std::unordered_map<Node*, LinkAdj> m_nodeAdj;
+	
 	btAlignedObjectArray<Node> m_bridges;
 
 	MonotonicSpline1D* spline;
@@ -398,13 +467,15 @@ private:
 					  std::vector<ObjData>& out) const;
 	void runBroadPhase();
 	void runNarrowPhase();
-	Node* createPreparedSpare(Node* a, Node* b, int j, int segments, NodePairNarrowPhase* pair);
-	void insertInterpolatedNodes(btLink<Node*>* anchor, Node* a, Node* b, btScalar rest, NodePairNarrowPhase* pair, bool insertAfter);
+	
+	Node* createPreparedSpare(Node* a, Node* b, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass);
+	void insertInterpolatedNodes(btLink<Node*>* anchor, Node* a, Node* b, btScalar restBeforeA, btScalar restAB, btScalar restAfterB, NodePairNarrowPhase* pair);
 	void addBackupNodes();
 	void updateBackupNodes();
 	void removeBackupNodes();
 	void removeAllBackupNodes();
-	void integrateSecondaryVelocity();
+	void secondaryNodesContact();
+	
 	bool aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 nodeMinAabb, btVector3 nodeMaxAabb, btVector3 minAabb, btVector3 maxAabb);
 
 	// Internal: run one 'constraint/projection' iteration of your existing cable solver
@@ -427,6 +498,7 @@ private:
 
 	btAlignedObjectArray<BroadPhasePair> _candidates;
 	btAlignedObjectArray<NodePairNarrowPhase> _nodePairContact;
+	btAlignedObjectArray<BroadPhasePair> _secondPairContact;
 	bool _impacted = false;
 
 	// Cached object used to resolve contacts
@@ -472,6 +544,9 @@ public:
 	int totalIterations() const { return m_iter.total; }
 
 	btLinkedList<Node*> getLinkedList() { return m_linkedList; }
+	btLinkedList<Link*> getLinkedListLinks() { return m_linkedListLinks; }
+
+	void updateNodesMasses();
 
 	enum CableState
 	{

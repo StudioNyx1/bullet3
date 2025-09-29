@@ -37,6 +37,9 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 		{
 			appendLink(i - 1, i);
 			m_linkedList.addTail(&node);
+
+			m_linkedListLinks.addTail(&m_links[i-1]);
+			onLinkInserted(&m_links[i-1]);
 		}
 		else
 		{
@@ -235,6 +238,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 	bool runBending = (currentIter + 1) % 2 == 0 || lastStep;
 	bool runCollisionDetection = firstStep || (currentIter + 1) % m_substepDelayCollisionNarrow == 0 || lastStep;
 	bool runContactConstraint = (currentIter + 1) % m_substepDelayCollisionSolver == 0 || lastStep;
+	bool shouldAddBackupNodes = (currentIter + 1) == m_substepDelayCollisionSolver;
 
 	updateNodeDeltaPos(currentIter);
 
@@ -259,15 +263,20 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 	if (runCollisionDetection)
 	{
-		//integrateSecondaryVelocity();
 		runNarrowPhase();
 	}
 
 	if (runContactConstraint)
 	{
+		updateBackupNodes();
+		secondaryNodesContact();
 		contactConstraint();
-		removeBackupNodes();
-		addBackupNodes();
+
+		if (shouldAddBackupNodes)
+		{
+			_secondPairContact.clear();
+			addBackupNodes();
+		}
 	}
 }
 
@@ -1073,7 +1082,7 @@ void btCable::runNarrowPhase()
 	}
 }
 
-btSoftBody::Node* btCable::createPreparedSpare(Node* a, Node* b, int j, int segments, NodePairNarrowPhase* pair)
+btSoftBody::Node* btCable::createPreparedSpare(Node* a, Node* b, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass)
 {
 	Node* spare = acquireSecondaryNode();
 	if (!spare) return nullptr;
@@ -1088,26 +1097,14 @@ btSoftBody::Node* btCable::createPreparedSpare(Node* a, Node* b, int j, int segm
 	spare->m_x = aPos + bPos;
 	spare->m_v = it * a->m_v + t * b->m_v;
 	spare->m_q = spare->m_x - b->m_v * m_sst.sdt;
-	// spare->m_im = a->m_im * 12;
+	spare->m_im = 1.0f / newNodeMass;
 
-	// Contact test and response
-	_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), spare->m_x));
-	MyContactResultCallback callback(0, &_nodeContactObject, pair->pair->body);
-	m_world->contactPairTest(&_nodeContactObject, pair->pair->body, callback);
-
-	if (callback.m_connected && callback.minDist < 0)
-	{
-		btRigidBody* rb = btRigidBody::upcast(pair->pair->body);
-		while (rb->m_redirectionTarget)
-		{
-			rb = rb->m_redirectionTarget;
-		}
-		btVector3 impulse = calculateBodyImpulse(rb, spare, callback.contactNorm, callback.contactPoint);
-		rb->applyRedirectionImpulse(impulse, callback.contactPoint);
-
-		spare->m_x = callback.contactPoint + callback.contactNorm * (m_collisionMargin + FLT_EPSILON);
-		spare->m_n = callback.contactNorm;
-	}
+	BroadPhasePair sparePair;
+	sparePair.body = pair->pair->body;
+	sparePair.node = spare;
+	sparePair.bodyType = pair->pair->bodyType;
+	
+	_secondPairContact.push_back(sparePair);
 
 	return spare;
 }
@@ -1115,78 +1112,69 @@ btSoftBody::Node* btCable::createPreparedSpare(Node* a, Node* b, int j, int segm
 void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 									  Node* a,
 									  Node* b,
-									  btScalar rest,
-									  NodePairNarrowPhase* pair,
-									  bool insertAfter)
+									  btScalar restBeforeA,
+									  btScalar restAB,
+									  btScalar restAfterB,
+									  NodePairNarrowPhase* pair)
 {
-	if (!anchor || !a || !b || rest <= btScalar(0)) return;
+	if (!anchor || !a || !b || restAB <= btScalar(0)) return;
 
-	const btScalar restThreshold = 1.05f * rest;
-	const btScalar dist = btDistance(a->m_x, b->m_x);
-	if (dist <= restThreshold) return;
+	btScalar dist = btDistance(a->m_x, b->m_x);
+	if (dist <= 1.2f * restAB) return;
 
-	int segments = (int)ceil(dist / rest);
-	segments = std::max(segments, 1);
-	const int inserts = segments - 1;
-	if (inserts <= 0) return;
+	// Decide segments (policy). Ensure at least 2 if we insert.
+	int segments = std::max(2, (int)std::ceil(dist / restAB));
+	int inserts  = segments - 1;
 
-	if (insertAfter)
+	removeLinkBetween(a, b);
+
+	btScalar rlSeg = restAB / (btScalar)segments;
+	btScalar halfLinear = 0.5f * m_linearMass;
+
+	// Update mass for 'a' immediately: adjacent rests (restBeforeA, rlSeg)
+	btScalar massA = halfLinear * (btMax(restBeforeA, btScalar(0)) + rlSeg);
+	if (a->isSecondary) a->m_im = 1.0f / massA; else setMass(a->index, massA);
+
+	Node* prev = a;
+	btLink<Node*>* cursor = anchor;
+
+	for (int j = 1; j <= inserts; ++j)
 	{
-		btLink<Node*>* cursor = anchor; // advance as we insert
-		for (int j = 1; j <= inserts; ++j)
-		{
-			Node* spare = createPreparedSpare(a, b, j, segments, pair);
-			if (!spare) break;
-			
-			btLink<Node*>* newLink = new btLink<Node*>();
-			newLink->setValue(spare);
-			newLink->insertAfter(cursor);
-			cursor = cursor->getNext(); // move to the newly inserted node
-		}
+		// Mass for the inserted node: (rlSeg, rlSeg)
+		btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
+		Node* spare = createPreparedSpare(a, b, j, segments, pair, secondaryMass);
+		if (!spare) break;
+
+		// Insert node into node list right after cursor
+		btLink<Node*>* newNode = new btLink<Node*>();
+		newNode->setValue(spare);
+		newNode->insertAfter(cursor);
+		cursor = cursor->getNext();
+
+		// Connect prev -> spare with uniform rest
+		addLinkBetweenConsecutiveNodes(prev, spare, rlSeg);
+		
+		prev = spare;
 	}
-	else
-	{
-		// Insert nodes just before anchor (which points to b), from closest to a to closest to b
-		for (int j = 1; j <= inserts; ++j)
-		{
-			Node* spare = createPreparedSpare(a, b, j, segments, pair);
-			if (!spare) break;
-			
-			btLink<Node*>* newLink = new btLink<Node*>();
-			newLink->setValue(spare);
-			newLink->insertBefore(anchor);
-		}
-	}
+
+	// Final link prev -> b
+	addLinkBetweenConsecutiveNodes(prev, b, rlSeg);
+
+	// Mass for 'b': (rlSeg, restAfterB)
+	btScalar massB = halfLinear * (rlSeg + btMax(restAfterB, btScalar(0)));
+	if (b->isSecondary) b->m_im = 1.0f / massB; else setMass(b->index, massB);
 }
 
 void btCable::addBackupNodes()
 {	
-	// if(_nodePairContact.size() == 0)
-	// {
-	// 	removeAllBackupNodes();
-	// }
-
     // Iterate original contact pairs, but do not re-walk newly created links.
     for (int i = 0, nPairs = _nodePairContact.size(); i < nPairs; ++i)
     {
-    	NodePairNarrowPhase* pair = &_nodePairContact.at(i);
+	    NodePairNarrowPhase* pair = &_nodePairContact.at(i);
     	Node* n = pair->node;
 
     	btLink<Node*>* linkN = m_linkedList.findByValue(n);
     	if (!linkN) continue;
-
-    	// Previous neighbor gap handling (n_prev -> n)
-    	btLink<Node*>* linkPrev = linkN->getPrev();
-    	if (linkPrev && !linkPrev->isHead())
-    	{
-    		Node* a = linkPrev->getValue();
-    		Node* b = linkN->getValue(); // n
-
-    		Link currentLink = m_links.at(b->index - 1);
-    		btScalar rest = currentLink.m_rl;
-
-    		insertInterpolatedNodes(linkN, a, b, rest, pair, false);
-    	}
 
     	// Next neighbor gap handling (n -> n_next)
     	btLink<Node*>* linkNext = linkN->getNext();
@@ -1195,19 +1183,143 @@ void btCable::addBackupNodes()
     		Node* a = linkN->getValue(); // n
     		Node* b = linkNext->getValue();
 
-    		Link currentLink = m_links.at(a->index - 1);
-    		btScalar rest = currentLink.m_rl;
+    		btScalar rest = 0;
+    		btScalar restBefore = 0;
+    		if (a->index > 0 && a->index - 1 < m_links.size())
+    		{
+    			Link* Lleft = nullptr;
+    			Link* Lright = nullptr;
+    			auto it = m_nodeAdj.find(n);
+    			if (it != m_nodeAdj.end()) {
+    				if (it->second.left)  Lleft  = it->second.left;
+    				if (it->second.right) Lright = it->second.right;
+    			}
+    			
+    			rest = Lright->m_rl;
+    			restBefore = Lleft->m_rl;
+    		}
 
-    		insertInterpolatedNodes(linkN, a, b, rest, pair, true);
+    		btScalar restAfterB = 0;
+    		if (b->index > 0 && b->index - 1 < m_links.size())
+    		{
+    			Link* Lright = nullptr;
+    			auto it = m_nodeAdj.find(n);
+    			if (it != m_nodeAdj.end()) {
+    				if (it->second.right) Lright = it->second.right;
+    			}
+    			
+    			restAfterB = Lright->m_rl;
+    		}
+
+    		insertInterpolatedNodes(linkN, a, b, restBefore, rest, restAfterB, pair);
     	}
     }
 }
 
+void btCable::updateBackupNodes()
+{
+	// Move the backup nodes between their primary as when they were created
+	btLink<Node*>* it = m_linkedList.getHead();
+	while (it && !it->isTail())
+	{
+		Node* cur = it->getValue();
+		if (!cur) { it = it->getNext(); continue; }
+
+		// skip primaries
+		if (!cur->isSecondary) { it = it->getNext(); continue; }
+
+		// We are at the start of a run (or in a run). Find runStart and runEnd in one forward pass.
+		btLink<Node*>* runStart = it;
+		btLink<Node*>* runEnd   = it;
+		int count = 0;
+
+		while (runEnd && !runEnd->isTail())
+		{
+			Node* n = runEnd->getValue();
+			if (!n || !n->isSecondary) break;
+
+			++count;
+
+			btLink<Node*>* next = runEnd->getNext();
+			if (!next || next->isTail()) break;
+
+			Node* nNext = next->getValue();
+			if (!nNext || !nNext->isSecondary) break;
+
+			runEnd = next;
+		}
+
+		// Bounding primaries
+		btLink<Node*>* leftL  = runStart->getPrev();
+		btLink<Node*>* rightL = runEnd->getNext();
+
+		// If we don't have two bounding primaries, skip this run.
+		if (!leftL || leftL->isHead() || !rightL || rightL->isTail()) {
+			it = rightL ? rightL : (runEnd ? runEnd->getNext() : nullptr);
+			continue;
+		}
+
+		Node* a = leftL->getValue();
+		Node* b = rightL->getValue();
+		if (!a || !b || a->isSecondary || b->isSecondary) {
+			it = rightL ? rightL : (runEnd ? runEnd->getNext() : nullptr);
+			continue;
+		}
+
+		// Interpolate secondaries uniformly between a and b,
+		// matching the creation in insertInterpolatedNodes where rlSeg was uniform.
+		const btVector3 xa = a->m_x;
+		const btVector3 xb = b->m_x;
+
+		// Single sweep to place nodes: t = i/(count+1), i=1..count
+		int i = 1;
+		for (btLink<Node*>* c = runStart;; c = c->getNext(), ++i)
+		{
+			Node* s = c->getValue();
+			if (s && s->isSecondary)
+			{
+				const btScalar t = btScalar(i) / btScalar(count + 1);
+				s->m_x = (btScalar(1) - t) * xa + t * xb;
+			}
+
+			if (c == runEnd) break;
+		}
+
+		// Continue after the run
+		it = rightL;
+	}
+}
+
+void btCable::secondaryNodesContact()
+{
+	for (int i = 0; i < _secondPairContact.size(); i++)
+	{
+		BroadPhasePair pair = _secondPairContact.at(i);
+		Node *n = pair.node;
+
+		// Contact test and response
+		_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), n->m_x));
+		MyContactResultCallback callback(0, &_nodeContactObject, pair.body);
+		m_world->contactPairTest(&_nodeContactObject, pair.body, callback);
+
+		if (callback.m_connected && callback.minDist < 0)
+		{
+			btRigidBody* rb = btRigidBody::upcast(pair.body);
+			while (rb->m_redirectionTarget)
+			{
+				rb = rb->m_redirectionTarget;
+			}
+			btVector3 impulse = calculateBodyImpulse(rb, n, callback.contactNorm, callback.contactPoint);
+			rb->applyRedirectionImpulse(impulse, callback.contactPoint);
+
+			n->m_x = callback.contactPoint + callback.contactNorm * (m_collisionMargin + FLT_EPSILON);
+			n->m_n = callback.contactNorm;
+		}
+	}
+}
+
 void btCable::removeBackupNodes()
 {
-	const btScalar rest = m_defaultRestLength;
-	const btScalar rest2 = rest * rest;
-
 	btLink<Node*>* cur = m_linkedList.getHead();
 	while (cur && !cur->isTail())
 	{
@@ -1254,7 +1366,16 @@ void btCable::removeBackupNodes()
 		}
 
 		// Compute primary-to-primary span
-		const btScalar ppDist2 = btDistance2(left->m_x, right->m_x);
+		btScalar ppDist2 = btDistance2(left->m_x, right->m_x);
+		// Use authoritative primary-to-primary link rest length
+		const int linkIndex = left->index; // link between left(i) and right(i+1) is m_links[i]
+		if (linkIndex < 0 || linkIndex >= m_links.size())
+		{
+			cur = runEnd;
+			continue;
+		}
+		const btScalar linkRest = m_links[linkIndex].m_rl;
+		btScalar rest2 = linkRest * linkRest;
 
 		// If P-P distance fits in one segment, remove the entire secondary run
 		if (ppDist2 <= rest2)
@@ -1270,6 +1391,11 @@ void btCable::removeBackupNodes()
 				if (n) releaseSecondaryNode(n);
 				delete toRemove;
 			}
+
+			// Rebuild single edge left->right
+			removeLinkBetween(left, right);
+			addLinkBetweenConsecutiveNodes(left, right, linkRest);
+			
 			// Continue after right primary
 			cur = runEnd;
 			continue;
@@ -1278,7 +1404,7 @@ void btCable::removeBackupNodes()
 		// Otherwise, compute required segments and trim extras if any
 		// segments k = ceil(dist / rest) -> required secondaries = k - 1
 		const btScalar ppDist = btDistance(left->m_x, right->m_x);
-		int segments = (int)ceil(ppDist / rest);
+		int segments = (int)ceil(ppDist / linkRest);
 		if (segments < 1) segments = 1;
 		int requiredSecondaries = segments - 1;
 
@@ -1307,6 +1433,20 @@ void btCable::removeBackupNodes()
 
 				--toRemove;
 			}
+
+			removeLinkBetween(left, right);
+			Node* prev = left;
+			btLink<Node*>* walk = cur->getNext();
+			while (walk != runEnd)
+			{
+				Node* mid = walk->getValue();
+				addLinkBetweenConsecutiveNodes(prev, mid);
+				prev = mid;
+				walk = walk->getNext();
+			}
+			
+			addLinkBetweenConsecutiveNodes(prev, right);
+			
 			// Continue after right primary
 			cur = runEnd;
 			continue;
@@ -1314,21 +1454,6 @@ void btCable::removeBackupNodes()
 
 		// Nothing to remove/trim; move forward
 		cur = runEnd;
-	}
-}
-
-void btCable::integrateSecondaryVelocity()
-{
-	for (int i = 0; i < m_secondaryPool.size(); i++)
-	{
-		if (!m_secondaryPool.at(i).nextFree)
-		{
-			continue;
-		}
-		
-		Node* n = &m_secondaryPool.at(i).node;
-
-		n->m_x += n->m_v * m_sst.sdt;
 	}
 }
 
@@ -1355,6 +1480,27 @@ void btCable::removeAllBackupNodes()
 		// Free the list link if heap-allocated
 		delete thisLink;
 	}
+
+	// Recreate link list to mirror existing primary links in m_links
+	// 1) clear current link-edge list
+	btLink<Link*>* ecur = m_linkedListLinks.getHead();
+	while (ecur && !ecur->isTail())
+	{
+		btLink<Link*>* rm = ecur;
+		ecur = ecur->getNext();
+		m_linkedListLinks.remove(rm);
+		onLinkRemoved(rm->getValue());
+		delete rm;
+	}
+
+	// 2) repopulate with pointers to m_links entries (primary edges only)
+	for (int i = 0; i < m_links.size(); ++i)
+	{
+		m_linkedListLinks.addTail(&m_links[i]);
+		onLinkInserted(&m_links[i]);
+	}
+
+	updateNodesMasses();
 }
 
 void btCable::solveConstraints()
