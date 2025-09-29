@@ -90,6 +90,19 @@ public:
 		return it == m_index.end() ? nullptr : it->second;
 	}
 
+	// Clear and free all dynamically allocated links
+	void clear() {
+		btLink<T>* cur = getHead();
+		while (cur && !cur->isTail()) {
+			btLink<T>* next = cur->getNext();
+			onNodeRemoved(cur);
+			cur->remove();
+			delete cur;
+			cur = next;
+		}
+		m_index.clear();
+	}
+
 private:
 	btLink<T> m_head;
 	btLink<T> m_tail;

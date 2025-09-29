@@ -50,6 +50,10 @@ class btCable : public btSoftBody
 		}
 		manifolds.clear();
 
+		m_linkedList.clear();
+		m_linkedListLinks.clear();
+		m_nodeAdj.clear();
+
 		// Release allocated data
 		if (m_nodePos != nullptr)
 		{
