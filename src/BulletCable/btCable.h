@@ -555,6 +555,8 @@ public:
 	btLinkedList<Node*> getLinkedList() { return m_linkedList; }
 	btLinkedList<Link*> getLinkedListLinks() { return m_linkedListLinks; }
 
+	void resetNodesAndLinks();
+
 	// Update all nodes mass according to the set linearMass
 	void updateNodesMasses();
 

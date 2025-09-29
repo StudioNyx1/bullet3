@@ -1503,6 +1503,42 @@ void btCable::removeAllBackupNodes()
 	updateNodesMasses();
 }
 
+void btCable::resetNodesAndLinks()
+{
+	// Rebuild the linked lists from the primary arrays: m_nodes and m_links.
+
+	// Clear lists
+	m_linkedList.clear();
+	m_linkedListLinks.clear();
+	m_nodeAdj.clear();
+
+	// Recreate node list in order
+	// Insert each Node* between head and tail, preserving order of m_nodes.
+	for (size_t i = 0; i < m_nodes.size(); ++i)
+	{
+		Node* n = &m_nodes[i];
+		if (!n) continue;
+
+		btLink<Node*>* link = new btLink<Node*>();
+		link->setValue(n);
+		m_linkedList.addTail(link);
+	}
+
+	// Recreate link list in order
+	// Insert each Link* similarly, assuming m_links is ordered along the cable.
+	for (size_t i = 0; i < m_links.size(); ++i)
+	{
+		Link* L = &m_links[i];
+		if (!L) continue;
+
+		btLink<Link*>* link = new btLink<Link*>();
+		link->setValue(L);
+		m_linkedListLinks.addTail(link);
+		onLinkInserted(L);
+	}
+}
+
+
 void btCable::solveConstraints()
 {
 	PrepareSolver();
