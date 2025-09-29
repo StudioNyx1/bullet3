@@ -974,7 +974,8 @@ public:
 
 		// Cable's creation
 		btCable* cable = new btCable(&m_softBodyWorldInfo, getSoftDynamicsWorld(), resolution, 0, positionNodes, massNodes);
-		cable->setTotalMass(totalMass);
+		//cable->setTotalMass(totalMass);
+		cable->updateNodesMasses();
 
 		cable->setUseCollision(false);
 		if (bodyB != nullptr)
@@ -997,7 +998,7 @@ public:
 		return cable;
 	}
 
-	btCable* createCableWaypoint(int resolution, int iteration, btScalar totalMass, btAlignedObjectArray<btVector3> anchorPos, btRigidBody* bodyA = nullptr, btRigidBody* bodyB = nullptr, bool DisableCollisionOnA = true, bool DisableCollisionOnB = true)
+	btCable* createCableWaypoint(int resolution, int iteration, btScalar linearMass, btAlignedObjectArray<btVector3> anchorPos, btRigidBody* bodyA = nullptr, btRigidBody* bodyB = nullptr, bool DisableCollisionOnA = true, bool DisableCollisionOnB = true)
 	{
 		int s = anchorPos.size() - 1;
 		btScalar totalDist = 0;
@@ -1037,13 +1038,15 @@ public:
 		}
 		// Cable's creation
 		btCable* cable = new btCable(&m_softBodyWorldInfo, getSoftDynamicsWorld(), resolutionReel, 0, positionNodes, massNodes);
+		cable->setLinearMass(linearMass);
 		cable->setUseCollision(false);
 		if (bodyA != nullptr)
 			cable->appendAnchor(0, bodyA, anchorPos.at(0) - bodyA->getWorldTransform().getOrigin(), DisableCollisionOnA);
 		if (bodyB != nullptr)
 			cable->appendAnchor(cable->m_nodes.size() - 1, bodyB, anchorPos.at(s) - bodyB->getWorldTransform().getOrigin(), DisableCollisionOnB);
 		// Cable's config
-		cable->setTotalMass(totalMass);
+		//cable->setTotalMass(totalMass);
+		cable->updateNodesMasses();
 		cable->m_cfg.piterations = iteration;
 		cable->m_cfg.kAHR = 1;
 

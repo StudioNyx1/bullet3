@@ -2093,6 +2093,44 @@ void btCable::setTotalMass(btScalar mass, bool fromfaces)
 	}
 }
 
+void btCable::updateNodesMasses()
+{
+	// Reset all masses
+	for (int i = 0; i < m_nodes.size(); ++i)
+	{
+		Node* node0 = &m_nodes[i];
+		node0->m_im = 0;
+	}
+
+	// Set all masses
+	for (int i = 0; i < m_links.size(); ++i)
+	{
+		btScalar mass0 = 0;
+		btScalar mass1 = 0;
+
+		Node* node0 = &m_nodes[i];
+		Node* node1 = &m_nodes[i+1];
+
+		if (node0->m_im > 0)
+		{
+			mass0 = 1.0f / node0->m_im;
+		}
+
+		if (node1->m_im > 0)
+		{
+			mass1 = 1.0f / node1->m_im;
+		}
+
+		btScalar currentHalfMass = (0.5 * m_linearMass * m_links[i].m_rl);
+
+		mass0 += currentHalfMass;
+		mass1 += currentHalfMass;
+
+		node0->m_im = 1.0f / mass0;
+		node1->m_im = 1.0f / mass1;
+	}
+}
+
 void btCable::setCollisionParameters(int substepSolverCollisionDelay, int substepNarrowCollisionDelay)
 {
 	m_substepDelayCollisionSolver = substepSolverCollisionDelay;

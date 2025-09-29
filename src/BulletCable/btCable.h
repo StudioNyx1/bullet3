@@ -401,6 +401,7 @@ private:
 	Node* createPreparedSpare(Node* a, Node* b, int j, int segments, NodePairNarrowPhase* pair);
 	void insertInterpolatedNodes(btLink<Node*>* anchor, Node* a, Node* b, btScalar rest, NodePairNarrowPhase* pair, bool insertAfter);
 	void addBackupNodes();
+	void updateBackupNodes();
 	void removeBackupNodes();
 	void removeAllBackupNodes();
 	void integrateSecondaryVelocity();
