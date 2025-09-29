@@ -245,6 +245,11 @@ private:
 	btScalar m_linearMass = 1.0;
 	btScalar m_maxTension = -1.0;
 
+	// Backup insertion threshold, expressed as a multiplier of the segment rest length.
+	// Backup nodes are added between two nodes when their current distance > m_backupAddThreshold * restLength.
+	// Default: 1.2f (i.e., insert backups when distance exceeds 120% of the rest length).
+	btScalar m_backupAddThreshold = 1.2f;
+	
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
 
@@ -546,7 +551,11 @@ public:
 	btLinkedList<Node*> getLinkedList() { return m_linkedList; }
 	btLinkedList<Link*> getLinkedListLinks() { return m_linkedListLinks; }
 
+	// Update all nodes mass according to the set linearMass
 	void updateNodesMasses();
+
+	// Sets the multiplier that triggers backup insertion when distance > multiplier * restLength.
+	void setBackupInsertionThreshold(btScalar multiplier);
 
 	enum CableState
 	{

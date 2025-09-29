@@ -1120,7 +1120,7 @@ void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 	if (!anchor || !a || !b || restAB <= btScalar(0)) return;
 
 	btScalar dist = btDistance(a->m_x, b->m_x);
-	if (dist <= 1.2f * restAB) return;
+	if (dist <= m_backupAddThreshold * restAB) return;
 
 	// Decide segments (policy). Ensure at least 2 if we insert.
 	int segments = std::max(2, (int)std::ceil(dist / restAB));
@@ -2314,6 +2314,11 @@ btScalar btCable::getLinkRestLength(int indexLink)
 	}
 	// If the node isn't in a section we use the last section restLength
 	return m_section[m_sectionCount - 1].RestLength;
+}
+
+void btCable::setBackupInsertionThreshold(btScalar multiplier)
+{
+	m_backupAddThreshold = multiplier;
 }
 
 void btCable::setDefaultRestLength(btScalar rl)
