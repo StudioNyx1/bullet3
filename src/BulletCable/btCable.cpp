@@ -181,35 +181,29 @@ void btCable::PrepareSolver()
 	{
 		Anchor& a = this->m_anchors[i];
 		const btVector3 ra = a.m_body->getWorldTransform().getBasis() * a.m_local;
-
-		const double invMassBody = a.m_body->getInvMass();
-		const double invMassNode = a.m_node->m_im;
 		const auto& invInertiaTensorWorld = a.m_body->getInvInertiaTensorWorld();
 
-		// Compute the real impulse matrix to be able to later compute the cable tension
-		a.m_c0 = ImpulseMatrix(m_sst.sdt,
-							   invMassNode,
-							   invMassBody,
-							   invInertiaTensorWorld,
-							   ra);
+		// Node's masses
+		const double invMassNode = a.m_node->m_im;
+		const double massNode = invMassNode < FLT_EPSILON ? 0.0 : 1.0 / invMassNode;
 
-		// Compute a tweaked impulse matrix used to stabilized distance body / anchor
-		const double nodeMass = (1.0 / invMassNode);
-		a.impacted = false;
+		// Body's masses
+		const double invMassBody = a.m_body->getInvMass();
+		const double massBody = a.m_body->getMass();
 
-		const double tweakedMass = nodeMass + a.m_body->getMass() * a.BodyMassRatio * (1.0 / a.m_body->m_anchorsCount);
-		a.m_c0_massBalance = ImpulseMatrix(m_sst.sdt,
-										   1.0 / tweakedMass,
-										   invMassBody,
-										   invInertiaTensorWorld,
-										   ra);
+		// // Tweaked mass
+		const double tweakedMass = massNode + massBody * a.BodyMassRatio;
+		const double invTweakedMass = tweakedMass < FLT_EPSILON ? 0.0 : 1.0 / tweakedMass;
 
+		// Masses' matrices
+		a.m_c0 = ImpulseMatrix(m_sst.sdt, invMassNode, invMassBody, invInertiaTensorWorld, ra);
+		a.m_c0_massBalance = ImpulseMatrix(m_sst.sdt, invTweakedMass, invMassBody, invInertiaTensorWorld, ra);
 		a.m_c1 = ra;
-		a.m_c2 = m_sst.sdt * a.m_node->m_im;
+		a.m_c2 = m_sst.sdt * invMassNode;
+		a.m_c2_massBalance = m_sst.sdt * invTweakedMass;
 		a.m_body->activate();
 		a.tension = btVector3(0, 0, 0);
 	}
-	_impacted = false;
 
 	// Prepare contacts
 	{
@@ -242,7 +236,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 	updateNodeDeltaPos(currentIter);
 
-	anchorConstraint(_impacted);
+	anchorConstraint();
 
 	distanceConstraint();
 
@@ -282,31 +276,31 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 void btCable::EndConstraintsSolve()
 {
-	if (_impacted)
-	{
-		anchorConstraint(_impacted);
-	}
-
 	for (int i = 0; i < m_anchors.size(); ++i)
 	{
 		Anchor& a = this->m_anchors[i];
-		if (a.m_body->canChangedMassAtImpact() && !a.m_body->isStaticOrKinematicObject())
+		bool isImpacted = a.m_body->isImpacted();
+		bool canChangeMass = a.m_body->canChangedMassAtImpact();
+		bool isStaticOrKinematic = a.m_body->isStaticOrKinematicObject();
+
+		if (isStaticOrKinematic) continue;
+
+		if (canChangeMass)
 		{
-			if (a.impacted)
-			{
-				btScalar limit = a.m_body->getUpperLimitDistanceImpact() - a.m_body->getLowerLimitDistanceImpact();
-				btScalar ratio = (a.m_dist - a.m_body->getLowerLimitDistanceImpact()) / limit;
-				btScalar func = 1.0 - pow(max(0.0, abs(ratio - 1.0) * 1.1 - 0.1), 3);
-				btScalar clampRatio = Clamp(func, 0.0, 1.0);
-				btScalar newMass = Lerp(a.m_body->getLowerLimitMassImpact(), a.m_body->getUpperLimitMassImpact(), clampRatio);
-				a.m_body->setMassProps(newMass, newMass * a.m_body->getLocalInertia() * a.m_body->getInvMass());
-				a.m_body->setGravity(m_worldInfo->m_gravity * (a.m_body->getLowerLimitMassImpact() / newMass));
-			}
-			else
-			{
-				a.m_body->setMassProps(a.m_body->getLowerLimitMassImpact(), a.m_body->getLowerLimitMassImpact() * a.m_body->getLocalInertia() * a.m_body->getInvMass());
-				a.m_body->setGravity(m_worldInfo->m_gravity);
-			}
+			btScalar limit = a.m_body->getUpperLimitDistanceImpact() - a.m_body->getLowerLimitDistanceImpact();
+			btScalar ratio = (a.m_dist - a.m_body->getLowerLimitDistanceImpact()) / limit;
+			btScalar func = 1.0 - pow(max(0.0, abs(ratio - 1.0) * 1.1 - 0.1), 3);
+			btScalar clampRatio = Clamp(func, 0.0, 1.0);
+			btScalar newMass = Lerp(a.m_body->getLowerLimitMassImpact(), a.m_body->getUpperLimitMassImpact(), clampRatio);
+			a.m_body->setMassProps(newMass, newMass * a.m_body->getLocalInertia() * a.m_body->getInvMass());
+			a.m_body->setGravity(m_worldInfo->m_gravity * (a.m_body->getLowerLimitMassImpact() / newMass));
+			a.m_body->updateInertiaTensor();
+		}
+		else if (isImpacted)
+		{
+			a.m_body->setMassProps(a.m_body->getLowerLimitMassImpact(), a.m_body->getLowerLimitMassImpact() * a.m_body->getLocalInertia() * a.m_body->getInvMass());
+			a.m_body->setGravity(m_worldInfo->m_gravity);
+			a.m_body->changeImpacted(false);
 		}
 	}
 
@@ -1599,51 +1593,30 @@ void btCable::updateNodeDeltaPos(int iteration)
 	}
 }
 
-void btCable::anchorConstraint(bool& impact)
+void btCable::anchorConstraint()
 {
 	BT_PROFILE("PSolve_Anchors");
 	const btScalar kAHR = m_cfg.kAHR;
 	const btScalar dt = m_sst.sdt;
 	for (int i = 0, ni = this->m_anchors.size(); i < ni; ++i)
 	{
-		Anchor& a = this->m_anchors[i];
+		Anchor& a = m_anchors[i];
 		Node& n = *a.m_node;
 
-		const btVector3 wa = a.m_body->getCenterOfMassPosition() + a.m_c1;
+		bool useMassBalance = a.BodyMassRatio > 0;
+		const btVector3 wa = a.m_body->getWorldTransform() * a.m_local;
 		const btVector3 va = a.m_body->getVelocityInLocalPoint(a.m_c1) * dt;
 		const btVector3 vb = n.m_x - n.m_q;
 		const btVector3 vr = (va - vb) + (wa - n.m_x) * kAHR;
+		const btVector3 impulse = (!useMassBalance ? a.m_c0 : a.m_c0_massBalance) * vr * a.m_influence;
 
-		const btVector3 vectAnchorNode = (wa - n.m_x);
-		const btScalar distAnchorNode = vectAnchorNode.length();
-		btScalar ratio = distAnchorNode / 0.1;
-		ratio = Clamp(ratio, 0.0, 1.0);
+		// Update anchor's data
+		a.m_dist = wa.distance(n.m_x);
+		a.m_body->applyImpulse(-impulse, a.m_c1);
+		a.tension += impulse / dt;
 
-		if (a.m_body->canChangedMassAtImpact() && !a.m_body->isStaticOrKinematicObject())
-		{
-			// distance Anchor-Node
-			if (wa.distance(n.m_x) > a.m_body->getLowerLimitDistanceImpact())
-			{
-				impact = true;
-				a.impacted = true;
-				a.m_dist = wa.distance(n.m_x);
-			}
-		}
-
-		const btVector3 impulse = a.m_c0 * vr * a.m_influence;
-		const btVector3 impulseMassBalance = a.m_c0_massBalance * vr * a.m_influence;
-		btVector3 finalImpulse = lerp(impulse, impulseMassBalance, ratio);
-		btScalar currentTension = a.tension.length();
-		a.tension += finalImpulse / dt;
-		btScalar finalTension = a.tension.length();
-		if (m_maxTension >= 0 && finalTension >= m_maxTension)
-		{
-			a.tension = a.tension.normalized() * m_maxTension;
-			finalImpulse *= (a.tension.length() - currentTension) / (finalTension - currentTension);
-		}
-
-		a.m_body->applyImpulse(-finalImpulse, a.m_c1);
-
+		// Update node's position
+		// n.m_x += impulse * (!useMassBalance ? a.m_c2 : a.m_c2_massBalance);
 		n.m_x = wa;
 	}
 }

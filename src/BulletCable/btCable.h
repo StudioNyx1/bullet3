@@ -460,7 +460,7 @@ private:
 	void predictMotion(btScalar dt) override;
 	void solveConstraints() override;
 	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
-	void anchorConstraint(bool& impacted);
+	void anchorConstraint();
 
 	void contactConstraint();
 	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
