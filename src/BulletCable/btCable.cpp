@@ -2529,11 +2529,6 @@ void btCable::setCollisionStiffness(btScalar stiffnessMin, btScalar stiffnessMax
 	this->penetrationMax = distMax;
 }
 
-void btCable::setCollisionViscosity(btScalar viscosity)
-{
-	this->collisionViscosity = viscosity;
-}
-
 void btCable::setCollisionResponseActive(bool active)
 {
 	this->impulseCompute = active;

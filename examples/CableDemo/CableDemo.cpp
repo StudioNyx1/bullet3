@@ -2037,8 +2037,6 @@ static void Init_TestSupportA18(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setCollisionMargin(margin);
 	cable->setCollisionResponseActive(true);
-	cable->setCollisionViscosity(51);
-	// cable->setCollisionViscosity(100);
 	//cable->setCollisionStiffness(0, 1000, 0, 1);
 	cable->setCollisionParameters(3, 6);
 
@@ -2287,7 +2285,6 @@ static void Init_TestCollisionCableSphere(CableDemo* pdemo)
 	cable->setUseCollision(true);
 	cable->getCollisionShape()->setMargin(margin);
 	cable->setUseLRA(true);
-	cable->setCollisionViscosity(50);
 	//cable->setCollisionStiffness(0, 100000, 0, 1);
 	cable->setCollisionParameters(3, 6);
 	cable->setCollisionMargin(margin);
@@ -2430,7 +2427,6 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 	cable->getCollisionShape()->setMargin(margin);
 
 	cable->setUseCollision(true);
-	cable->setCollisionViscosity(20);
 	cable->setCollisionMargin(margin);
 	cable->setCollisionParameters(5, 10);
 	//cable->setCollisionStiffness(0, 50000, 0, 1);
@@ -2776,7 +2772,6 @@ static void Init_TestCollisionOn1Node(CableDemo* pdemo)
 	cable->setCollisionMargin(margin);
 	cable->setUseLRA(true);
 	cable->setCollisionParameters(1, 2);
-	cable->setCollisionViscosity(100);
 	//cable->setCollisionStiffness(100, 10000, 0, 0.01);
 
 	pdemo->SetCameraPosition(btVector3(0, -3, 0));
@@ -2931,7 +2926,6 @@ static void Init_TestClaw(CableDemo* pdemo)
 	cable->setUseBending(false);
 	cable->setUseCollision(true);
 	cable->setCableRadius(margin);
-	cable->setCollisionViscosity(100);
 	cable->setCollisionMargin(margin);
 	cable->setCollisionParameters(3, 6);
 	// cable->setCollisionStiffness(0, 1000, 0, 1);
@@ -3025,10 +3019,8 @@ static void Init_DetachA18(CableDemo* pdemo)
 	cable->setCollisionMargin(margin);
 	cable->setCollisionParameters(3, 6);
 	cable->getCollisionShape()->setMargin(margin);
-	cable->setCollisionViscosity(0);
 
 	// cable->setCollisionParameters(3, 3, 0);
-	// cable->setCollisionViscosity(20);
 	// double dataX[5] = {0, 0.001, 0.01, 0.5, 1};
 	// double dataY[5] = {0, 1, 100000, 5000000, 10000000};
 	// cable->updateCurveResponse(dataX, dataY, 5);
@@ -3248,7 +3240,6 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	mcmvCable->setCollisionMargin(margin);
 	mcmvCable->getCollisionShape()->setMargin(margin);
 	mcmvCable->setCollisionParameters(5, 5);
-	mcmvCable->setCollisionViscosity(50);
 	
 	pdemo->m_cable = mcmvCable;
 

@@ -429,8 +429,6 @@ private:
 	btScalar collisionStiffnessMin = 100;
 	btScalar collisionStiffnessMax = 10000;
 
-	btScalar collisionViscosity = 10;
-
 	btScalar m_defaultRestLength;
 
 	btScalar maxAngle = 0;
@@ -686,7 +684,6 @@ public:
 	void setLinearMass(btScalar mass);
 
 	void setCollisionStiffness(btScalar stiffnessMin, btScalar stiffnessMax, btScalar distMin, btScalar distMax);
-	void setCollisionViscosity(btScalar viscosity);
 	void setCollisionResponseActive(bool active);
 	void setCollisionMode(int mode);
 	void setControlPoint(vector<btScalar> dataX, vector<btScalar> dataY);
