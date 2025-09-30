@@ -478,7 +478,7 @@ private:
 	void runBroadPhase();
 	void runNarrowPhase();
 	
-	Node* createPreparedSpare(btVector3 aPos, btVector3 bPos, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass);
+	Node* createPreparedSpare(btVector3 aPos, btVector3 bPos, btVector3 aVel, btVector3 bVel, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass);
 	void insertInterpolatedNodes(btLink<Node*>* anchor, Node* a, Node* b, btScalar restBeforeA, btScalar restAB, btScalar restAfterB, NodePairNarrowPhase* pair);
 	void addBackupNodes();
 	void addAnchorBackup();

@@ -1077,7 +1077,7 @@ void btCable::runNarrowPhase()
 	}
 }
 
-btSoftBody::Node* btCable::createPreparedSpare(btVector3 aPos, btVector3 bPos, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass)
+btSoftBody::Node* btCable::createPreparedSpare(btVector3 aPos, btVector3 bPos, btVector3 aVel, btVector3 bVel, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass)
 {
 	Node* spare = acquireSecondaryNode();
 	if (!spare) return nullptr;
@@ -1090,8 +1090,8 @@ btSoftBody::Node* btCable::createPreparedSpare(btVector3 aPos, btVector3 bPos, i
 	btVector3 aLerpPos = it * aPos;
 
 	spare->m_x = aLerpPos + bLerpPos;
-	//spare->m_v = it * a->m_v + t * b->m_v;
-	//spare->m_q = spare->m_x - b->m_v * m_sst.sdt;
+	spare->m_v = it * aVel + t * bVel;
+	spare->m_q = spare->m_x - bVel * m_sst.sdt;
 	spare->m_im = 1.0f / newNodeMass;
 
 	if (!pair)
@@ -1142,7 +1142,7 @@ void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 	{
 		// Mass for the inserted node: (rlSeg, rlSeg)
 		btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
-		Node* spare = createPreparedSpare(a->m_x, b->m_x, j, segments, pair, secondaryMass);
+		Node* spare = createPreparedSpare(a->m_x, b->m_x, a->m_v, b->m_v, j, segments, pair, secondaryMass);
 		if (!spare) break;
 
 		// Insert node into node list right after cursor
@@ -1284,7 +1284,7 @@ void btCable::addAnchorBackup()
 					{
 						btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
 
-						Node* spare = createPreparedSpare(xAnchorWorld, a->m_x, j, segments, pair, secondaryMass);
+						Node* spare = createPreparedSpare(xAnchorWorld, a->m_x, btVector3{0,0,0}, a->m_v, j, segments, pair, secondaryMass);
 						if (!spare) break;
 
 						// Insert before current cursor
@@ -1351,7 +1351,7 @@ void btCable::addAnchorBackup()
 					{
 						btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
 		
-						Node* spare = createPreparedSpare(b->m_x, xAnchorWorld, j, segments, pair, secondaryMass);
+						Node* spare = createPreparedSpare(b->m_x, xAnchorWorld, b->m_v, btVector3{0,0,0}, j, segments, pair, secondaryMass);
 						if (!spare) break;
 		
 						btLink<Node*>* newNode = new btLink<Node*>();
