@@ -270,6 +270,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 		{
 			_secondPairContact.clear();
 			addBackupNodes();
+			addAnchorBackup();
 		}
 	}
 }
@@ -1076,22 +1077,27 @@ void btCable::runNarrowPhase()
 	}
 }
 
-btSoftBody::Node* btCable::createPreparedSpare(Node* a, Node* b, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass)
+btSoftBody::Node* btCable::createPreparedSpare(btVector3 aPos, btVector3 bPos, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass)
 {
 	Node* spare = acquireSecondaryNode();
 	if (!spare) return nullptr;
 
 	// Interpolate along a -> b
-	const btScalar t  = btScalar(j) / btScalar(segments);
-	const btScalar it = btScalar(1) - t;
+	btScalar t  = btScalar(j) / btScalar(segments);
+	btScalar it = btScalar(1) - t;
 
-	const btVector3 bPos = t * b->m_x;
-	const btVector3 aPos = it * a->m_x;
+	btVector3 bLerpPos = t * bPos;
+	btVector3 aLerpPos = it * aPos;
 
-	spare->m_x = aPos + bPos;
-	spare->m_v = it * a->m_v + t * b->m_v;
-	spare->m_q = spare->m_x - b->m_v * m_sst.sdt;
+	spare->m_x = aLerpPos + bLerpPos;
+	//spare->m_v = it * a->m_v + t * b->m_v;
+	//spare->m_q = spare->m_x - b->m_v * m_sst.sdt;
 	spare->m_im = 1.0f / newNodeMass;
+
+	if (!pair)
+	{
+		return spare;
+	}
 
 	BroadPhasePair sparePair;
 	sparePair.body = pair->pair->body;
@@ -1136,7 +1142,7 @@ void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 	{
 		// Mass for the inserted node: (rlSeg, rlSeg)
 		btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
-		Node* spare = createPreparedSpare(a, b, j, segments, pair, secondaryMass);
+		Node* spare = createPreparedSpare(a->m_x, b->m_x, j, segments, pair, secondaryMass);
 		if (!spare) break;
 
 		// Insert node into node list right after cursor
@@ -1208,6 +1214,158 @@ void btCable::addBackupNodes()
     		insertInterpolatedNodes(linkN, a, b, restBefore, rest, restAfterB, pair);
     	}
     }
+}
+
+void btCable::addAnchorBackup()
+{
+	// Insert backup nodes between:
+	// - the first anchor and the first node
+	// - the last node and the last anchor
+	// using the same policy as addBackupNodes()/insertInterpolatedNodes.
+	// Only if the head/tail node is colliding
+	
+	btScalar halfLinear = btScalar(0.5) * m_linearMass;
+	for (int i = 0, nPairs = _nodePairContact.size(); i < nPairs; ++i)
+	{
+		NodePairNarrowPhase* pair = &_nodePairContact.at(i);
+		int nIdx = pair->node->index;
+		if (nIdx != 0 || nIdx != m_nodes.size()-1)
+		{
+			continue;
+		}
+
+		// Head anchor -> first node
+		btLink<Node*>* firstNodeLink = m_linkedList.getHead(); // first node 
+		if (firstNodeLink && !firstNodeLink->isTail())
+		{
+			Node* a = firstNodeLink->getValue(); // first node
+
+			// Get rest to the right (firstNode -> secondNode) as "rest"
+			btScalar restAB = btScalar(0);
+
+			// Try to read from adjacency of anchor->a link. Expect m_nodeAdj[a].right to be the link (firstNode -> secondNode)
+			Link* LRightOfA = nullptr;
+			auto ita = m_nodeAdj.find(a);
+			if (ita != m_nodeAdj.end()) {
+				LRightOfA = ita->second.right; // link: (firstNode -> secondNode)
+			}
+
+			if (LRightOfA)
+			{
+				restAB = LRightOfA->m_rl;
+			}
+			
+			if (LRightOfA && restAB > FLT_EPSILON)
+			{
+				// Compute current distance between anchor and first node
+				// Obtain anchor world position
+				btVector3 xAnchorLocal = m_anchors[0].m_local;
+				btVector3 xAnchorWorld = m_anchors[0].m_body->getWorldTransform() * xAnchorLocal;
+				btVector3 xFirst  = a->m_x;
+				btScalar dist = btDistance(xAnchorWorld, xFirst);
+
+				if (dist > m_backupAnchorAddThreshold * restAB)
+				{
+					// Decide number of segments
+					int segments = std::max(2, (int)ceil(dist / restAB));
+					int inserts  = segments - 1;
+					btScalar rlSeg = restAB / (btScalar)segments;
+
+					// Mass for 'a' considering (0, rlSeg)
+					btScalar massA = halfLinear * (rlSeg);
+					if (a->isSecondary) a->m_im = btScalar(1) / massA; else setMass(a->index, massA);
+
+					// We'll insert after anchor (before the first node).
+					btLink<Node*>* cursor = firstNodeLink;
+					Node* prev = a;   
+
+					// Insert from the node closest to 'a' down to the one closest to anchor
+					for (int j = inserts; j >= 1; --j)
+					{
+						btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
+
+						Node* spare = createPreparedSpare(xAnchorWorld, a->m_x, j, segments, pair, secondaryMass);
+						if (!spare) break;
+
+						// Insert before current cursor
+						btLink<Node*>* newNode = new btLink<Node*>();
+						newNode->setValue(spare);
+						newNode->insertBefore(cursor);
+
+						// Link spare -> prev (prev is to the right).
+						addLinkBetweenConsecutiveNodes(spare, prev, rlSeg);
+						prev = spare;        // move leftwards
+						cursor = newNode;    // next insert goes before this one
+					}
+				}
+			}
+		}
+		
+		// Last node -> tail anchor
+		// Find last node (node before tail)
+		btLink<Node*>* lastNodeLink = m_linkedList.getTail(); // last node
+		
+		if (lastNodeLink && !lastNodeLink->isHead())
+		{
+			Node* b = lastNodeLink->getValue(); // last node
+		
+			// Get rest to the left (prevB -> B) as "restAB"
+			btScalar restAB = btScalar(0);
+		
+			// From adjacency, the left link of b should be (prevB -> B)
+			Link* LleftOfB = nullptr;
+
+			auto itb = m_nodeAdj.find(b);
+			if (itb != m_nodeAdj.end()) {
+				LleftOfB = itb->second.left; // link: (prevB -> B)
+			}
+
+			if (LleftOfB)
+			{
+				restAB = LleftOfB->m_rl;
+			}
+				
+			if (LleftOfB && restAB > FLT_EPSILON) {
+
+				// Compute current distance between b and anchor
+				btVector3 xAnchorLocal = m_anchors[m_anchors.size()-1].m_local;
+				btVector3 xAnchorWorld = m_anchors[m_anchors.size()-1].m_body->getWorldTransform() * xAnchorLocal;
+				btVector3 xLast = b->m_x;
+				btScalar dist = btDistance(xLast, xAnchorWorld);
+		
+				if (dist > m_backupAnchorAddThreshold * restAB)
+				{
+					int segments = std::max(2, (int)ceil(dist / restAB));
+					int inserts  = segments - 1;
+					btScalar rlSeg = restAB / (btScalar)segments;
+		
+					// Mass for 'b' considering (rlSeg, 0)
+					btScalar massB = halfLinear * (rlSeg);
+					if (b->isSecondary) b->m_im = btScalar(1) / massB; else setMass(b->index, massB);
+		
+					// Insert before tail anchor (after last node)
+					btLink<Node*>* cursor = lastNodeLink;
+		
+					Node* prev = b;
+					for (int j = 1; j <= inserts; ++j)
+					{
+						btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
+		
+						Node* spare = createPreparedSpare(b->m_x, xAnchorWorld, j, segments, pair, secondaryMass);
+						if (!spare) break;
+		
+						btLink<Node*>* newNode = new btLink<Node*>();
+						newNode->setValue(spare);
+						newNode->insertAfter(cursor);
+						cursor = cursor->getNext();
+		
+						addLinkBetweenConsecutiveNodes(prev, spare, rlSeg);
+						prev = spare;
+					}
+				}
+			}
+		}
+	}
 }
 
 void btCable::updateBackupNodes()
@@ -1544,6 +1702,18 @@ void btCable::solveConstraints()
 	}
 
 	EndConstraintsSolve();
+
+	//DEBUG : Iterate through all nodes (even secondary) and compute total mass
+	btScalar totalMass = 0;
+	btLink<Node*>* cur = m_linkedList.getHead();
+	while (cur && !cur->isTail())
+	{
+		Node n = *cur->getValue();
+		totalMass += 1.0f / n.m_im;
+		cur = cur->getNext();
+	}
+
+	std::cout << "Total mass: " << totalMass << '\n';
 }
 
 void btCable::resetManifoldLifeTime()

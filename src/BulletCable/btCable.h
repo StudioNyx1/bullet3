@@ -253,6 +253,9 @@ private:
 	// Backup nodes are added between two nodes when their current distance > m_backupAddThreshold * restLength.
 	// Default: 1.2f (i.e., insert backups when distance exceeds 120% of the rest length).
 	btScalar m_backupAddThreshold = 1.2f;
+
+	// Backup insertion threshold for anchor support, expressed as a multiplier of the segment rest length.
+	btScalar m_backupAnchorAddThreshold = 1.05f;
 	
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
@@ -477,9 +480,10 @@ private:
 	void runBroadPhase();
 	void runNarrowPhase();
 	
-	Node* createPreparedSpare(Node* a, Node* b, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass);
+	Node* createPreparedSpare(btVector3 aPos, btVector3 bPos, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass);
 	void insertInterpolatedNodes(btLink<Node*>* anchor, Node* a, Node* b, btScalar restBeforeA, btScalar restAB, btScalar restAfterB, NodePairNarrowPhase* pair);
 	void addBackupNodes();
+	void addAnchorBackup();
 	void updateBackupNodes();
 	void removeBackupNodes();
 	void removeAllBackupNodes();
