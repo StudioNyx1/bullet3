@@ -398,6 +398,11 @@ void btRigidBody::setMassProps(btScalar mass, const btVector3& inertia)
 	m_invMass = m_linearFactor * m_inverseMass;
 }
 
+void btRigidBody::setLowerLimitMassImpact(btScalar mass)
+{
+	m_lowerLimitMassImpact = mass;
+}
+
 void btRigidBody::updateInertiaTensor()
 {
 	m_invInertiaTensorWorld = m_worldTransform.getBasis().scaled(m_invInertiaLocal) * m_worldTransform.getBasis().transpose();

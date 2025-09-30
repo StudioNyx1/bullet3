@@ -203,6 +203,7 @@ protected:
 	///setupRigidBody is only used internally by the constructor
 	void setupRigidBody(const btRigidBodyConstructionInfo& constructionInfo);
 	bool m_canChangedMassAtImpact;
+	bool m_impacted;
 	btScalar m_lowerLimitMassImpact;
 	btScalar m_upperLimitMassImpact;
 	btScalar m_lowerLimitDistanceImpact;
@@ -213,6 +214,16 @@ public:
 	bool canChangedMassAtImpact()
 	{
 		return m_canChangedMassAtImpact;
+	}
+
+	bool isImpacted()
+	{
+		return m_impacted;
+	}
+
+	void changeImpacted(bool impacted)
+	{
+		m_impacted = impacted;
 	}
 
 	btScalar getLowerLimitMassImpact()
@@ -238,6 +249,7 @@ public:
 	void updateMassAtImpact(bool impacted, btScalar lowerMass, btScalar upperMass, btScalar lowerLimit, btScalar upperLimit)
 	{ 
 		m_canChangedMassAtImpact = impacted;
+		m_impacted = true;
 		m_lowerLimitMassImpact = lowerMass;
 		m_upperLimitMassImpact = upperMass;
 		m_lowerLimitDistanceImpact = lowerLimit;
@@ -330,6 +342,8 @@ public:
 	}
 
 	void setMassProps(btScalar mass, const btVector3& inertia);
+
+	void setLowerLimitMassImpact(btScalar mass);
 
 	const btVector3& getLinearFactor() const
 	{
