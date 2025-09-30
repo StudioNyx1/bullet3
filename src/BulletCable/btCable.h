@@ -255,7 +255,7 @@ private:
 	btScalar m_backupAddThreshold = 1.2f;
 
 	// Backup insertion threshold for anchor support, expressed as a multiplier of the segment rest length.
-	btScalar m_backupAnchorAddThreshold = 1.05f;
+	btScalar m_backupAnchorAddThreshold = 1.2f;
 	
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
@@ -564,6 +564,7 @@ public:
 
 	// Sets the multiplier that triggers backup insertion when distance > multiplier * restLength.
 	void setBackupInsertionThreshold(btScalar multiplier);
+	void setAnchorBackupInsertionThreshold(btScalar multiplier);
 
 	enum CableState
 	{

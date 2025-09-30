@@ -2500,6 +2500,11 @@ void btCable::setBackupInsertionThreshold(btScalar multiplier)
 	m_backupAddThreshold = multiplier;
 }
 
+void btCable::setAnchorBackupInsertionThreshold(btScalar multiplier)
+{
+	m_backupAnchorAddThreshold = multiplier;
+}
+
 void btCable::setDefaultRestLength(btScalar rl)
 {
 	m_defaultRestLength = rl;
