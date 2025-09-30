@@ -1456,13 +1456,16 @@ void btCable::secondaryNodesContact()
 
 		if (callback.m_connected && callback.minDist < 0)
 		{
-			btRigidBody* rb = btRigidBody::upcast(pair.body);
-			while (rb->m_redirectionTarget)
+			if (impulseCompute)
 			{
-				rb = rb->m_redirectionTarget;
+				btRigidBody* rb = btRigidBody::upcast(pair.body);
+				while (rb->m_redirectionTarget)
+				{
+					rb = rb->m_redirectionTarget;
+				}
+				btVector3 impulse = calculateBodyImpulse(rb, n, callback.contactNorm, callback.contactPoint);
+				rb->applyRedirectionImpulse(impulse, callback.contactPoint);	
 			}
-			btVector3 impulse = calculateBodyImpulse(rb, n, callback.contactNorm, callback.contactPoint);
-			rb->applyRedirectionImpulse(impulse, callback.contactPoint);
 
 			n->m_x = callback.contactPoint + callback.contactNorm * (m_collisionMargin + FLT_EPSILON);
 			n->m_n = callback.contactNorm;
