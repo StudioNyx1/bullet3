@@ -12,6 +12,8 @@
 
 btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m) : btSoftBody(worldInfo, node_count, x, m), _nodeContactSphere(m_collisionMargin)
 {
+	m_nodes.reserve(m_worldInfo->maxNodeNumberPerCable);
+	m_links.reserve(m_worldInfo->maxNodeNumberPerCable - 1);
 	m_world = world;
 	m_solverSubStep = worldInfo->numIteration;
 	m_cpt = 0;
@@ -647,6 +649,10 @@ void btCable::Grows(float dt)
 		}
 		distance -= linkRestLength;
 
+		m_linkedList.addTail(newNode);
+		m_linkedListLinks.addTail(&m_links[m_links.size() - 1]);
+		onLinkInserted(&m_links[m_links.size() - 1]);
+
 		// Update Mass
 		btScalar firstNodeMass = m_linearMass * 0.5f * distance;
 		setMass(nodeSize - 1, firstNodeMass);
@@ -722,7 +728,11 @@ void btCable::Shrinks(float dt)
 		if (nodesSize > 2)
 		{
 			// Remove the last node and the last link
+			onLinkRemoved(m_linkedListLinks.getTail()->getValue());
+			m_linkedListLinks.remove(m_linkedListLinks.getTail());
 			m_links.removeAtIndex(linkSize - 1);
+
+			m_linkedList.remove(m_linkedList.getTail());
 			removeNodeAt(nodesSize - 1);
 			nodesSize--;
 			linkSize--;
