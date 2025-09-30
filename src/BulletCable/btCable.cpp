@@ -271,8 +271,14 @@ void btCable::solveSingleCableIteration(int currentIter)
 		if (shouldAddBackupNodes)
 		{
 			_secondPairContact.clear();
-			addBackupNodes();
-			addAnchorBackup();
+			if (collisionBackupEnabled)
+			{
+				addBackupNodes();
+			}
+			if (anchorBackupEnabled)
+			{
+				addAnchorBackup();
+			}
 		}
 	}
 }
@@ -2505,6 +2511,17 @@ void btCable::setAnchorBackupInsertionThreshold(btScalar multiplier)
 {
 	m_backupAnchorAddThreshold = multiplier;
 }
+
+void btCable::setCollisionBackupActivation(bool active)
+{
+	collisionBackupEnabled = active;
+}
+
+void btCable::setAnchorBackupActivation(bool active)
+{
+	anchorBackupEnabled = active;
+}
+
 
 void btCable::setDefaultRestLength(btScalar rl)
 {

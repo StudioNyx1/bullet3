@@ -249,6 +249,9 @@ private:
 	btScalar m_linearMass = 1.0;
 	btScalar m_maxTension = -1.0;
 
+	bool anchorBackupEnabled = true; // Enables backup nodes addition at anchors
+	bool collisionBackupEnabled = true; // Enables backup nodes addition at collision points
+
 	// Backup insertion threshold, expressed as a multiplier of the segment rest length.
 	// Backup nodes are added between two nodes when their current distance > m_backupAddThreshold * restLength.
 	// Default: 1.2f (i.e., insert backups when distance exceeds 120% of the rest length).
@@ -565,6 +568,9 @@ public:
 	// Sets the multiplier that triggers backup insertion when distance > multiplier * restLength.
 	void setBackupInsertionThreshold(btScalar multiplier);
 	void setAnchorBackupInsertionThreshold(btScalar multiplier);
+
+	void setAnchorBackupActivation(bool active);
+	void setCollisionBackupActivation(bool active);
 
 	enum CableState
 	{
