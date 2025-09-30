@@ -1702,18 +1702,6 @@ void btCable::solveConstraints()
 	}
 
 	EndConstraintsSolve();
-
-	//DEBUG : Iterate through all nodes (even secondary) and compute total mass
-	btScalar totalMass = 0;
-	btLink<Node*>* cur = m_linkedList.getHead();
-	while (cur && !cur->isTail())
-	{
-		Node n = *cur->getValue();
-		totalMass += 1.0f / n.m_im;
-		cur = cur->getNext();
-	}
-
-	std::cout << "Total mass: " << totalMass << '\n';
 }
 
 void btCable::resetManifoldLifeTime()
