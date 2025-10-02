@@ -1188,9 +1188,15 @@ void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 	btScalar dist = btDistance(a->m_x, b->m_x);
 	if (dist <= m_backupAddThreshold * restAB) return;
 
+	BackupNodesRun* backupRun = new BackupNodesRun();
+	backupRun->leftPrimary = a;
+	backupRun->rightPrimary = b;
+
 	// Decide segments (policy). Ensure at least 2 if we insert.
 	int segments = std::max(2, (int)std::ceil(dist / restAB));
 	int inserts  = segments - 1;
+
+	backupRun->secondaryRun.reserve(inserts);
 
 	removeLinkBetween(a, b);
 
@@ -1203,6 +1209,7 @@ void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 
 	m_massOverrides[a].changedInvMass = a->m_im;
 	m_massOverrides[a].hasChanged = true;
+
 	Node* prev = a;
 	btLink<Node*>* cursor = anchor;
 
@@ -1221,6 +1228,8 @@ void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 
 		// Connect prev -> spare with uniform rest
 		addLinkBetweenConsecutiveNodes(prev, spare, rlSeg);
+
+		backupRun->secondaryRun.push_back(spare);
 		
 		prev = spare;
 	}
@@ -1443,75 +1452,29 @@ void btCable::addAnchorBackup()
 
 void btCable::updateBackupNodes()
 {
-	// Move the backup nodes between their primary as when they were created
-	btLink<Node*>* it = m_linkedList.getHead();
-	while (it && !it->isTail())
+	for (int i = 0; i < m_backupNodesRun.size(); ++i)
 	{
-		Node* cur = it->getValue();
-		if (!cur) { it = it->getNext(); continue; }
+		BackupNodesRun* run = m_backupNodesRun.at(i);
 
-		// skip primaries
-		if (!cur->isSecondary) { it = it->getNext(); continue; }
-
-		// We are at the start of a run (or in a run). Find runStart and runEnd in one forward pass.
-		btLink<Node*>* runStart = it;
-		btLink<Node*>* runEnd   = it;
-		int count = 0;
-
-		while (runEnd && !runEnd->isTail())
-		{
-			Node* n = runEnd->getValue();
-			if (!n || !n->isSecondary) break;
-
-			++count;
-
-			btLink<Node*>* next = runEnd->getNext();
-			if (!next || next->isTail()) break;
-
-			Node* nNext = next->getValue();
-			if (!nNext || !nNext->isSecondary) break;
-
-			runEnd = next;
-		}
-
-		// Bounding primaries
-		btLink<Node*>* leftL  = runStart->getPrev();
-		btLink<Node*>* rightL = runEnd->getNext();
-
-		// If we don't have two bounding primaries, skip this run.
-		if (!leftL || leftL->isHead() || !rightL || rightL->isTail()) {
-			it = rightL ? rightL : (runEnd ? runEnd->getNext() : nullptr);
-			continue;
-		}
-
-		Node* a = leftL->getValue();
-		Node* b = rightL->getValue();
-		if (!a || !b || a->isSecondary || b->isSecondary) {
-			it = rightL ? rightL : (runEnd ? runEnd->getNext() : nullptr);
-			continue;
-		}
-
+		if (!run || !run->leftPrimary || !run->rightPrimary) { continue; }
+		if (run->leftPrimary->isSecondary || run->rightPrimary->isSecondary) { continue; }
+		
 		// Interpolate secondaries uniformly between a and b,
 		// matching the creation in insertInterpolatedNodes where rlSeg was uniform.
-		const btVector3 xa = a->m_x;
-		const btVector3 xb = b->m_x;
+		btVector3 xa = run->leftPrimary->m_x;
+		btVector3 xb = run->rightPrimary->m_x;
 
-		// Single sweep to place nodes: t = i/(count+1), i=1..count
-		int i = 1;
-		for (btLink<Node*>* c = runStart;; c = c->getNext(), ++i)
+		int count = run->secondaryRun.size();
+		
+		for (int k = 0; k < count; ++k)
 		{
-			Node* s = c->getValue();
-			if (s && s->isSecondary)
-			{
-				const btScalar t = btScalar(i) / btScalar(count + 1);
-				s->m_x = (btScalar(1) - t) * xa + t * xb;
-			}
-
-			if (c == runEnd) break;
+			Node* s = run->secondaryRun[k];
+			if (!s) { continue; }
+			
+			// assume s is secondary by construction
+			const btScalar t = btScalar(k + 1) / btScalar(count + 1);
+			s->m_x = (1.0f - t) * xa + t * xb;
 		}
-
-		// Continue after the run
-		it = rightL;
 	}
 }
 
@@ -1729,6 +1692,7 @@ void btCable::removeAllBackupNodes()
 	}
 
 	updateNodesMasses();
+	m_backupNodesRun.clear();
 	resetOverridesState();
 }
 

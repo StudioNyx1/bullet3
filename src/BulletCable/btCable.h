@@ -276,6 +276,17 @@ private:
 	void restorePrimaryMasses();
 	void restoreChangedMasses();
 	void resetOverridesState(); // Restore states to default in the map
+
+	struct BackupNodesRun
+	{
+		Node* leftPrimary;
+		btAlignedObjectArray<Node*> secondaryRun;
+		Node* rightPrimary;
+	};
+
+	// Storage of nodes runs where backups are added
+	btAlignedObjectArray<BackupNodesRun*> m_backupNodesRun;
+
 	struct NodePoolEntry {
 		Node node;
 		int nextFree; // -1 if in-use
