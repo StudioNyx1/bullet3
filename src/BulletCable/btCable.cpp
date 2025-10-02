@@ -264,9 +264,9 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 	if (runContactConstraint)
 	{
+		contactConstraint();
 		updateBackupNodes();
 		secondaryNodesContact();
-		contactConstraint();
 
 		if (shouldAddBackupNodes)
 		{
