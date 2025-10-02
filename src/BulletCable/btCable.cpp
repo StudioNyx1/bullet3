@@ -240,6 +240,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 	anchorConstraint();
 
+	restorePrimaryMasses();
 	distanceConstraint();
 
 	if (useLRA)
@@ -264,6 +265,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 	if (runContactConstraint)
 	{
+		restoreChangedMasses();
 		contactConstraint();
 		updateBackupNodes();
 		secondaryNodesContact();
@@ -345,6 +347,54 @@ void btCable::EndConstraintsSolve()
 	removeAllBackupNodes();
 	_nodePairContact.clear();
 }
+
+void btCable::rememberPrimariesMass()
+{
+	for (int i = 0; i < m_nodes.size(); ++i)
+	{
+		Node& n = m_nodes.at(i);
+		SavedMass saved_mass;
+		saved_mass.originalInvMass = n.m_im;
+		saved_mass.changedInvMass = -1;
+		saved_mass.hasChanged = false;
+		m_massOverrides[&n] = saved_mass;
+	}	
+}
+
+void btCable::restorePrimaryMasses()
+{
+	for (int i = 0; i < m_nodes.size(); ++i)
+	{
+		Node& n = m_nodes.at(i);
+		SavedMass& saved_mass = m_massOverrides[&n];
+		if (saved_mass.hasChanged)
+		{
+			n.m_im = saved_mass.originalInvMass;
+		}
+	}
+}
+
+void btCable::restoreChangedMasses()
+{
+	for (int i = 0; i < m_nodes.size(); ++i)
+	{
+		Node& n = m_nodes.at(i);
+		SavedMass& saved_mass = m_massOverrides[&n];
+		if (saved_mass.hasChanged)
+		{
+			n.m_im = saved_mass.changedInvMass;
+		}
+	}
+}
+
+void btCable::resetOverridesState()
+{
+	for (auto& kv : m_massOverrides) {
+		kv.second.changedInvMass = -1;
+		kv.second.hasChanged = false;
+	}
+}
+
 
 void btCable::updateNodeData()
 {
@@ -1151,6 +1201,8 @@ void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 	btScalar massA = halfLinear * (btMax(restBeforeA, btScalar(0)) + rlSeg);
 	if (a->isSecondary) a->m_im = 1.0f / massA; else setMass(a->index, massA);
 
+	m_massOverrides[a].changedInvMass = a->m_im;
+	m_massOverrides[a].hasChanged = true;
 	Node* prev = a;
 	btLink<Node*>* cursor = anchor;
 
@@ -1179,6 +1231,11 @@ void btCable::insertInterpolatedNodes(btLink<Node*>* anchor,
 	// Mass for 'b': (rlSeg, restAfterB)
 	btScalar massB = halfLinear * (rlSeg + btMax(restAfterB, btScalar(0)));
 	if (b->isSecondary) b->m_im = 1.0f / massB; else setMass(b->index, massB);
+
+	m_massOverrides[b].changedInvMass = b->m_im;
+	m_massOverrides[b].hasChanged = true;
+
+	m_backupNodesRun.push_back(backupRun);
 }
 
 void btCable::addBackupNodes()
@@ -1672,6 +1729,7 @@ void btCable::removeAllBackupNodes()
 	}
 
 	updateNodesMasses();
+	resetOverridesState();
 }
 
 void btCable::resetNodesAndLinks()
@@ -2461,6 +2519,8 @@ void btCable::updateNodesMasses()
 		node0->m_im = 1.0f / mass0;
 		node1->m_im = 1.0f / mass1;
 	}
+
+	rememberPrimariesMass();
 }
 
 void btCable::setCollisionParameters(int substepSolverCollisionDelay, int substepNarrowCollisionDelay)

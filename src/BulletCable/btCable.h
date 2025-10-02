@@ -263,6 +263,19 @@ private:
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
 
+	struct SavedMass {
+		btScalar originalInvMass; // original inverse mass
+		btScalar changedInvMass; // changed inverse mass
+		bool hasChanged;
+	};
+	
+	// Stores masses of primary nodes which have been overidden
+	std::unordered_map<Node*, SavedMass> m_massOverrides; 
+
+	void rememberPrimariesMass();
+	void restorePrimaryMasses();
+	void restoreChangedMasses();
+	void resetOverridesState(); // Restore states to default in the map
 	struct NodePoolEntry {
 		Node node;
 		int nextFree; // -1 if in-use
