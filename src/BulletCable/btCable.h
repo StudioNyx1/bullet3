@@ -286,6 +286,8 @@ private:
 
 	// Storage of nodes runs where backups are added
 	btAlignedObjectArray<BackupNodesRun*> m_backupNodesRun;
+	
+	btAlignedObjectArray<Node> m_anchorBackups;
 
 	struct NodePoolEntry {
 		Node node;
@@ -490,7 +492,7 @@ private:
 	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
 	void anchorConstraint();
 
-	void contactConstraint();
+	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts);
 	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
 	btScalar computeCollisionMargin(const btCollisionShape* shape) const;
 	void resetManifoldLifeTime();
@@ -502,8 +504,8 @@ private:
 	void collectPotentials(btCollisionObjectArray& collisionObjectArray, std::vector<btCollisionObject*>& out) const;
 	void buildObjData(const std::vector<btCollisionObject*>& pots,
 					  std::vector<ObjData>& out) const;
-	void runBroadPhase();
-	void runNarrowPhase();
+	void runBroadPhase(btAlignedObjectArray<Node>& nodesArray, btAlignedObjectArray<BroadPhasePair>& outCandidates);
+	void runNarrowPhase(btAlignedObjectArray<BroadPhasePair>& candidates, btAlignedObjectArray<NodePairNarrowPhase> &outPairContacts);
 	
 	Node* createPreparedSpare(btVector3 aPos, btVector3 bPos, btVector3 aVel, btVector3 bVel, int j, int segments, NodePairNarrowPhase* pair, btScalar newNodeMass);
 	void insertInterpolatedNodes(btLink<Node*>* anchor, Node* a, Node* b, btScalar restBeforeA, btScalar restAB, btScalar restAfterB, NodePairNarrowPhase* pair);
@@ -512,8 +514,10 @@ private:
 	void updateBackupNodes();
 	void removeBackupNodes();
 	void removeAllBackupNodes();
-	void secondaryNodesContact();
-	
+	void secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candidates, bool applyNodeChange);
+	void anchorBackupsContact();
+	void depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidates);
+
 	bool aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 nodeMinAabb, btVector3 nodeMaxAabb, btVector3 minAabb, btVector3 maxAabb);
 
 	// Internal: run one 'constraint/projection' iteration of your existing cable solver
@@ -535,7 +539,10 @@ private:
 	IterativeSolveState m_iter;
 
 	btAlignedObjectArray<BroadPhasePair> _candidates;
+	btAlignedObjectArray<BroadPhasePair> _anchorBackupCandidates;
 	btAlignedObjectArray<NodePairNarrowPhase> _nodePairContact;
+	btAlignedObjectArray<NodePairNarrowPhase> _anchorBackupPairContact;
+	btAlignedObjectArray<NodePairNarrowPhase> _backupPairContact;
 	btAlignedObjectArray<BroadPhasePair> _secondPairContact;
 	bool _impacted = false;
 
