@@ -265,10 +265,10 @@ void btCable::solveSingleCableIteration(int currentIter)
 		restoreChangedMasses();
 		
 		contactConstraint(_nodePairContact);
-		secondaryNodesContact(_anchorBackupCandidates, false);
+		secondaryNodesContact(_anchorBackupCandidates, false); // not applying position change on nodes (acts like a wall)
 		
 		updateBackupNodes();
-		secondaryNodesContact(_secondPairContact, true);
+		secondaryNodesContact(_secondPairContact, true); // applies position change on nodes (backups primary collisions)
 
 		if (shouldAddBackupNodes)
 		{
@@ -279,6 +279,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 			if (anchorBackupEnabled)
 			{
 				addAnchorBackup();
+				runBroadPhase(m_anchorBackups, _anchorBackupCandidates);
 			}
 		}
 	}
