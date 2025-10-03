@@ -1750,7 +1750,7 @@ void btCable::removeAllBackupNodes()
 		onLinkInserted(&m_links[i]);
 	}
 
-	updateNodesMasses();
+	updateNodesMass();
 	m_backupNodesRun.clear();
 	_secondPairContact.clear();
 	_anchorBackupPairContact.clear();
@@ -2509,7 +2509,7 @@ void btCable::setTotalMass(btScalar mass, bool fromfaces)
 	}
 }
 
-void btCable::updateNodesMasses()
+void btCable::updateNodesMass()
 {
 	// Reset all masses
 	for (int i = 0; i < m_nodes.size(); ++i)

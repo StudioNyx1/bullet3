@@ -594,7 +594,13 @@ public:
 	void resetNodesAndLinks();
 
 	// Update all nodes mass according to the set linearMass
-	void updateNodesMasses();
+	/// Each node mass is computed using the linear mass times half the length of links on both sides
+	/// Assuming the following cable with 4 nodes : 1 -- 2 ------ 3 ---- 4
+	///  1 mass is - * linear mass
+	///  2 mass is (- + ---) * linear mass
+	///  3 mass is (--- + --) * linear mass
+	///  4 mass is -- * linear mass
+	void updateNodesMass();
 
 	// Sets the multiplier that triggers backup insertion when distance > multiplier * restLength.
 	void setBackupInsertionThreshold(btScalar multiplier);
