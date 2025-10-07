@@ -157,14 +157,6 @@ void btCable::PrepareSolver()
 		node.computeNodeConstraint = true;
 		node.m_splitv = btVector3(0, 0, 0);
 		node.m_nbCollidingObjectPotential = 0;
-
-		// Reset drawings
-		// node.m_xOut = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
-		// node.m_xStartOut = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
-		// node.m_xOutNormal = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
-		// node.m_xOutMargin = FLT_MAX;
-		// node.m_xStartRay = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
-		// node.m_xEndRay = btVector3(FLT_MAX, FLT_MAX, FLT_MAX);
 	}
 
 	// Prepare links
@@ -1870,12 +1862,21 @@ void btCable::anchorConstraint()
 		const btVector3 va = a.m_body->getVelocityInLocalPoint(a.m_c1) * dt;
 		const btVector3 vb = n.m_x - n.m_q;
 		const btVector3 vr = (va - vb) + (wa - n.m_x) * kAHR;
-		const btVector3 impulse = (!useMassBalance ? a.m_c0 : a.m_c0_massBalance) * vr * a.m_influence;
+		btVector3 impulse = (!useMassBalance ? a.m_c0 : a.m_c0_massBalance) * vr * a.m_influence;
+
+		// Limit the impulse
+		btScalar currentTension = a.tension.length();
+		a.tension += impulse / dt;
+		btScalar finalTension = a.tension.length();
+		if (m_maxTension >= 0 && finalTension >= m_maxTension)
+		{
+			a.tension = a.tension.normalized() * m_maxTension;
+			impulse *= (a.tension.length() - currentTension) / (finalTension - currentTension);
+		}
 
 		// Update anchor's data
 		a.m_dist = wa.distance(n.m_x);
 		a.m_body->applyImpulse(-impulse, a.m_c1);
-		a.tension += impulse / dt;
 
 		// Update node's position
 		// n.m_x += impulse * (!useMassBalance ? a.m_c2 : a.m_c2_massBalance);
