@@ -261,19 +261,22 @@ void btCable::EndConstraintsSolve()
 		if (canChangeMass)
 		{
 			btScalar limit = a.m_body->getUpperLimitDistanceImpact() - a.m_body->getLowerLimitDistanceImpact();
-			btScalar ratio = (a.m_dist - a.m_body->getLowerLimitDistanceImpact()) / limit;
-			btScalar func = 1.0 - pow(max(0.0, abs(ratio - 1.0) * 1.1 - 0.1), 3);
-			btScalar clampRatio = Clamp(func, 0.0, 1.0);
-			btScalar newMass = Lerp(a.m_body->getLowerLimitMassImpact(), a.m_body->getUpperLimitMassImpact(), clampRatio);
+			btScalar ratio = Clamp((a.m_dist - a.m_body->getLowerLimitDistanceImpact()) / limit, 0.0, 1.0);
+			btScalar func = 1.0 - pow(1.0 - ratio, 3);									// easeOutCubic
+			// btScalar func = sqrt(1.0 - pow(ratio - 1.0, 2.0));						// easeOutCirc
+			// btScalar func = ratio * ratio;											// easeInQuad
+			// btScalar func = ratio * ratio * ratio * ratio;							// easeInQuart
+			btScalar newMass = Lerp(a.m_body->getLowerLimitMassImpact(), a.m_body->getUpperLimitMassImpact(), func);
 			a.m_body->setMassProps(newMass, newMass * a.m_body->getLocalInertia() * a.m_body->getInvMass());
-			a.m_body->setGravity(m_worldInfo->m_gravity * (a.m_body->getLowerLimitMassImpact() / newMass));
 			a.m_body->updateInertiaTensor();
+			a.m_body->setGravity(m_worldInfo->m_gravity * (a.m_body->getLowerLimitMassImpact() / newMass));
 		}
 		else if (isImpacted)
 		{
 			a.m_body->setMassProps(a.m_body->getLowerLimitMassImpact(), a.m_body->getLowerLimitMassImpact() * a.m_body->getLocalInertia() * a.m_body->getInvMass());
-			a.m_body->setGravity(m_worldInfo->m_gravity);
+			a.m_body->updateInertiaTensor();
 			a.m_body->changeImpacted(false);
+			a.m_body->setGravity(m_worldInfo->m_gravity);
 		}
 	}
 
