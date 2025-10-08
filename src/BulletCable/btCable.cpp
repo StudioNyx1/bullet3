@@ -281,32 +281,35 @@ void btCable::EndConstraintsSolve()
 {
 	for (int i = 0; i < m_anchors.size(); ++i)
 	{
-		Anchor& a = this->m_anchors[i];
-		bool isImpacted = a.m_body->isImpacted();
-		bool canChangeMass = a.m_body->canChangedMassAtImpact();
-		bool isStaticOrKinematic = a.m_body->isStaticOrKinematicObject();
+		Anchor& anchor = this->m_anchors[i];
+		btRigidBody* body = anchor.m_body;
+		Node* node = anchor.m_node;
+
+		bool isImpacted = body->isImpacted();
+		bool canChangeMass = body->canChangedMassAtImpact();
+		bool isStaticOrKinematic = body->isStaticOrKinematicObject();
 
 		if (isStaticOrKinematic) continue;
 
 		if (canChangeMass)
 		{
-			btScalar limit = a.m_body->getUpperLimitDistanceImpact() - a.m_body->getLowerLimitDistanceImpact();
-			btScalar ratio = Clamp((a.m_dist - a.m_body->getLowerLimitDistanceImpact()) / limit, 0.0, 1.0);
+			btScalar limit = body->getUpperLimitDistanceImpact() - body->getLowerLimitDistanceImpact();
+			btScalar ratio = Clamp((anchor.m_dist - body->getLowerLimitDistanceImpact()) / limit, 0.0, 1.0);
 			btScalar func = 1.0 - pow(1.0 - ratio, 3);									// easeOutCubic
 			// btScalar func = sqrt(1.0 - pow(ratio - 1.0, 2.0));						// easeOutCirc
 			// btScalar func = ratio * ratio;											// easeInQuad
 			// btScalar func = ratio * ratio * ratio * ratio;							// easeInQuart
-			btScalar newMass = Lerp(a.m_body->getLowerLimitMassImpact(), a.m_body->getUpperLimitMassImpact(), func);
-			a.m_body->setMassProps(newMass, newMass * a.m_body->getLocalInertia() * a.m_body->getInvMass());
-			a.m_body->updateInertiaTensor();
-			a.m_body->setGravity(m_worldInfo->m_gravity * (a.m_body->getLowerLimitMassImpact() / newMass));
+			btScalar newMass = Lerp(body->getLowerLimitMassImpact(), body->getUpperLimitMassImpact(), func);
+			body->setMassProps(newMass, newMass * body->getLocalInertia() * body->getInvMass());
+			body->updateInertiaTensor();
+			body->setGravity(m_worldInfo->m_gravity * (body->getLowerLimitMassImpact() / newMass));
 		}
 		else if (isImpacted)
 		{
-			a.m_body->setMassProps(a.m_body->getLowerLimitMassImpact(), a.m_body->getLowerLimitMassImpact() * a.m_body->getLocalInertia() * a.m_body->getInvMass());
-			a.m_body->updateInertiaTensor();
-			a.m_body->changeImpacted(false);
-			a.m_body->setGravity(m_worldInfo->m_gravity);
+			body->setMassProps(body->getLowerLimitMassImpact(), body->getLowerLimitMassImpact() * body->getLocalInertia() * body->getInvMass());
+			body->updateInertiaTensor();
+			body->changeImpacted(false);
+			body->setGravity(m_worldInfo->m_gravity);
 		}
 	}
 
