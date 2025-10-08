@@ -393,19 +393,20 @@ void btCable::resetOverridesState()
 
 void btCable::updateNodeData()
 {
-	const btScalar frameDT = (1.0 / m_sst.fdt) * (1.0 - m_cfg.kDP);
-	const btScalar subFrameDT = (1.0 / m_sst.sdt) * (1.0 - m_cfg.kDP);
+	const btScalar frameDT = 1.0 / m_sst.fdt;
+	const btScalar subFrameDT = 1.0 / m_sst.sdt;
+	const btScalar damping = 1.0 - m_cfg.kDP;
 	for (int i = 0; i < m_nodes.size(); ++i)
 	{
 		// Update velocities for the cable
 		Node& n = m_nodes[i];
 		n.m_vn = n.m_v;
-		n.m_v = (n.m_x - n.m_q) * subFrameDT;
+		n.m_v = (n.m_x - n.m_q) * subFrameDT * damping;
 
 		// Only update data for last substep
 		if (m_world->GetIndexSubIteration() == m_world->GetSubIteration() - 1)
 		{
-			btVector3 nodeVelocity = (n.m_x - n.m_xn) * frameDT;
+			btVector3 nodeVelocity = (n.m_x - n.m_xn) * frameDT * damping;
 
 			// Update velocities for the hydro's forces
 			n.m_movingAverage[n.m_indexMovingAverage] = nodeVelocity;
