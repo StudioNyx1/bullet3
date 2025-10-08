@@ -1317,7 +1317,8 @@ void btCable::addAnchorBackup()
 		// Try to read from adjacency of anchor->a link. Expect m_nodeAdj[a].right to be the link (firstNode -> secondNode)
 		Link* LRightOfA = nullptr;
 		auto ita = m_nodeAdj.find(a);
-		if (ita != m_nodeAdj.end()) {
+		if (ita != m_nodeAdj.end()) 
+		{
 			LRightOfA = ita->second.right; // link: (firstNode -> secondNode)
 		}
 
@@ -1330,8 +1331,12 @@ void btCable::addAnchorBackup()
 		{
 			// Compute current distance between anchor and first node
 			// Obtain anchor world position
-			btVector3 xAnchorLocal = m_anchors[0].m_local;
-			btVector3 xAnchorWorld = m_anchors[0].m_body->getWorldTransform() * xAnchorLocal;
+			int idxAnchor = 0;
+			for (int idx = 0; idx < m_anchors.size(); ++idx)
+				idxAnchor = a->index == m_anchors[idx].m_node->index ? idx : idxAnchor;
+
+			btVector3 xAnchorLocal = m_anchors[idxAnchor].m_local;
+			btVector3 xAnchorWorld = m_anchors[idxAnchor].m_body->getWorldTransform() * xAnchorLocal;
 			btVector3 xFirst  = a->m_x;
 			btScalar dist = btDistance(xAnchorWorld, xFirst);
 
@@ -1393,7 +1398,8 @@ void btCable::addAnchorBackup()
 		Link* LleftOfB = nullptr;
 
 		auto itb = m_nodeAdj.find(b);
-		if (itb != m_nodeAdj.end()) {
+		if (itb != m_nodeAdj.end()) 
+		{
 			LleftOfB = itb->second.left; // link: (prevB -> B)
 		}
 
@@ -1402,11 +1408,15 @@ void btCable::addAnchorBackup()
 			restAB = LleftOfB->m_rl;
 		}
 			
-		if (LleftOfB && restAB > FLT_EPSILON) {
+		if (LleftOfB && restAB > FLT_EPSILON) 
+		{
+			// Compute current distance between b and anchor		
+			int idxAnchor = 0;
+			for (int idx = 0; idx < m_anchors.size(); ++idx)
+				idxAnchor = b->index == m_anchors[idx].m_node->index ? idx : idxAnchor;
 
-			// Compute current distance between b and anchor
-			btVector3 xAnchorLocal = m_anchors[m_anchors.size()-1].m_local;
-			btVector3 xAnchorWorld = m_anchors[m_anchors.size()-1].m_body->getWorldTransform() * xAnchorLocal;
+			btVector3 xAnchorLocal = m_anchors[idxAnchor].m_local;
+			btVector3 xAnchorWorld = m_anchors[idxAnchor].m_body->getWorldTransform() * xAnchorLocal;
 			btVector3 xLast = b->m_x;
 			btScalar dist = btDistance(xLast, xAnchorWorld);
 	
