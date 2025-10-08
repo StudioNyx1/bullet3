@@ -975,7 +975,7 @@ public:
 		// Cable's creation
 		btCable* cable = new btCable(&m_softBodyWorldInfo, getSoftDynamicsWorld(), resolution, 0, positionNodes, massNodes);
 		//cable->setTotalMass(totalMass);
-		cable->updateNodesMasses();
+		cable->updateNodesMass();
 
 		cable->setUseCollision(false);
 		if (bodyB != nullptr)
@@ -1046,7 +1046,7 @@ public:
 			cable->appendAnchor(cable->m_nodes.size() - 1, bodyB, anchorPos.at(s) - bodyB->getWorldTransform().getOrigin(), DisableCollisionOnB);
 		// Cable's config
 		//cable->setTotalMass(totalMass);
-		cable->updateNodesMasses();
+		cable->updateNodesMass();
 		cable->m_cfg.piterations = iteration;
 		cable->m_cfg.kAHR = 1;
 
