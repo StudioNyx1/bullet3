@@ -1749,7 +1749,7 @@ void btCable::removeAllBackupNodes()
 	updateNodesMass();
 	m_backupNodesRun.clear();
 	_secondPairContact.clear();
-	_anchorBackupPairContact.clear();
+	_anchorBackupCandidates.clear();
 	m_anchorBackups.clear();
 	resetOverridesState();
 }
