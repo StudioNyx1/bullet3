@@ -303,7 +303,7 @@ void btRigidBody::saveKinematicState(btScalar timeStep)
 	//		//printf("angular = %f %f %f\n",m_angularVelocity.getX(),m_angularVelocity.getY(),m_angularVelocity.getZ());
 	// }
 
-	//if we use motionstate to synchronize world transforms, get the new kinematic/animated world transform
+	// In Unity, we update the render of the rigibody, so we need to sync the motion state
 	if (getMotionState()) getMotionState()->getWorldTransform(m_worldTransform);
 }
 
