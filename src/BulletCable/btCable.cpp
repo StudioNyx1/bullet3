@@ -1492,7 +1492,7 @@ void btCable::secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candid
 	for (int i = 0; i < candidates.size(); i++)
 	{
 		BroadPhasePair pair = candidates.at(i);
-		Node *n = pair.node;
+		Node *n = &m_secondaryPool.at(pair.node->poolIndex).node;		
 
 		// First contact test
 		_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), n->m_x));
