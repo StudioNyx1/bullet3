@@ -1288,16 +1288,15 @@ void btCable::addAnchorBackup()
 	// Insert backup nodes between:
 	// - the first anchor and the first node
 	// - the last node and the last anchor
-	// using the same policy as addBackupNodes()/insertInterpolatedNodes.
+	// using a fixed number of nodes chosen based on distance.
 	
-	btScalar halfLinear = 0.5f * m_linearMass;
 	// Head anchor -> first node
 	btLink<Node*>* firstNodeLink = m_linkedList.getHead(); // first node 
 	if (firstNodeLink && !firstNodeLink->isTail())
 	{
 		Node* a = firstNodeLink->getValue(); // first node
 
-		// Get rest to the right (firstNode -> secondNode) as "rest"
+		// Get rest to the right (firstNode -> secondNode)
 		btScalar restAB = 0.0f;
 
 		// Try to read from adjacency of anchor->a link. Expect m_nodeAdj[a].right to be the link (firstNode -> secondNode)
@@ -1328,28 +1327,22 @@ void btCable::addAnchorBackup()
 
 			if (dist > m_backupAnchorAddThreshold * restAB)
 			{
-				// Decide number of segments
-				int segments = std::max(2, (int)ceil(dist / restAB));
-				int inserts  = segments - 1;
-				btScalar rlSeg = restAB / (btScalar)segments;
+				// Decide number of nodes to insert based on distance.
+				// Compute desired inserts purely from distance
+				int inserts = (int)floor(dist / m_anchorBackupSpacing);
 
-				// Mass for 'a' considering (0, rlSeg)
-				btScalar massA = halfLinear * (rlSeg);
-				if (a->isSecondary) a->m_im = 1.0f / massA; else setMass(a->index, massA);
-
-				m_massOverrides[a].changedInvMass = a->m_im;
-				m_massOverrides[a].hasChanged = true;
+				// Ensure we still insert something if over threshold
+				inserts = btMax(inserts, 1);
 
 				// We'll insert after anchor (before the first node).
 				btLink<Node*>* cursor = firstNodeLink;
-				Node* prev = a;   
 
 				// Insert from the node closest to 'a' down to the one closest to anchor
 				for (int j = inserts; j >= 1; --j)
 				{
-					btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
-
-					Node* spare = createPreparedSpare(xAnchorWorld, a->m_x, btVector3{0,0,0}, a->m_v, j, segments, nullptr, secondaryMass);
+					// j indicates which fraction between anchor (0) and a (1) this node lies at when distributing evenly by count
+					// We reuse createPreparedSpare with j and (inserts+1) to place by fraction of dist
+					Node* spare = createPreparedSpare(xAnchorWorld, a->m_x, btVector3{0,0,0}, a->m_v, j, inserts + 1, nullptr, m_anchorBackupMass);
 					if (!spare) break;
 
 					// Insert before current cursor
@@ -1357,12 +1350,8 @@ void btCable::addAnchorBackup()
 					newNode->setValue(spare);
 					newNode->insertBefore(cursor);
 
-					// Link spare -> prev (prev is to the right).
-					addLinkBetweenConsecutiveNodes(spare, prev, rlSeg);
-
 					m_anchorBackups.push_back(*spare);
 					
-					prev = spare;        // move leftwards
 					cursor = newNode;    // next insert goes before this one
 				}
 			}
@@ -1377,7 +1366,7 @@ void btCable::addAnchorBackup()
 	{
 		Node* b = lastNodeLink->getValue(); // last node
 	
-		// Get rest to the left (prevB -> B) as "restAB"
+		// Get rest to the left (prevB -> B)
 		btScalar restAB = 0.0f;
 	
 		// From adjacency, the left link of b should be (prevB -> B)
@@ -1408,26 +1397,17 @@ void btCable::addAnchorBackup()
 	
 			if (dist > m_backupAnchorAddThreshold * restAB)
 			{
-				int segments = std::max(2, (int)ceil(dist / restAB));
-				int inserts  = segments - 1;
-				btScalar rlSeg = restAB / (btScalar)segments;
-	
-				// Mass for 'b' considering (rlSeg, 0)
-				btScalar massB = halfLinear * (rlSeg);
-				if (b->isSecondary) b->m_im = 1.0f / massB; else setMass(b->index, massB);
-
-				m_massOverrides[b].changedInvMass = b->m_im;
-				m_massOverrides[b].hasChanged = true;
+				// Decide number of nodes to insert based on distance (same policy as head side)
+				int inserts = (int)floor(dist / m_anchorBackupSpacing);
+				inserts = btMax(inserts, 1);
 	
 				// Insert before tail anchor (after last node)
 				btLink<Node*>* cursor = lastNodeLink;
 	
-				Node* prev = b;
 				for (int j = 1; j <= inserts; ++j)
 				{
-					btScalar secondaryMass = halfLinear * (rlSeg + rlSeg);
-	
-					Node* spare = createPreparedSpare(b->m_x, xAnchorWorld, b->m_v, btVector3{0,0,0}, j, segments, nullptr, secondaryMass);
+					// Place by even fractions across the distance segment
+					Node* spare = createPreparedSpare(b->m_x, xAnchorWorld, b->m_v, btVector3{0,0,0}, j, inserts + 1, nullptr, m_anchorBackupMass);
 					if (!spare) break;
 	
 					btLink<Node*>* newNode = new btLink<Node*>();
@@ -1435,10 +1415,7 @@ void btCable::addAnchorBackup()
 					newNode->insertAfter(cursor);
 					cursor = cursor->getNext();
 	
-					addLinkBetweenConsecutiveNodes(prev, spare, rlSeg);
 					m_anchorBackups.push_back(*spare);
-					
-					prev = spare;
 				}
 			}
 		}
@@ -2602,6 +2579,17 @@ void btCable::setAnchorBackupInsertionThreshold(btScalar multiplier)
 {
 	m_backupAnchorAddThreshold = multiplier;
 }
+
+void btCable::setAnchorBackupMass(btScalar mass)
+{
+	m_anchorBackupMass = mass;
+}
+
+void btCable::setAnchorBackupSpacing(btScalar spacing)
+{
+	m_anchorBackupSpacing = spacing;
+}
+
 
 void btCable::setCollisionBackupActivation(bool active)
 {
