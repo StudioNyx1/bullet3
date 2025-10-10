@@ -476,18 +476,6 @@ void btCable::updateNodeData()
 		// Using a cylinder volume calculation with 2 links and divide by 2
 		m_nodeData[i].volume = SIMD_PI * m_cableData->radius * m_cableData->radius * sizeElement * 0.5;
 	}
-
-	for (int i = 0; i < m_secondaryPool.size(); i++)
-	{
-		if (!m_secondaryPool.at(i).nextFree)
-		{
-			continue;
-		}
-		
-		Node* n = &m_secondaryPool.at(i).node;
-
-		n->m_v = (n->m_x - n->m_q) * subFrameDT;
-	}
 }
 
 void btCable::ResetForceAndVelocity()
