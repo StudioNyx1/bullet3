@@ -3089,6 +3089,22 @@ void btSoftBody::updateBounds()
 					mins[d] = m_nodes[i].m_x[d];
 			}
 		}
+
+		// Include anchors world position (body dependent)
+		int aCount = m_anchors.size();
+		for (int a = 0; a < aCount; ++a)
+		{
+			const Anchor& anch = m_anchors[a];
+			
+			if (anch.m_body)
+			{
+				const btVector3& pb = anch.m_body->getWorldTransform().getOrigin();
+				if (pb.x() < mins.x()) mins.setX(pb.x()); else if (pb.x() > maxs.x()) maxs.setX(pb.x());
+				if (pb.y() < mins.y()) mins.setY(pb.y()); else if (pb.y() > maxs.y()) maxs.setY(pb.y());
+				if (pb.z() < mins.z()) mins.setZ(pb.z()); else if (pb.z() > maxs.z()) maxs.setZ(pb.z());
+			}
+		}
+		
 		const btScalar csm = getCollisionShape()->getMargin();
 		const btVector3 mrg = btVector3(csm,
 										csm,
