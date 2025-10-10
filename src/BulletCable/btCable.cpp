@@ -890,8 +890,6 @@ void btCable::runBroadPhase()
 
 			BroadPhasePair bp;
 			bp.node = n;
-			bp.minLink = lo;
-			bp.maxLink = hi;
 			bp.body = od.obj;
 			bp.bodyType = od.obj->getInternalType();
 			threadBuckets[tid].push_back(bp);

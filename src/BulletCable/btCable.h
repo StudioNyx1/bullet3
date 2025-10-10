@@ -102,8 +102,6 @@ public:
 	struct BroadPhasePair
 	{
 		Node* node;
-		btVector3 minLink;
-		btVector3 maxLink;
 		btCollisionObject* body;
 		int bodyType;
 	};
