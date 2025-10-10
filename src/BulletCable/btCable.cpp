@@ -223,7 +223,9 @@ void btCable::solveSingleCableIteration(int currentIter)
 	bool runBending = (currentIter + 1) % 2 == 0 || lastStep;
 	bool runCollisionDetection = firstStep || (currentIter + 1) % m_substepDelayCollisionNarrow == 0 || lastStep;
 	bool runContactConstraint = (currentIter + 1) % m_substepDelayCollisionSolver == 0 || lastStep;
+	
 	bool shouldAddBackupNodes = (currentIter + 1) == m_substepDelayCollisionSolver;
+	bool runCollisionDetectionAnchorBackup = (currentIter + 1) % m_substepDelayCollisionNarrow == 0;
 
 	updateNodeDeltaPos(currentIter);
 
@@ -250,28 +252,38 @@ void btCable::solveSingleCableIteration(int currentIter)
 	if (runCollisionDetection)
 	{
 		runNarrowPhase(_candidates, _nodePairContact);
+		
+		updateBackupNodes(); // update backup node pos after bounding primary nodes have been affected by other constraints
+		runNarrowPhase(_backupPairCandidates, _backupPairContact);
+
+		// For anchor backups we only need to make them collide once in the frame because they are not affected by any constraints
+		// So we detect and solve the contact only once here
+		if (runCollisionDetectionAnchorBackup)
+		{
+			runNarrowPhase(_anchorBackupCandidates, _anchorBackupPairContact);
+			contactConstraint(_anchorBackupPairContact, true);
+		}
 	}
 
 	if (runContactConstraint)
 	{
 		restoreChangedMasses();
 		
-		contactConstraint(_nodePairContact);
-		secondaryNodesContact(_anchorBackupCandidates, false); // not applying position change on nodes (acts like a wall)
-		
-		updateBackupNodes();
-		secondaryNodesContact(_secondPairContact, true); // applies position change on nodes (backups primary collisions)
+		contactConstraint(_nodePairContact, true);
+		contactConstraint(_backupPairContact, true);
 
 		if (shouldAddBackupNodes)
 		{
 			if (collisionBackupEnabled)
 			{
 				addBackupNodes();
+				depenetrateBackups(_backupPairCandidates, _backupPairContact);
 			}
 			if (anchorBackupEnabled)
 			{
 				addAnchorBackup();
 				runBroadPhase(m_anchorBackups, _anchorBackupCandidates);
+				depenetrateBackups(_anchorBackupCandidates, _anchorBackupPairContact);
 			}
 		}
 	}
@@ -1010,6 +1022,11 @@ void btCable::runNarrowPhase(btAlignedObjectArray<BroadPhasePair>& candidates, b
 	{
 		BroadPhasePair* c = &candidates.at(i);
 		Node* node = c->node;
+
+		if (node->isSecondary)
+		{
+			node = &m_secondaryPool.at(node->poolIndex).node;
+		}
 		btRigidBody* rb = btRigidBody::upcast(c->body);
 		if (!rb) continue;
 
@@ -1142,7 +1159,7 @@ btSoftBody::Node* btCable::createPreparedSpare(btVector3 aPos, btVector3 bPos, b
 
 	spare->m_x = aLerpPos + bLerpPos;
 	spare->m_v = it * aVel + t * bVel;
-	spare->m_q = spare->m_x - bVel * m_sst.sdt;
+	spare->m_q = spare->m_x - spare->m_v * m_sst.sdt;
 	spare->m_im = 1.0f / newNodeMass;
 
 	if (!pair)
@@ -1155,7 +1172,7 @@ btSoftBody::Node* btCable::createPreparedSpare(btVector3 aPos, btVector3 bPos, b
 	sparePair.node = spare;
 	sparePair.bodyType = pair->pair->bodyType;
 	
-	_secondPairContact.push_back(sparePair);
+	_backupPairCandidates.push_back(sparePair);
 
 	return spare;
 }
@@ -1503,17 +1520,19 @@ void btCable::secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candid
 	}
 }
 
-void btCable::depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidates)
+void btCable::depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidates, btAlignedObjectArray<NodePairNarrowPhase>& outPairContatcs)
 {
 	for (int i = 0; i < candidates.size(); i++)
 	{
-		BroadPhasePair pair = candidates.at(i);
-		Node *n = pair.node;
+		BroadPhasePair *pair = &candidates.at(i);
+		Node *n = pair->node;
+
+		n = &m_secondaryPool.at(n->poolIndex).node;
 
 		// First contact test
 		_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), n->m_x));
-		MyContactResultCallback cb1(0, &_nodeContactObject, pair.body);
-		m_world->contactPairTest(&_nodeContactObject, pair.body, cb1);
+		MyContactResultCallback cb1(0, &_nodeContactObject, pair->body);
+		m_world->contactPairTest(&_nodeContactObject, pair->body, cb1);
 
 		if (cb1.m_connected && cb1.minDist < 0)
 		{
@@ -1522,8 +1541,8 @@ void btCable::depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidate
 
 			// Second contact test from projected position (corner case)
 			_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), proj1));
-			MyContactResultCallback cb2(0, &_nodeContactObject, pair.body);
-			m_world->contactPairTest(&_nodeContactObject, pair.body, cb2);
+			MyContactResultCallback cb2(0, &_nodeContactObject, pair->body);
+			m_world->contactPairTest(&_nodeContactObject, pair->body, cb2);
 
 			// Choose the deepest penetration if both hit; otherwise keep the first
 			bool hit2 = (cb2.m_connected && cb2.minDist < 0);
@@ -1531,12 +1550,27 @@ void btCable::depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidate
 
 			btVector3& finalPoint = use2 ? cb2.contactPoint : cb1.contactPoint;
 			btVector3& finalNorm  = use2 ? cb2.contactNorm  : cb1.contactNorm;
+			btScalar& finalDistance = use2 ? cb2.minDist : cb1.minDist;
 
 			// Final depenetration using the chosen contact (apply once at the end if requested)
 			btVector3 finalPos = finalPoint + finalNorm * (m_collisionMargin + FLT_EPSILON);
 
 			n->m_x = finalPos;
+			//n->m_q = n->m_x - n->m_v * m_sst.sdt;
+			n->m_q = finalPos;
             n->m_n = finalNorm;
+
+			// Add to narrow pairs to save that we have collided 
+			NodePairNarrowPhase narrowPair;
+			narrowPair.node = n;
+			narrowPair.pair = pair;
+			narrowPair.hitPoint = finalPoint;
+			narrowPair.normal = finalNorm;
+			narrowPair.timeOfImpact = 0.0f;
+			narrowPair.distance = finalDistance;
+			narrowPair.worldTransform = pair->body->getWorldTransform();
+			narrowPair.margin = computeCollisionMargin(pair->body->getCollisionShape());
+			outPairContatcs.push_back(narrowPair);
 		}
 	}
 }
@@ -1724,9 +1758,14 @@ void btCable::removeAllBackupNodes()
 	}
 
 	updateNodesMass();
-	m_backupNodesRun.clear();
-	_secondPairContact.clear();
+	
+	_backupPairContact.clear();
+	_anchorBackupPairContact.clear();
+	
+	_backupPairCandidates.clear();
 	_anchorBackupCandidates.clear();
+
+	m_backupNodesRun.clear();
 	m_anchorBackups.clear();
 	resetOverridesState();
 }
@@ -2121,7 +2160,7 @@ void btCable::bendingConstraint()
 
 #pragma region Contact Constraint
 
-void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts)
+void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts, bool updateNodesPos)
 {
 	int nbContactPairPotential = pairContacts.size();
 	if (nbContactPairPotential == 0) return;
@@ -2139,6 +2178,11 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairCo
 		}
 		
 		Node* node = pair->node;
+
+		if (node->isSecondary)
+		{
+			node = &m_secondaryPool.at(node->poolIndex).node;
+		}
 
 		//node->m_x = pair->hitPoint; // debug, causes nodes to stick to their collision point
 
@@ -2178,8 +2222,11 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairCo
 			}
 
 			// Update the node position at last
-			node->m_x = pair->hitPoint;
-			node->m_n = pair->normal;
+			if (updateNodesPos)
+			{
+				node->m_x = pair->hitPoint;
+				node->m_n = pair->normal;
+			}
 		}
 	}
 }

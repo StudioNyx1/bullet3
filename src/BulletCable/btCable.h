@@ -257,6 +257,9 @@ private:
 
 	// Backup insertion threshold for anchor support, expressed as a multiplier of the segment rest length.
 	btScalar m_backupAnchorAddThreshold = 1.2f;
+
+	btScalar m_anchorBackupMass = 0.5f;
+	btScalar m_anchorBackupSpacing = 0.1;
 	
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
@@ -490,7 +493,7 @@ private:
 	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
 	void anchorConstraint();
 
-	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts);
+	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts, bool updateNodesPos);
 	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
 	btScalar computeCollisionMargin(const btCollisionShape* shape) const;
 	void resetManifoldLifeTime();
@@ -513,8 +516,7 @@ private:
 	void removeBackupNodes();
 	void removeAllBackupNodes();
 	void secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candidates, bool applyNodeChange);
-	void anchorBackupsContact();
-	void depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidates);
+	void depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidates, btAlignedObjectArray<NodePairNarrowPhase>& outPairContatcs);
 
 	bool aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 nodeMinAabb, btVector3 nodeMaxAabb, btVector3 minAabb, btVector3 maxAabb);
 
@@ -541,7 +543,7 @@ private:
 	btAlignedObjectArray<NodePairNarrowPhase> _nodePairContact;
 	btAlignedObjectArray<NodePairNarrowPhase> _anchorBackupPairContact;
 	btAlignedObjectArray<NodePairNarrowPhase> _backupPairContact;
-	btAlignedObjectArray<BroadPhasePair> _secondPairContact;
+	btAlignedObjectArray<BroadPhasePair> _backupPairCandidates;
 	bool _impacted = false;
 
 	// Cached object used to resolve contacts
@@ -603,6 +605,8 @@ public:
 	// Sets the multiplier that triggers backup insertion when distance > multiplier * restLength.
 	void setBackupInsertionThreshold(btScalar multiplier);
 	void setAnchorBackupInsertionThreshold(btScalar multiplier);
+	void setAnchorBackupMass(btScalar mass);
+	void setAnchorBackupSpacing(btScalar spacing);
 
 	void setAnchorBackupActivation(bool active);
 	void setCollisionBackupActivation(bool active);
