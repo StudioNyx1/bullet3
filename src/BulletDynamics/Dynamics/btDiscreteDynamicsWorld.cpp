@@ -459,13 +459,13 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 			internalSingleStepSimulation(fixedTimeStep);
 
 			// Update Rigids' positions
-			synchronizeMotionStates();
+			synchronizeMotionStates();	
+			
+			// Update Kinematics' position for the next frame
+			syncKinematicState();
 
 			m_indexSubIteration++;
 		}
-
-		// Update Kinematics' position for the next frame
-		syncKinematicState();
 	}
 	else
 	{

@@ -183,7 +183,7 @@ void btCable::PrepareSolver()
 		const double massBody = a.m_body->getMass();
 
 		// // Tweaked mass
-		const double tweakedMass = massNode + massBody * a.BodyMassRatio;
+		const double tweakedMass = massNode + massBody * a.m_bodyMassRatio;
 		const double invTweakedMass = tweakedMass < FLT_EPSILON ? 0.0 : 1.0 / tweakedMass;
 
 		// Masses' matrices
@@ -193,7 +193,7 @@ void btCable::PrepareSolver()
 		a.m_c2 = m_sst.sdt * invMassNode;
 		a.m_c2_massBalance = m_sst.sdt * invTweakedMass;
 		a.m_body->activate();
-		a.tension = btVector3(0, 0, 0);
+		a.m_tension = btVector3(0, 0, 0);
 	}
 
 	// Prepare contacts
@@ -404,7 +404,6 @@ void btCable::resetOverridesState()
 		kv.second.hasChanged = false;
 	}
 }
-
 
 void btCable::updateNodeData()
 {
@@ -1876,7 +1875,7 @@ void btCable::anchorConstraint()
 		Anchor& a = m_anchors[i];
 		Node& n = *a.m_node;
 
-		bool useMassBalance = a.BodyMassRatio > 0;
+		bool useMassBalance = a.m_bodyMassRatio > 0;
 		const btVector3 wa = a.m_body->getWorldTransform() * a.m_local;
 		const btVector3 va = a.m_body->getVelocityInLocalPoint(a.m_c1) * dt;
 		const btVector3 vb = n.m_x - n.m_q;
@@ -1884,13 +1883,13 @@ void btCable::anchorConstraint()
 		btVector3 impulse = (!useMassBalance ? a.m_c0 : a.m_c0_massBalance) * vr * a.m_influence;
 
 		// Limit the impulse
-		btScalar currentTension = a.tension.length();
-		a.tension += impulse / dt;
-		btScalar finalTension = a.tension.length();
+		btScalar currentTension = a.m_tension.length();
+		a.m_tension += impulse / dt;
+		btScalar finalTension = a.m_tension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
-			a.tension = a.tension.normalized() * m_maxTension;
-			impulse *= (a.tension.length() - currentTension) / (finalTension - currentTension);
+			a.m_tension = a.m_tension.normalized() * m_maxTension;
+			impulse *= (a.m_tension.length() - currentTension) / (finalTension - currentTension);
 		}
 
 		// Update anchor's data
@@ -2388,7 +2387,7 @@ btVector3 btCable::getTensionAt(int index)
 {
 	int size = m_anchors.size();
 	if (index < size && index >= 0)
-		return m_anchors[index].tension;
+		return m_anchors[index].m_tension;
 	else
 		return btVector3(0, 0, 0);
 }
