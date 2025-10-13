@@ -805,6 +805,23 @@ public:
 				}
 			}
 
+			if (m_currentDemoIndex == 28)
+			{
+				for (int i = 0; i < m_dynamicsWorld->getNumCollisionObjects(); ++i)
+				{
+					btRigidBody* rb = btRigidBody::upcast(m_dynamicsWorld->getCollisionObjectArray()[i]);
+					if (rb)
+					{
+						if (rb->getInvMass() == 0.0)
+						{
+							btTransform transform = rb->getWorldTransform();
+							transform.setOrigin(transform.getOrigin() + btVector3(0, 0, 0) * deltaTime);
+							if (rb->getMotionState()) rb->getMotionState()->setWorldTransform(transform);
+						}
+					}
+				}
+			}
+
 			const auto currentTime{Clock::now()};
 			if (m_applyForceOnRigidbody)
 			{
@@ -1234,8 +1251,8 @@ static void Init_Weigths(CableDemo* pdemo)
 		btCable* cable = pdemo->createCable(resolution, iteration, 200, anchorPositionKinematic, anchorPositionPhysic, physic, kinematic);
 		cable->setCollisionParameters(1, 2);
 
-		cable->m_anchors[0].BodyMassRatio = 1;
-		cable->m_anchors[1].BodyMassRatio = 1;
+		cable->m_anchors[0].m_bodyMassRatio = 1;
+		cable->m_anchors[1].m_bodyMassRatio = 1;
 	}
 }
 
@@ -2040,8 +2057,8 @@ static void Init_TestSupportA18(CableDemo* pdemo)
 	//cable->setCollisionStiffness(0, 1000, 0, 1);
 	cable->setCollisionParameters(3, 6);
 
-	cable->m_anchors[0].BodyMassRatio = 0.1;
-	cable->m_anchors[1].BodyMassRatio = 0.1;
+	cable->m_anchors[0].m_bodyMassRatio = 0.1;
+	cable->m_anchors[1].m_bodyMassRatio = 0.1;
 
 	pdemo->SetCameraPosition(btVector3(0, 2, -3));
 }
@@ -2435,7 +2452,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 
 	for (int i = 0; i < cable->m_anchors.size(); ++i)
 	{
-		cable->m_anchors[i].BodyMassRatio = 0.000015;
+		cable->m_anchors[i].m_bodyMassRatio = 0.000015;
 	}
 	pdemo->SetCameraPosition(btVector3(0, 10, 0));
 
@@ -4052,20 +4069,16 @@ static void Init_ImpulseAnchor(CableDemo* pdemo)
 	waypointPos.push_back(transformRingLest.getOrigin() + btVector3(0,0.3,0));
 	waypointPos.push_back(transformAttachPoint.getOrigin());
 
-	// Joint
-	// btTransform framePivot = btTransform::getIdentity();
-	// framePivot.setOrigin(btVector3(0, -4.7, 0));
-	// btTransform frameWorld = attachPoint->getWorldTransform() * framePivot;
-	// btTransform frameA = attachPoint->getWorldTransform().inverse() * frameWorld;
-	// btTransform frameB = ringLest->getWorldTransform().inverse() * frameWorld;
-	// btFixedConstraint* fixed = pdemo->createFixedConstraint(*attachPoint, *ringLest, frameA, frameB, 256);
-
 	// Cable
-	btCable* cable = pdemo->createCableWaypoint(50, 100, 10, waypointPos, ringLest, attachPoint, true, true);
-	cable->setUseLRA(true);
-	cable->getCollisionShape()->setMargin(margin);
-	// cable->m_anchors[0].BodyMassRatio = 0.7;
-	// cable->m_anchors[1].BodyMassRatio = 0.7;
+	btCable* cable = pdemo->createCableWaypoint(50, 50, 10, waypointPos, ringLest, attachPoint, true, true);
+	cable->setUseLRA(false);
+	// cable->usePreFTL = true;
+	//cable->usePostFTL = true;
+	cable->getCollisionShape()->setMargin(0.01f);
+	cable->m_anchors[0].m_bodyMassRatio = 0.2;
+	cable->m_anchors[1].m_bodyMassRatio = 0.2;
+	cable->setCableRadius(0.05f);
+	pdemo->m_cable = cable;
 }
 
 void (*demofncs[])(CableDemo*) =
