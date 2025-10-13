@@ -498,13 +498,10 @@ public:
 		btMatrix3x3 m_c0_massBalance;   // Impulse matrix tweaked to stabilized distance body/anchor
 		btVector3 m_c1;		            // Relative anchor
 		btScalar m_c2;		            // ima*dt
-		btVector3 tension;              // tension at this anchor
-		
-		bool impacted = false;			// overtension on specific body
-		btScalar m_dist;				// Last distance known between anchor posiiton and node position
-
-		// 0.2% of body mass added to anchor node by default
-		btScalar BodyMassRatio = 0.002f;
+		btScalar m_c2_massBalance;		// tweaked ima*dt
+		btVector3 m_tension;            // tension at this anchor
+		btScalar m_dist;			    // Last distance known between anchor posiiton and node position
+		btScalar m_bodyMassRatio;       // Body added mass to node
 	};
 	/* Note			*/
 	struct Note : Element

@@ -474,8 +474,8 @@ void btSequentialImpulseConstraintSolver::initSolverBody(btSolverBody* solverBod
 		solverBody->m_linearFactor = rb->getLinearFactor();
 		solverBody->m_linearVelocity = rb->getLinearVelocity();
 		solverBody->m_angularVelocity = rb->getAngularVelocity();
-		solverBody->m_externalTorqueImpulse = rb->updateAngularAcceleration() * timeStep;
 		solverBody->m_externalForceImpulse = rb->updateAcceleration() * timeStep;
+		solverBody->m_externalTorqueImpulse = rb->updateAngularAcceleration() * timeStep;
 	}
 	else
 		{
@@ -488,8 +488,8 @@ void btSequentialImpulseConstraintSolver::initSolverBody(btSolverBody* solverBod
 		solverBody->m_angularVelocity.setValue(0, 0, 0);
 		solverBody->m_externalForceImpulse.setValue(0, 0, 0);
 		solverBody->m_externalTorqueImpulse.setValue(0, 0, 0);
-					}
-				}
+	}
+}
 
 btScalar btSequentialImpulseConstraintSolver::restitutionCurve(btScalar rel_vel, btScalar restitution, btScalar velocityThreshold)
 {
