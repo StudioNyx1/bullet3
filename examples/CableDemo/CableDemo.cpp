@@ -4014,23 +4014,38 @@ static void Init_ImpulseAnchor(CableDemo* pdemo)
 	ringShape->addChildShape(leftBoxTransform, lefrightBoxShape);
 	ringShape->addChildShape(rightBoxTransform, lefrightBoxShape);
 
+	btBoxShape* a18Shape = new btBoxShape(btVector3(0.6, 2, 0.6));
+
 	// Masses
 	btScalar massRingLest(10);
-	btScalar massRingA18(704);
+	btScalar massRingA18(0);
+	btScalar massA18(100);
 
 	// Transform
 	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 10, 0));
 	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, 5, 0));
 	btTransform transformRingA18(btQuaternion(btVector3(0,1,0), 3.14/2.0), btVector3(0, 5-0.3, 0));
+	btTransform transformA18(btMatrix3x3::getIdentity(), btVector3(0, 5-2.35-0.3, 0));
 
 	// RB
-	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(0), transformAttachPoint, new btBoxShape(btVector3(0,0,0)));
+	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1,0.1,0.1)));
+	attachPoint->setCollisionFlags(2); // attachPoint->getCollisionFlags();
+	attachPoint->setSleepingThresholds(0, 0);
+	attachPoint->setMassProps(0, btVector3(0,0,0));
+
 	btRigidBody* ringLest = pdemo->createRigidBody(massRingLest, transformRingLest, ringShape);
 	ringLest->setSleepingThresholds(0, 0);
-	ringLest->updateMassAtImpact(true, massRingLest, 1000, 0.001, 1);
+	// ringLest->updateMassAtImpact(true, massRingLest, 1000, 0.001, 1);
+
+	btRigidBody* a18 = pdemo->createRigidBody(massA18, transformA18, a18Shape);
+	a18->setSleepingThresholds(0, 0);
 
 	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
 	ringA18->setSleepingThresholds(0, 0);
+	ringA18->m_redirectionTarget = a18;
+	ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.35, 0));
+	a18->m_kinematicChildren.push_back(ringA18);
+
 	
 	// Cable's Waypoints
 	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
