@@ -493,8 +493,8 @@ private:
 	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
 	void anchorConstraint();
 
-	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts, bool updateNodesPos);
-	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
+	void contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts, bool updateNodesPos, CollisionMode collisionMode);
+	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition, CollisionMode collisionMode);
 	btScalar computeCollisionMargin(const btCollisionShape* shape) const;
 	void resetManifoldLifeTime();
 
@@ -515,7 +515,7 @@ private:
 	void updateBackupNodes();
 	void removeBackupNodes();
 	void removeAllBackupNodes();
-	void secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candidates, bool applyNodeChange);
+	void secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candidates, bool applyNodeChange, CollisionMode collisionMode); // Uses contact pair test to solve secondary nodes contacts
 	void depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidates, btAlignedObjectArray<NodePairNarrowPhase>& outPairContatcs);
 
 	bool aabbTestMargin(btVector3 nodeVel, btVector3 objVel, btVector3 nodeMinAabb, btVector3 nodeMaxAabb, btVector3 minAabb, btVector3 maxAabb);
@@ -530,10 +530,6 @@ private:
 		bool active = false;
 		int total = 0;
 		int current = 0;
-
-		// Add caches you may need across iterations here (e.g., predicted positions)
-		// Example:
-		// btAlignedObjectArray<btVector3> m_predictedPos;
 	};
 
 	IterativeSolveState m_iter;

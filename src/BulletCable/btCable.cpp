@@ -261,7 +261,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 		if (runCollisionDetectionAnchorBackup)
 		{
 			runNarrowPhase(_anchorBackupCandidates, _anchorBackupPairContact);
-			contactConstraint(_anchorBackupPairContact, true);
+			contactConstraint(_anchorBackupPairContact, true, CollisionMode::Base); // No curve application on anchorBackups
 		}
 	}
 
@@ -269,8 +269,8 @@ void btCable::solveSingleCableIteration(int currentIter)
 	{
 		restoreChangedMasses();
 		
-		contactConstraint(_nodePairContact, true);
-		contactConstraint(_backupPairContact, true);
+		contactConstraint(_nodePairContact, true, collisionMode);
+		contactConstraint(_backupPairContact, true, collisionMode);
 
 		if (shouldAddBackupNodes)
 		{
@@ -1466,7 +1466,7 @@ void btCable::updateBackupNodes()
 	}
 }
 
-void btCable::secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candidates, bool applyNodeChange)
+void btCable::secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candidates, bool applyNodeChange, CollisionMode collisionMode)
 {
 	for (int i = 0; i < candidates.size(); i++)
 	{
@@ -1506,7 +1506,7 @@ void btCable::secondaryNodesContact(btAlignedObjectArray<BroadPhasePair>& candid
 				{
 					rb = rb->m_redirectionTarget;
 				}
-				btVector3 impulse = calculateBodyImpulse(rb, n, finalNorm, finalPoint);
+				btVector3 impulse = calculateBodyImpulse(rb, n, finalNorm, finalPoint, collisionMode);
 				rb->applyRedirectionImpulse(impulse, finalPoint);
 			}
 
@@ -2159,7 +2159,7 @@ void btCable::bendingConstraint()
 
 #pragma region Contact Constraint
 
-void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts, bool updateNodesPos)
+void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairContacts, bool updateNodesPos, CollisionMode collisionMode)
 {
 	int nbContactPairPotential = pairContacts.size();
 	if (nbContactPairPotential == 0) return;
@@ -2216,7 +2216,7 @@ void btCable::contactConstraint(btAlignedObjectArray<NodePairNarrowPhase> pairCo
 
 			if (rb && impulseCompute)
 			{
-				btVector3 imp = calculateBodyImpulse(rb, node, pair->normal, pair->hitPoint);
+				btVector3 imp = calculateBodyImpulse(rb, node, pair->normal, pair->hitPoint, collisionMode);
 				rb->applyRedirectionImpulse(imp, pair->hitPoint);
 			}
 
@@ -2235,7 +2235,7 @@ btScalar btCable::computeCollisionMargin(const btCollisionShape* shape) const
 	return m_collisionMargin + shape->getMargin();
 }
 
-btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition)
+btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition, CollisionMode collisionMode)
 {
 	// a = node
 	// b = body
