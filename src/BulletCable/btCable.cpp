@@ -1525,14 +1525,17 @@ void btCable::depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidate
 	{
 		BroadPhasePair *pair = &candidates.at(i);
 		Node *n = pair->node;
+		btCollisionObject* obj = pair->body;
 
 		n = &m_secondaryPool.at(n->poolIndex).node;
 
 		// First contact test
 		_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), n->m_x));
-		MyContactResultCallback cb1(0, &_nodeContactObject, pair->body);
-		m_world->contactPairTest(&_nodeContactObject, pair->body, cb1);
+		MyContactResultCallback cb1(0, &_nodeContactObject, obj);
+		m_world->contactPairTest(&_nodeContactObject, obj, cb1);
 
+		btTransform currentTr = obj->getWorldTransform();
+		obj->setWorldTransform(obj->getPreviousWorldTransform());
 		if (cb1.m_connected && cb1.minDist < 0)
 		{
 			// Compute first projection (do not apply yet)
@@ -1540,8 +1543,8 @@ void btCable::depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidate
 
 			// Second contact test from projected position (corner case)
 			_nodeContactObject.setWorldTransform(btTransform(btQuaternion::getIdentity(), proj1));
-			MyContactResultCallback cb2(0, &_nodeContactObject, pair->body);
-			m_world->contactPairTest(&_nodeContactObject, pair->body, cb2);
+			MyContactResultCallback cb2(0, &_nodeContactObject, obj);
+			m_world->contactPairTest(&_nodeContactObject, obj, cb2);
 
 			// Choose the deepest penetration if both hit; otherwise keep the first
 			bool hit2 = (cb2.m_connected && cb2.minDist < 0);
@@ -1567,10 +1570,12 @@ void btCable::depenetrateBackups(btAlignedObjectArray<BroadPhasePair>& candidate
 			narrowPair.normal = finalNorm;
 			narrowPair.timeOfImpact = 0.0f;
 			narrowPair.distance = finalDistance;
-			narrowPair.worldTransform = pair->body->getWorldTransform();
-			narrowPair.margin = computeCollisionMargin(pair->body->getCollisionShape());
+			narrowPair.worldTransform = obj->getWorldTransform();
+			narrowPair.margin = computeCollisionMargin(obj->getCollisionShape());
 			outPairContatcs.push_back(narrowPair);
 		}
+
+		obj->setWorldTransform(currentTr);
 	}
 }
 
