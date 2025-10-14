@@ -289,7 +289,7 @@ private:
 	void predictMotion(btScalar dt) override;
 	void solveConstraints() override;
 	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
-	void anchorConstraint(bool& impacted);
+	void anchorConstraint();
 
 	void contactConstraint();
 	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
@@ -488,9 +488,9 @@ public:
 
 	void setWantedGrowSpeedAndDistance(btScalar speed, btScalar distance);
 	void setLinearMass(btScalar mass);
+	void updateNodesMass();
 
 	void setCollisionStiffness(btScalar stiffnessMin, btScalar stiffnessMax, btScalar distMin, btScalar distMax);
-	void setCollisionViscosity(btScalar viscosity);
 	void setCollisionResponseActive(bool active);
 	void setCollisionMode(int mode);
 	void setControlPoint(vector<btScalar> dataX, vector<btScalar> dataY);
