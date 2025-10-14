@@ -1134,8 +1134,8 @@ void btCable::anchorConstraint()
 		a.m_body->applyImpulse(-impulse, a.m_c1);
 
 		// Update node's position
-		// n.m_x += impulse * (!useMassBalance ? a.m_c2 : a.m_c2_massBalance);
-		n.m_x = wa;
+		n.m_x += impulse * (!useMassBalance ? a.m_c2 : a.m_c2_massBalance);
+		//n.m_x = wa;
 	}
 }
 
