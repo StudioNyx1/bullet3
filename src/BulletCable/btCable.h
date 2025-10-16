@@ -274,13 +274,21 @@ private:
 	// Node forces members
 	bool useHydroAero = true;
 
+	// XPDB
+	btScalar cableStiffness = 500 * 1e9;
+	btScalar dampingStiffness = 500 * 1e4;
+
 	float m_collisionMargin = 0;
 
 	btCable::CableData* m_cableData;
 	btCable::NodeData* m_nodeData;
 	btCable::NodePos* m_nodePos;
 
-	void distanceConstraint();
+	void distanceConstraint(int currentIter);
+	void distanceConstraintBullet();
+	void distanceConstraintBulletVariant();
+	void distanceConstraintXPBD();
+
 	void distanceConstraintLock(int limMin, int limMax);
 	void LRAConstraint();
 	void LRAHierachique();
