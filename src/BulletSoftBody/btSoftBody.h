@@ -316,6 +316,7 @@ public:
 		int m_nbCollidingObjectInFrame;  // Number of element in collision
 		btVector3 m_q;       // Previous step position/Test position
 		btVector3 m_v;       // Velocity
+		btVector3 m_q_sub;   // Previous substed position
 		btVector3 m_vn;      // Previous step velocity
 		btVector3 m_f;       // Force accumulator
 		btVector3 m_n;       // Normal
@@ -359,6 +360,7 @@ public:
 		btScalar m_c0;       // (ima+imb)*kLST
 		btScalar m_c1;       // rl^2
 		btScalar m_c2;       // |gradient|^2/c0
+		btScalar m_lambda = 0.0;   // Previous compliance
 
 		BT_DECLARE_ALIGNED_ALLOCATOR();
 	};

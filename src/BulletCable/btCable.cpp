@@ -148,6 +148,9 @@ void btCable::PrepareSolver()
 		node.computeNodeConstraint = true;
 		node.m_splitv = btVector3(0, 0, 0);
 		node.m_nbCollidingObjectPotential = 0;
+
+		// XPDB
+		node.m_q_sub = node.m_x;  // Reset each substep for damping
 	}
 
 	// Prepare links
@@ -156,6 +159,9 @@ void btCable::PrepareSolver()
 		Link& l = m_links[i];
 		l.m_c3 = l.m_n[1]->m_q - l.m_n[0]->m_q;
 		l.m_c2 = 1.0 / (l.m_c3.length2() * l.m_c0);
+
+		// XPDB
+		l.m_lambda = 0.0;
 	}
 
 	// Prepare anchors
@@ -219,7 +225,7 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 	anchorConstraint();
 
-	distanceConstraint();
+	distanceConstraint(currentIter);
 
 	if (useLRA)
 	{
@@ -1139,13 +1145,43 @@ void btCable::anchorConstraint()
 	}
 }
 
-void btCable::distanceConstraint()
+void btCable::distanceConstraint(int currentIter)
+{
+	//distanceConstraintBulletVariant();
+	//distanceConstraintBullet();
+	distanceConstraintXPBD();
+}
+
+void btCable::distanceConstraintBullet()
+{
+	BT_PROFILE("PSolve_Links");
+	for (int i = 0, ni = m_links.size(); i < ni; ++i)
+	{
+		Link& l = m_links[i];
+		if (l.m_c0 > 0)
+		{
+			Node& a = *l.m_n[0];
+			Node& b = *l.m_n[1];
+			const btVector3 del = b.m_x - a.m_x;
+			const btScalar len = del.length2();
+			if (l.m_c1 + len > SIMD_EPSILON)
+			{
+				const btScalar k = ((l.m_c1 - len) / (l.m_c0 * (l.m_c1 + len))) * 1.0;
+				a.m_x -= del * (k * a.m_im);
+				b.m_x += del * (k * b.m_im);
+			}
+		}
+	}
+}
+
+void btCable::distanceConstraintBulletVariant()
 {
 	BT_PROFILE("PSolve_Links");
 
 	Link* l;
 	Node* a;
 	Node* b;
+
 	for (int i = 0; i < m_links.size(); ++i)
 	{
 		l = &m_links[i];
@@ -1169,11 +1205,109 @@ void btCable::distanceConstraint()
 
 		btScalar sumInvMass = a->m_im + b->m_im;
 		if (sumInvMass >= SIMD_EPSILON)
+
 		{
 			btVector3 denom = 1 / sumInvMass * (normAB - l->m_rl) * ABNormalized;
 			a->m_x += (a->m_im * denom) * k;
 			b->m_x -= (b->m_im * denom) * k;
 		}
+	}
+}
+
+void btCable::distanceConstraintXPBD()
+{
+	BT_PROFILE("PSolve_Links");
+
+	Link* l;
+	Node* a;
+	Node* b;
+
+	const btScalar dt = m_sst.sdt;
+	const btScalar invDt2 = 1.0 / (dt * dt);
+
+	//// @TEST(jeremy) Physical based stiffness
+	//// https://en.wikipedia.org/wiki/Young%27s_modulus
+	//// https://en.wikipedia.org/wiki/Hooke%27s_law#Derived_formulae
+	//const btScalar crossSectionArea = SIMD_PI * m_cableData->radius * m_cableData->radius;  // m²
+	//const btScalar youngModulus = 300 * 1e09;  // Pa
+	//stiffness = crossSectionArea * youngModulus;
+	//// @TEST(jeremy) Physical based stiffness
+
+	// Scaled compliance to be deltaT independant
+	//cableStiffness = 500 * 1e9;
+	const btScalar alpha_t = 1.0 / cableStiffness * invDt2;
+
+	// Scaled damping to be deltaT independant
+	//dampingStiffness = 500 * 1e4;
+	const btScalar beta_t = dampingStiffness * dt * dt;
+	const btScalar gamma_t = (alpha_t * beta_t) / dt;
+
+
+	for (int i = 0; i < m_links.size(); ++i)
+	{
+		l = &m_links[i];
+		a = l->m_n[0];
+		b = l->m_n[1];
+		if (!a->computeNodeConstraint && !b->computeNodeConstraint)
+			continue;
+
+		a->computeNodeConstraint = true;
+		b->computeNodeConstraint = true;
+
+		// Guard against zero division error
+		if (a->m_im < SIMD_EPSILON && b->m_im < SIMD_EPSILON)
+		{
+			continue;
+		}
+
+		// Get cable segment
+		btVector3 AB = b->m_x - a->m_x;
+		btScalar L = AB.length();
+		if (L < SIMD_EPSILON)
+		{
+			continue;
+		}
+		btVector3 linkDirection = AB.normalized();
+
+		// XPBD
+		// @TODO(jeremy) Use squared distance constraint to be more numerically stable
+		// https://matthias-research.github.io/pages/publications/XPBD.pdf
+
+		// Distance constraint --> Cs​(b​, a​) = ∥b​−a∥ − L0
+		const btScalar C = L - l->m_rl;
+		// dC/d --> Power rule + chain rule --> 0.5 * d^0.5 * 2 * d --> d / ||d||
+		const btVector3 Ca_gradient = -linkDirection;
+		const btVector3 Cb_gradient = linkDirection;
+
+		// Rayleigh damping constraint -> Project relative motion onto the motion axis
+		// If segment is getting longer, the projection is positive and damping correction will pull them back in
+		// If segment is getting smaller, the projection is negative and damping correction will pull them apart
+		// ∇C·(xi - xn) = linkDirection · [xbi​−xbn, ​xai​−xan​​]
+		btScalar damping_constraint = linkDirection.dot((b->m_x - b->m_q_sub) - (a->m_x - a->m_q_sub));
+
+		// XPBD lagrangian
+		// ∇C(x) * Transpose(∇C(x)) = ∥∇C(x)∥2 = 1 (because ∥∇C(x)∥ == 1)
+		const btScalar invmeff = a->m_im + b->m_im;
+		const btScalar numer = -(C + alpha_t * l->m_lambda + gamma_t * damping_constraint);
+		const btScalar denom = (1.0 + gamma_t) * invmeff + alpha_t;
+		const btScalar dLambda = numer / denom;
+		l->m_lambda += dLambda;
+
+		//// @TEST(jeremy) Used to scale / boost lagrangian 
+		//const btScalar omegaRef = 1.0;
+		//btScalar omegaA = omegaRef;
+		//btScalar omegaB = omegaRef;
+		//const btVector3 dxA = a->m_im * Ca_gradient * dLambda * omegaA;
+		//const btVector3 dxB = b->m_im * Cb_gradient * dLambda * omegaB;
+		//a->m_x += dxA;
+		//b->m_x += dxB;
+		//// @TEST(jeremy) Used to scale / boost lagrangian 
+
+		// Update iteration (n and n-1) positions
+		const btVector3 dxA = a->m_im * Ca_gradient * dLambda;
+		const btVector3 dxB = b->m_im * Cb_gradient * dLambda;
+		a->m_x += dxA;
+		b->m_x += dxB;
 	}
 }
 
