@@ -396,6 +396,7 @@ public:
 	btScalar getRestLength();
 
 	btVector3 getTensionAt(int index);
+	btVector3 getLocalAnchorWithNode(int index);
 
 	void bendingConstraint();
 

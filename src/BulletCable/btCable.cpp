@@ -1621,6 +1621,19 @@ btVector3 btCable::getTensionAt(int index)
 		return btVector3(0, 0, 0);
 }
 
+btVector3 btCable::getLocalAnchorWithNode(int indexNode)
+{
+	for (int idxAnchor = 0; idxAnchor < m_anchors.size(); ++idxAnchor)
+	{
+		if (m_anchors[idxAnchor].m_node->index == indexNode)
+		{
+			return m_anchors[idxAnchor].m_local;
+		}
+	}
+
+	return btVector3(0, 0, 0);
+}
+
 void btCable::setBendingMaxAngle(btScalar angle)
 {
 	this->maxAngle = angle;
