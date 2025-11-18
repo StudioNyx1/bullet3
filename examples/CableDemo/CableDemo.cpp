@@ -3999,9 +3999,9 @@ static void Init_FixedJoint(CableDemo* pdemo)
 	btFixedConstraint* fixed = pdemo->createFixedConstraint(*rod, *cube, frameA, frameB, 256);
 }
 
-static void Init_ImpulseAnchor(CableDemo* pdemo)
+static void Init_Stability(CableDemo* pdemo)
 {
-	// Shape
+	// Shapes
 	btCollisionShape* updownBoxShape = new btBoxShape(btVector3(0.4, 0.1, 0.1));
 	btCollisionShape* lefrightBoxShape = new btBoxShape(btVector3(0.1, 0.4, 0.1));
 	btTransform upBoxTransform(btMatrix3x3::getIdentity(), btVector3(0,0.3,0));
@@ -4020,85 +4020,91 @@ static void Init_ImpulseAnchor(CableDemo* pdemo)
 	// Masses
 	btScalar massRingLest(10);
 	btScalar massRingA18(0);
-	btScalar massA18(10000);
+	btScalar massA18(704);
 
 	// Transform
 	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 10, 0));
 	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, 5, 0));
-	btTransform transformRingA18(btQuaternion(btVector3(0,1,0), 3.14/2.0), btVector3(0, 5-0.3, 0));
-	btTransform transformA18(btMatrix3x3::getIdentity(), btVector3(0, 5-2.35-0.3, 0));
+	btTransform transformRingA18(btQuaternion(btVector3(0,1,0), SIMD_HALF_PI), btVector3(0, 4.7, 0));
+	btTransform transformA18(btMatrix3x3::getIdentity(), btVector3(0, 2.35, 0));
 
-	// RB
+	// Attach Point
 	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1,0.1,0.1)));
 	attachPoint->setCollisionFlags(2); // attachPoint->getCollisionFlags();
 	attachPoint->setSleepingThresholds(0, 0);
 	attachPoint->setMassProps(0, btVector3(0,0,0));
-
+	
+	// Objet A (Lest)
 	btRigidBody* ringLest = pdemo->createRigidBody(massRingLest, transformRingLest, ringShape);
 	ringLest->setSleepingThresholds(0, 0);
 	// ringLest->updateMassAtImpact(true, massRingLest, 1000, 0.001, 1);
 
+	// Object B (A18's claws)
+	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
+	ringA18->setSleepingThresholds(0, 0);
+
+	// Objet C (A18)
 	btRigidBody* a18 = pdemo->createRigidBody(massA18, transformA18, a18Shape);
 	a18->setSleepingThresholds(0, 0);
 
-	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
-	ringA18->setSleepingThresholds(0, 0);
+	// Object B's set up
 	ringA18->m_redirectionTarget = a18;
 	ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.35, 0));
 	a18->m_Children.push_back(ringA18);
 
-	
 	// Cable's Waypoints
 	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
 	waypointPos.push_back(transformRingLest.getOrigin() + btVector3(0,0.3,0));
 	waypointPos.push_back(transformAttachPoint.getOrigin());
 
-	// Cable
-	btCable* cable = pdemo->createCableWaypoint(50, 50, 10, waypointPos, ringLest, attachPoint, true, true);
-	cable->setUseLRA(false);
+	// Cable's Parameters
+	int resolution = 30;
+	int iteration = 100;
+	double linearMass = 10;
 
+	// Cable
+	btCable* cable = pdemo->createCableWaypoint(resolution, iteration, linearMass, waypointPos, ringLest, attachPoint, true, true);
+	cable->setUseLRA(false);
 	cable->m_anchors[0].m_bodyMassRatio = 0.0;
 	cable->m_anchors[1].m_bodyMassRatio = 0.0;
+	cable->getCollisionShape()->setMargin(0.01);
+	cable->setCableRadius(0.05);
 
-	cable->getCollisionShape()->setMargin(0.01f);
-	cable->setCableRadius(0.05f);
-
-	//pdemo->SetCameraPosition(btVector3(0, -3, 0));
+	// Add the current cable to allow the user to debug it
 	pdemo->m_cable = cable;
-
 }
 
 void (*demofncs[])(CableDemo*) =
-	{
-		Init_CableForceDown,
-		Init_CableForceUp,
-		Init_Nodes,
-		Init_Weigths,
-		Init_Iterations,
-		Init_Lengths,
-		Init_TestArse,
-		Init_TestCollisionFreeCableWithStaticCube,
-		Init_TestSupportA18,
-		Init_Test1000Nodes,
-		Init_TestCollisionCableSphere,
-		Init_TestCollisionFallingA18Constraint,
-		Init_TestCollisionCableConvexHullOnMeshSphere,
-		Init_TestCollisionRingBox,
-		Init_TestCollisionRingSphere,
-		Init_TestCollisionOn1Node,
-		Init_TestClaw,
-		Init_Growth,
-		Init_TestCableCollisionMt,
-		Init_CableHydro,
-		Init_CableBending,
-		Init_TwoCablesOneCube,
-		Init_DetachA18,
-		Init_MCMVCable,
-		Init_BallJoint,
-		Init_FixedJoint,
-		Init_RayCast,
-		Init_Collision,
-		Init_ImpulseAnchor
+{
+	Init_CableForceDown,
+	Init_CableForceUp,
+	Init_Nodes,
+	Init_Weigths,
+	Init_Iterations,
+	Init_Lengths,
+	Init_TestArse,
+	Init_TestCollisionFreeCableWithStaticCube,
+	Init_TestSupportA18,
+	Init_Test1000Nodes,
+	Init_TestCollisionCableSphere,
+	Init_TestCollisionFallingA18Constraint,
+	Init_TestCollisionCableConvexHullOnMeshSphere,
+	Init_TestCollisionRingBox,
+	Init_TestCollisionRingSphere,
+	Init_TestCollisionOn1Node,
+	Init_TestClaw,
+	Init_Growth,
+	Init_TestCableCollisionMt,
+	Init_CableHydro,
+	Init_CableBending,
+	Init_TwoCablesOneCube,
+	Init_DetachA18,
+	Init_MCMVCable,
+	Init_BallJoint,
+	Init_FixedJoint,
+	Init_RayCast,
+	Init_Collision,
+	Init_Stability
 };
 
 ////////////////////////////////////
