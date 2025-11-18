@@ -185,7 +185,7 @@ private:
 	bool m_applyForceOnRigidbody;
 	bool m_moveBody;
 	bool m_attachLock;
-	bool m_printTens;
+	bool m_printAnchorData;
 	bool m_close = false;
 	bool m_grow = false;
 	bool m_growWithSpeedAndDistance = false;
@@ -250,7 +250,7 @@ public:
 		m_attachLock = false;
 		m_moveBody = false;
 		m_printFPS = false;
-		m_printTens = false;
+		m_printAnchorData = false;
 		m_cameraPosition = btVector3(0, 3, 0);
 		m_cameraDistance = 5;
 		m_cameraPitch = 0;
@@ -414,7 +414,7 @@ public:
 
 		if (key == 't' && state)
 		{
-			m_printTens = !m_printTens;
+			m_printAnchorData = !m_printAnchorData;
 		}
 
 		if (key == 'y' && state) // toggle stepping mode
@@ -657,16 +657,25 @@ public:
 		m_attachLock = false;
 	}
 
-	void printTension()
+	void printAnchorData()
 	{
 		for (int i = 0; i < getSoftDynamicsWorld()->getSoftBodyArray().size(); ++i)
 		{
 			btCable* cable = (btCable*)getSoftDynamicsWorld()->getSoftBodyArray().at(i);
 			for (int i = 0; i < cable->m_anchors.size(); i++)
 			{
-				if (cable->m_anchors.at(i).m_body->getInvMass() == 0) continue;
-				cout << " Tension on Anchor " << i << " - Node " << cable->m_anchors.at(i).m_node->index
-					 << " = " << cable->getTensionAt(i).length() << " - Mass " << 1.0 / cable->m_anchors.at(i).m_body->getInvMass() << endl;
+				auto anchor = cable->m_anchors.at(i);
+				auto node = anchor.m_node;
+				auto body = anchor.m_body;
+
+				cout << "Anchor[" << i << "]-Node[" << node->index << "]:" << "\n\t"
+					<< "Mass (Body):" << 1.0 / body->getInvMass() << "\n\t"
+					<< "Last Tension: " << anchor.m_lastTension.length() << "\n\t"
+					<< "Total Tension: " << anchor.m_totalTension.length() / substepSolver << "\n\t"
+					<< "Distance Anchor-Node: " << node->m_x.distance(body->getWorldTransform() * anchor.m_local) << "\n\t"
+					<< "Distance Cable: " << cable->getRestLength() << "\n\t"
+					<< "Mass Cable: " << cable->getTotalMass() << "\n\t"
+					<< endl;
 			}
 		}
 	}
@@ -828,8 +837,8 @@ public:
 				_cable->setUseLRA(true);
 			}
 			//attachLock();
-			if (m_printTens)
-				printTension();
+			if (m_printAnchorData)
+				printAnchorData();
 
 			if (m_grow)
 				Grows(deltaTime);
