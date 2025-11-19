@@ -440,9 +440,6 @@ void btCable::predictMotion(btScalar dt)
 	m_sst.radmrg = getCollisionShape()->getMargin();
 	m_sst.updmrg = m_sst.radmrg * (btScalar)0.25;
 
-	// Forces
-	// if (useGravity) addVelocity(m_gravity * m_sst.sdt);
-
 	// SoftRigidBody
 	NodeForces* nodeForces = ((btSoftRigidDynamicsWorld*)m_world)->m_nodeForces;
 	btVector3 nodeForceToApply = btVector3();
@@ -457,15 +454,15 @@ void btCable::predictMotion(btScalar dt)
 			// Get the Hydro and Aero forces
 			NodeForces currentNodeForces = nodeForces[m_cableData->startIndex + i];
 
-			// Integrate once (first sub step)
+			// Add gravity force
+			if (useGravity)
+			{
+				n.m_f += m_gravity / n.m_im;
+			}
+
+			// Extern forces (applied once)
 			if (m_world->GetIndexSubIteration() == 0)
 			{
-				// Add gravity force
-				if (useGravity)
-				{
-					n.m_f += m_gravity / n.m_im;
-				}
-
 				// Integrate forces only on first iteration
 				if (useHydroAero)
 				{
