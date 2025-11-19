@@ -555,8 +555,7 @@ void btSoftBody::appendAnchor(int node, btRigidBody* body, const btVector3& loca
 	a.m_influence = influence;
 	// Init to avoid garbage int the first anchorConstraint
 	a.m_dist = 0.0;
-	// 0.2% of body mass added to anchor node by default
-	a.m_bodyMassRatio = 0.002;
+	a.m_bodyMassRatio = 0.0;
 	m_anchors.push_back(a);
 
 	// Keep track of the number of anchor attached to this body
