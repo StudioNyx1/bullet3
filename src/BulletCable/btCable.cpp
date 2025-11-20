@@ -190,7 +190,11 @@ void btCable::PrepareSolver()
 		a.m_c2 = m_sst.sdt * invMassNode;
 		a.m_c2_massBalance = m_sst.sdt * invTweakedMass;
 		a.m_body->activate();
-		a.m_tension = btVector3(0, 0, 0);
+		if (m_world->GetIndexSubIteration() == 0)
+		{
+			a.m_totalTension = btVector3(0, 0, 0);
+		}
+		a.m_lastTension = btVector3(0, 0, 0);
 	}
 
 	// Prepare contacts
@@ -1123,13 +1127,14 @@ void btCable::anchorConstraint()
 		btVector3 impulse = (!useMassBalance ? a.m_c0 : a.m_c0_massBalance) * vr * a.m_influence;
 
 		// Limit the impulse
-		btScalar currentTension = a.m_tension.length();
-		a.m_tension += impulse / dt;
-		btScalar finalTension = a.m_tension.length();
+		btScalar currentTension = a.m_lastTension.length();
+		a.m_lastTension += impulse / dt;
+		a.m_totalTension += impulse / dt;
+		btScalar finalTension = a.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
-			a.m_tension = a.m_tension.normalized() * m_maxTension;
-			impulse *= (a.m_tension.length() - currentTension) / (finalTension - currentTension);
+			a.m_lastTension = a.m_lastTension.normalized() * m_maxTension;
+			impulse *= (a.m_lastTension.length() - currentTension) / (finalTension - currentTension);
 		}
 
 		// Update anchor's data
@@ -1747,7 +1752,7 @@ btVector3 btCable::getTensionAt(int index)
 {
 	int size = m_anchors.size();
 	if (index < size && index >= 0)
-		return m_anchors[index].m_tension;
+		return m_anchors[index].m_lastTension;
 	else
 		return btVector3(0, 0, 0);
 }

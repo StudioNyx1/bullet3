@@ -501,7 +501,8 @@ public:
 		btVector3 m_c1;		            // Relative anchor
 		btScalar m_c2;		            // ima*dt
 		btScalar m_c2_massBalance;		// tweaked ima*dt
-		btVector3 m_tension;            // tension at this anchor
+		btVector3 m_lastTension;        // calculated tension for the last substep
+		btVector3 m_totalTension;       // calculated tension for all the substeps
 		btScalar m_dist;			    // Last distance known between anchor posiiton and node position
 		btScalar m_bodyMassRatio;       // Body added mass to node
 	};
