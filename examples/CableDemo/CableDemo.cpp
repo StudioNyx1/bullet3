@@ -675,6 +675,7 @@ public:
 					<< "Distance Anchor-Node: " << node->m_x.distance(body->getWorldTransform() * anchor.m_local) << "\n\t"
 					<< "Distance Cable: " << cable->getRestLength() << "\n\t"
 					<< "Mass Cable: " << cable->getTotalMass() << "\n\t"
+					<< "Mass Node: " << 1.0 / node->m_im << "\n\t"
 					<< endl;
 			}
 		}
@@ -4027,12 +4028,12 @@ static void Init_Stability(CableDemo* pdemo)
 	btBoxShape* a18Shape = new btBoxShape(btVector3(0.6, 2, 0.6));
 
 	// Masses
-	btScalar massRingLest(10);
+	btScalar massRingLest(6200);
 	btScalar massRingA18(0);
 	btScalar massA18(704);
 
 	// Transform
-	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 10, 0));
+	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 7.7, 0));
 	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, 5, 0));
 	btTransform transformRingA18(btQuaternion(btVector3(0,1,0), SIMD_HALF_PI), btVector3(0, 4.7, 0));
 	btTransform transformA18(btMatrix3x3::getIdentity(), btVector3(0, 2.35, 0));
@@ -4048,18 +4049,21 @@ static void Init_Stability(CableDemo* pdemo)
 	ringLest->setSleepingThresholds(0, 0);
 	// ringLest->updateMassAtImpact(true, massRingLest, 1000, 0.001, 1);
 
-	// Object B (A18's claws)
-	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
-	ringA18->setSleepingThresholds(0, 0);
+	// // Object B (A18's claws)
+	// btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
+	// ringA18->setSleepingThresholds(0, 0);
+	// 
+	// // Objet C (A18)
+	// btRigidBody* a18 = pdemo->createRigidBody(massA18, transformA18, a18Shape);
+	// a18->setSleepingThresholds(0, 0);
+	// 
+	// // Object B's set up
+	// ringA18->m_redirectionTarget = a18;
+	// ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.35, 0));
+	// a18->m_Children.push_back(ringA18);
 
-	// Objet C (A18)
-	btRigidBody* a18 = pdemo->createRigidBody(massA18, transformA18, a18Shape);
-	a18->setSleepingThresholds(0, 0);
-
-	// Object B's set up
-	ringA18->m_redirectionTarget = a18;
-	ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.35, 0));
-	a18->m_Children.push_back(ringA18);
+	// Object D (ground)
+	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion::getIdentity(), btVector3(0,4,0)), new btBoxShape(btVector3(10,0.2,10)));
 
 	// Cable's Waypoints
 	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
@@ -4067,16 +4071,17 @@ static void Init_Stability(CableDemo* pdemo)
 	waypointPos.push_back(transformAttachPoint.getOrigin());
 
 	// Cable's Parameters
-	int resolution = 30;
+	int resolution = 20;
 	int iteration = 100;
 	double linearMass = 10;
 
 	// Cable
 	btCable* cable = pdemo->createCableWaypoint(resolution, iteration, linearMass, waypointPos, ringLest, attachPoint, true, true);
+	cable->setUseBending(false);
 	cable->setUseLRA(false);
 	cable->m_anchors[0].m_bodyMassRatio = 0.0;
 	cable->m_anchors[1].m_bodyMassRatio = 0.0;
-	cable->getCollisionShape()->setMargin(0.01);
+	cable->getCollisionShape()->setMargin(0.025);
 	cable->setCableRadius(0.05);
 
 	// Add the current cable to allow the user to debug it
