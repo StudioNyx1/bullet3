@@ -670,8 +670,11 @@ public:
 
 				cout << "Anchor[" << i << "]-Node[" << node->index << "]:" << "\n\t"
 					<< "Mass (Body):" << 1.0 / body->getInvMass() << "\n\t"
-					<< "Tension: " << cable->getTensionAt(i).length() << "\n\t"
+					<< "Last Tension: " << anchor.m_lastTension.length() << "\n\t"
+					<< "Total Tension: " << anchor.m_totalTension.length() / substepSolver << "\n\t"
 					<< "Distance Anchor-Node: " << node->m_x.distance(body->getWorldTransform() * anchor.m_local) << "\n\t"
+					<< "Distance Cable: " << cable->getRestLength() << "\n\t"
+					<< "Mass Cable: " << cable->getTotalMass() << "\n\t"
 					<< endl;
 			}
 		}
