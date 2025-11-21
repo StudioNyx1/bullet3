@@ -165,6 +165,7 @@ void btCable::PrepareSolver()
 	}
 
 	// Prepare anchors
+	doAnchorPlacement = true;
 	for (i = 0, ni = this->m_anchors.size(); i < ni; ++i)
 	{
 		Anchor& a = this->m_anchors[i];
@@ -198,6 +199,10 @@ void btCable::PrepareSolver()
 		{
 			a.m_totalTension = btVector3(0, 0, 0);
 		}
+
+		// When a node's mass is greater than 5% of the attached body's mass, we cancel out the AnchorConstraintPlacement
+		bool canAnchorPlacement = massBody < FLT_EPSILON ? true : (tweakedMass/massBody < 5.0/100.0);
+		doAnchorPlacement = doAnchorPlacement && canAnchorPlacement;
 	}
 
 	// Prepare contacts
@@ -262,6 +267,11 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 void btCable::EndConstraintsSolve()
 {
+	if (doAnchorPlacement)
+	{
+		anchorConstraintPlacement();
+	}
+
 	for (int i = 0; i < m_anchors.size(); ++i)
 	{
 		Anchor& anchor = this->m_anchors[i];
@@ -1145,11 +1155,44 @@ void btCable::anchorConstraint()
 	}
 }
 
+void btCable::anchorConstraintPlacement()
+{
+	const btScalar kAHR = m_cfg.kAHR;
+	const btScalar dt = m_sst.sdt;
+
+	for (int i = 0, ni = this->m_anchors.size(); i < ni; ++i)
+	{
+		Anchor& a = m_anchors[i]; 
+		const btTransform& t = a.m_body->getWorldTransform();
+		Node& n = *a.m_node;
+
+		const btVector3 wa = t * a.m_local;
+		const btVector3 va = a.m_body->getVelocityInLocalPoint(a.m_c1) * dt;
+		const btVector3 vb = n.m_x - n.m_q_sub;
+		const btVector3 vr = (va - vb) + (wa - n.m_x) * kAHR;
+		btVector3 impulse = a.m_c0_massBalance * vr * a.m_influence;
+		
+		btScalar currentTension = a.m_lastTension.length();
+		a.m_lastTension += impulse / dt;
+		a.m_totalTension += impulse / dt;
+		btScalar finalTension = a.m_lastTension.length();
+		if (m_maxTension >= 0 && finalTension >= m_maxTension)
+		{
+			a.m_lastTension = a.m_lastTension.normalized() * m_maxTension;
+			impulse *= (a.m_lastTension.length() - currentTension) / (finalTension - currentTension);
+		}
+		
+		a.m_dist = wa.distance(n.m_x);
+		n.m_x = wa;
+		a.m_body->applyImpulse(-impulse, a.m_c1);
+	}
+}
+
 void btCable::distanceConstraint(int currentIter)
 {
-	//distanceConstraintBulletVariant();
-	//distanceConstraintBullet();
-	distanceConstraintXPBD();
+	// distanceConstraintBulletVariant();
+	distanceConstraintBullet();
+	// distanceConstraintXPBD();
 }
 
 void btCable::distanceConstraintBullet()
