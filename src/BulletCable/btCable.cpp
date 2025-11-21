@@ -1152,7 +1152,7 @@ void btCable::anchorConstraint()
 		Node& n = *a.m_node;
 		const btVector3 wa = t * a.m_local;
 		const btVector3 va = a.m_body->getVelocityInLocalPoint(a.m_c1) * dt;
-		const btVector3 vb = n.m_x - n.m_q;
+		const btVector3 vb = n.m_x - n.m_q_sub;
 		const btVector3 vr = (va - vb) + (wa - n.m_x) * kAHR;
 		btVector3 impulse = a.m_c0_massBalance * vr * a.m_influence;
 
