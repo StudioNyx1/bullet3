@@ -239,6 +239,7 @@ private:
 	bool useBending = true;
 	bool useGravity = true;
 	bool useCollision = true;
+	bool doAnchorPlacement = false;
 	btScalar m_linearMass = 1.0;
 	btScalar m_maxTension = -1.0;
 
@@ -298,6 +299,7 @@ private:
 	void solveConstraints() override;
 	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
 	void anchorConstraint();
+	void anchorConstraintPlacement();
 
 	void contactConstraint();
 	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
