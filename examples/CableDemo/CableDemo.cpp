@@ -675,6 +675,7 @@ public:
 					<< "Distance Anchor-Node: " << node->m_x.distance(body->getWorldTransform() * anchor.m_local) << "\n\t"
 					<< "Distance Cable: " << cable->getRestLength() << "\n\t"
 					<< "Mass Cable: " << cable->getTotalMass() << "\n\t"
+					<< "Mass Node: " << 1.0 / node->m_im << "\n\t"
 					<< endl;
 			}
 		}
@@ -4032,7 +4033,7 @@ static void Init_Stability(CableDemo* pdemo)
 	btScalar massA18(704);
 
 	// Transform
-	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 5.7, 0));
+	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 7.7, 0));
 	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, 5, 0));
 	btTransform transformRingA18(btQuaternion(btVector3(0,1,0), SIMD_HALF_PI), btVector3(0, 4.7, 0));
 	btTransform transformA18(btMatrix3x3::getIdentity(), btVector3(0, 2.35, 0));
@@ -4070,16 +4071,16 @@ static void Init_Stability(CableDemo* pdemo)
 	waypointPos.push_back(transformAttachPoint.getOrigin());
 
 	// Cable's Parameters
-	int resolution = 5;
+	int resolution = 20;
 	int iteration = 100;
-	double linearMass = 1;
+	double linearMass = 10;
 
 	// Cable
 	btCable* cable = pdemo->createCableWaypoint(resolution, iteration, linearMass, waypointPos, ringLest, attachPoint, true, true);
 	cable->setUseBending(false);
 	cable->setUseLRA(false);
-	cable->m_anchors[0].m_bodyMassRatio = 0.2;
-	cable->m_anchors[1].m_bodyMassRatio = 0.2;
+	cable->m_anchors[0].m_bodyMassRatio = 0.0;
+	cable->m_anchors[1].m_bodyMassRatio = 0.0;
 	cable->getCollisionShape()->setMargin(0.025);
 	cable->setCableRadius(0.05);
 
