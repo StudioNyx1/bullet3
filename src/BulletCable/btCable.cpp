@@ -168,33 +168,36 @@ void btCable::PrepareSolver()
 	for (i = 0, ni = this->m_anchors.size(); i < ni; ++i)
 	{
 		Anchor& a = this->m_anchors[i];
-		const btVector3 ra = a.m_body->getWorldTransform().getBasis() * a.m_local;
-		const auto& invInertiaTensorWorld = a.m_body->getInvInertiaTensorWorld();
+		Node* n = a.m_node;
+		btRigidBody* b = a.m_body; 
+
+		// Relative anchor position
+		const btVector3 ra = b->getWorldTransform().getBasis() * a.m_local;
 
 		// Node's masses
-		const double invMassNode = a.m_node->m_im;
+		const double invMassNode = n->m_im;
 		const double massNode = invMassNode < FLT_EPSILON ? 0.0 : 1.0 / invMassNode;
 
 		// Body's masses
-		const double invMassBody = a.m_body->getInvMass();
-		const double massBody = a.m_body->getMass();
+		const double invMassBody = b->getInvMass();
+		const double massBody = b->getMass();
 
-		// // Tweaked mass
+		// Tweaked mass
 		const double tweakedMass = massNode + massBody * a.m_bodyMassRatio;
 		const double invTweakedMass = tweakedMass < FLT_EPSILON ? 0.0 : 1.0 / tweakedMass;
 
 		// Masses' matrices
-		a.m_c0 = ImpulseMatrix(m_sst.sdt, invMassNode, invMassBody, invInertiaTensorWorld, ra);
-		a.m_c0_massBalance = ImpulseMatrix(m_sst.sdt, invTweakedMass, invMassBody, invInertiaTensorWorld, ra);
+		a.m_c0 = ImpulseMatrix(m_sst.sdt, invMassNode, invMassBody, b->getInvInertiaTensorWorld(), ra);
+		a.m_c0_massBalance = ImpulseMatrix(m_sst.sdt, invTweakedMass, invMassBody, b->getInvInertiaTensorWorld(), ra);
 		a.m_c1 = ra;
 		a.m_c2 = m_sst.sdt * invMassNode;
 		a.m_c2_massBalance = m_sst.sdt * invTweakedMass;
 		a.m_body->activate();
+		a.m_lastTension = btVector3(0, 0, 0);	
 		if (m_world->GetIndexSubIteration() == 0)
 		{
 			a.m_totalTension = btVector3(0, 0, 0);
 		}
-		a.m_lastTension = btVector3(0, 0, 0);
 	}
 
 	// Prepare contacts
@@ -1145,16 +1148,14 @@ void btCable::anchorConstraint()
 	for (int i = 0, ni = this->m_anchors.size(); i < ni; ++i)
 	{
 		Anchor& a = m_anchors[i];
+		const btTransform& t = a.m_body->getWorldTransform();
 		Node& n = *a.m_node;
-
-		bool useMassBalance = a.m_bodyMassRatio > 0;
-		const btVector3 wa = a.m_body->getWorldTransform() * a.m_local;
+		const btVector3 wa = t * a.m_local;
 		const btVector3 va = a.m_body->getVelocityInLocalPoint(a.m_c1) * dt;
 		const btVector3 vb = n.m_x - n.m_q;
 		const btVector3 vr = (va - vb) + (wa - n.m_x) * kAHR;
-		btVector3 impulse = (!useMassBalance ? a.m_c0 : a.m_c0_massBalance) * vr * a.m_influence;
+		btVector3 impulse = a.m_c0_massBalance * vr * a.m_influence;
 
-		// Limit the impulse
 		btScalar currentTension = a.m_lastTension.length();
 		a.m_lastTension += impulse / dt;
 		a.m_totalTension += impulse / dt;
@@ -1167,11 +1168,8 @@ void btCable::anchorConstraint()
 
 		// Update anchor's data
 		a.m_dist = wa.distance(n.m_x);
+		n.m_x += impulse * a.m_c2_massBalance;
 		a.m_body->applyImpulse(-impulse, a.m_c1);
-
-		// Update node's position
-		n.m_x += impulse * (!useMassBalance ? a.m_c2 : a.m_c2_massBalance);
-		//n.m_x = wa;
 	}
 }
 
