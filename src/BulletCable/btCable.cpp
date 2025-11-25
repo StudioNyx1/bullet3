@@ -1327,7 +1327,7 @@ void btCable::distanceConstraintXPBD()
 		// If segment is getting longer, the projection is positive and damping correction will pull them back in
 		// If segment is getting smaller, the projection is negative and damping correction will pull them apart
 		// ∇C·(xi - xn) = linkDirection · [xbi​−xbn, ​xai​−xan​​]
-		btScalar damping_constraint = linkDirection.dot((b->m_x - b->m_q_sub) - (a->m_x - a->m_q_sub));
+		btScalar damping_constraint = linkDirection.dot((b->m_x - b->m_q) - (a->m_x - a->m_q));
 
 		// XPBD lagrangian
 		// ∇C(x) * Transpose(∇C(x)) = ∥∇C(x)∥2 = 1 (because ∥∇C(x)∥ == 1)
