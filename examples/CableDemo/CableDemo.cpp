@@ -4081,6 +4081,7 @@ static void Init_Stability(CableDemo* pdemo)
 	cable->setUseLRA(false);
 	cable->m_anchors[0].m_bodyMassRatio = 0.0;
 	cable->m_anchors[1].m_bodyMassRatio = 0.0;
+	cable->setDistanceMode(2);
 	cable->getCollisionShape()->setMargin(0.025);
 	cable->setCableRadius(0.05);
 
