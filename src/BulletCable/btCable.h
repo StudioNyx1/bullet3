@@ -32,11 +32,20 @@ public:
 ///Its purpose is to be able to create a cable/rope with our own method parameters that Bullet does not implement.
 class btCable : public btSoftBody
 {
+	typedef void (btCable::* DistanceFunction)();
+
 	enum class CollisionMode
 	{
 		Base = 0, // No additional coefficient applied
 		Linear,	// Linear coefficient depending on penetration
 		Curve // depending on user given curve
+	};
+
+	enum class DistanceMode
+	{
+		Bullet = 0, // Original distance constraint from Bullet
+		BulletVariant, // Modified distance constraint evolving with node's masses 
+		XPBD // Modified distance constraint from XPBD
 	};
 
 	//
@@ -348,6 +357,9 @@ public:
 	btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m);
 
 	CollisionMode collisionMode;
+	DistanceMode m_distanceMode;
+	DistanceFunction m_distanceFunction; // avoid a lot of "if/switch" statements
+
 	btScalar WantedDistance = 0;
 	btScalar WantedSpeed = 0;
 	btScalar forceResponseCoef;
@@ -511,6 +523,9 @@ public:
 	void setMaxTension(btScalar maxTension);
 
 	bool shouldTestObject(btCollisionObject* colObj) const;
+
+	void setDistanceMode(int mode);
+	int getDistanceMode();
 
 #pragma endregion
 };

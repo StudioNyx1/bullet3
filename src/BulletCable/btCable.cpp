@@ -67,6 +67,7 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	_nodeContactObject = btCollisionObject();
 	_nodeContactTransform = btTransform::getIdentity();
 	_nodeContactObject.setCollisionShape(&_nodeContactSphere);
+	setDistanceMode((int) DistanceMode::BulletVariant);
 }
 
 void btCable::updateLength(btScalar dt)
@@ -1190,9 +1191,7 @@ void btCable::anchorConstraintPlacement()
 
 void btCable::distanceConstraint(int currentIter)
 {
-	// distanceConstraintBulletVariant();
-	distanceConstraintBullet();
-	// distanceConstraintXPBD();
+	(this->*m_distanceFunction)();
 }
 
 void btCable::distanceConstraintBullet()
@@ -2070,6 +2069,28 @@ void btCable::setCollisionResponseActive(bool active)
 int btCable::getGrowingState()
 {
 	return m_growingState;
+}
+
+void btCable::setDistanceMode(int mode)
+{
+	m_distanceMode = (DistanceMode)mode;
+	switch(m_distanceMode)
+	{
+		case DistanceMode::Bullet:
+			m_distanceFunction = &btCable::distanceConstraintBullet;
+			break;
+		case DistanceMode::BulletVariant:
+			m_distanceFunction = &btCable::distanceConstraintBulletVariant;
+			break;
+		case DistanceMode::XPBD:
+			m_distanceFunction = &btCable::distanceConstraintXPBD;
+			break;
+	}
+}
+
+int btCable::getDistanceMode()
+{
+	return (int)m_distanceMode;
 }
 
 #pragma endregion
