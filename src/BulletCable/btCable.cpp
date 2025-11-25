@@ -451,42 +451,38 @@ void btCable::predictMotion(btScalar dt)
 		float addedMass = 0.0f;
 		if (isActive())
 		{
-			// Get the Hydro and Aero forces
-			NodeForces currentNodeForces = nodeForces[m_cableData->startIndex + i];
-
 			// Add gravity force
 			if (useGravity)
 			{
 				n.m_f += m_gravity / n.m_im;
 			}
 
-			// Extern forces (applied once)
-			if (m_world->GetIndexSubIteration() == 0)
+			// Integrate forces only on first iteration
+			if (useHydroAero)
 			{
-				// Integrate forces only on first iteration
-				if (useHydroAero)
-				{
-					// We check if currentNodeForces are correct, if not, then we dont apply these forces.
-					if (std::isinf(currentNodeForces.x) || std::isnan(currentNodeForces.x) || std::isinf(currentNodeForces.y) || std::isnan(currentNodeForces.y) || std::isinf(currentNodeForces.z) || std::isnan(currentNodeForces.z))
-					{
-						cableState = InternalForcesError;
-					}
-					else
-					{
-						n.m_f.setValue(n.m_f.getX() + currentNodeForces.x, n.m_f.getY() + currentNodeForces.y, n.m_f.getZ() + currentNodeForces.z);
-					}
-				}
-			}
+				// Get the Hydro and Aero forces
+				NodeForces& currentNodeForces = nodeForces[m_cableData->startIndex + i];
 
-			// Integrate addedMass for each substep
-			addedMass = currentNodeForces.ma;
+				// TODO @BenH. : Verif a déplacer dans Unity (appliqué 4 fois)
+				// We check if currentNodeForces are correct, if not, then we dont apply these forces.
+				if (std::isinf(currentNodeForces.x) || std::isnan(currentNodeForces.x) || std::isinf(currentNodeForces.y) || std::isnan(currentNodeForces.y) || std::isinf(currentNodeForces.z) || std::isnan(currentNodeForces.z))
+				{
+					cableState = InternalForcesError;
+				}
+				else
+				{
+					n.m_f.setValue(n.m_f.getX() + currentNodeForces.x, n.m_f.getY() + currentNodeForces.y, n.m_f.getZ() + currentNodeForces.z);
+				}
+
+				// Integrate addedMass for each substep
+				addedMass = currentNodeForces.ma;
+			}
 		}
 
 		const btScalar mass = 1.0f / n.m_im + addedMass;
 		btVector3 acceleration = n.m_f / mass;
 		n.m_v += acceleration * m_sst.sdt;
 		n.m_x += n.m_v * m_sst.sdt;
-
 		n.m_f = btVector3(0, 0, 0);
 	}
 
