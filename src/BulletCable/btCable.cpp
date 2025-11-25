@@ -1224,6 +1224,7 @@ void btCable::distanceConstraint(int currentIter)
 void btCable::distanceConstraintBullet()
 {
 	BT_PROFILE("PSolve_Links");
+	const btScalar stiffness = m_materials[0]->m_kLST;
 	for (int i = 0, ni = m_links.size(); i < ni; ++i)
 	{
 		Link& l = m_links[i];
@@ -1235,7 +1236,7 @@ void btCable::distanceConstraintBullet()
 			const btScalar len = del.length2();
 			if (l.m_c1 + len > SIMD_EPSILON)
 			{
-				const btScalar k = ((l.m_c1 - len) / (l.m_c0 * (l.m_c1 + len))) * 1.0;
+				const btScalar k = ((l.m_c1 - len) / (l.m_c0 * (l.m_c1 + len))) * stiffness;
 				a.m_x -= del * (k * a.m_im);
 				b.m_x += del * (k * b.m_im);
 			}
@@ -1270,15 +1271,15 @@ void btCable::distanceConstraintBulletVariant()
 		}
 		btVector3 ABNormalized = AB.normalized();
 		btScalar normAB = AB.length();
-		btScalar k = m_materials[0]->m_kLST;
+		btScalar stiffness = m_materials[0]->m_kLST;
 
 		btScalar sumInvMass = a->m_im + b->m_im;
 		if (sumInvMass >= SIMD_EPSILON)
 
 		{
 			btVector3 denom = 1 / sumInvMass * (normAB - l->m_rl) * ABNormalized;
-			a->m_x += (a->m_im * denom) * k;
-			b->m_x -= (b->m_im * denom) * k;
+			a->m_x += (a->m_im * denom) * stiffness;
+			b->m_x -= (b->m_im * denom) * stiffness;
 		}
 	}
 }
@@ -1293,6 +1294,7 @@ void btCable::distanceConstraintXPBD()
 
 	const btScalar dt = m_sst.sdt;
 	const btScalar invDt2 = 1.0 / (dt * dt);
+	const btScalar stiffness = m_materials[0]->m_kLST;
 
 	//// @TEST(jeremy) Physical based stiffness
 	//// https://en.wikipedia.org/wiki/Young%27s_modulus
@@ -1303,11 +1305,10 @@ void btCable::distanceConstraintXPBD()
 	//// @TEST(jeremy) Physical based stiffness
 
 	// Scaled compliance to be deltaT independant
-	//cableStiffness = 500 * 1e9;
-	const btScalar alpha_t = 1.0 / cableStiffness * invDt2;
+	// const btScalar alpha_t = 1.0 / cableStiffness * invDt2;
+	const btScalar alpha_t = btClamped(1.0 - stiffness, 0.0, 1.0) * invDt2;
 
 	// Scaled damping to be deltaT independant
-	//dampingStiffness = 500 * 1e4;
 	const btScalar beta_t = dampingStiffness * dt * dt;
 	const btScalar gamma_t = (alpha_t * beta_t) / dt;
 
