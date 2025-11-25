@@ -286,7 +286,7 @@ private:
 
 	// XPDB
 	btScalar cableStiffness = 500 * 1e9;
-	btScalar dampingStiffness = 500 * 1e4;
+	btScalar dampingStiffness = 0;
 
 	float m_collisionMargin = 0;
 
