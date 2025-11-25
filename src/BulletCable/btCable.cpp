@@ -67,6 +67,8 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	_nodeContactObject = btCollisionObject();
 	_nodeContactTransform = btTransform::getIdentity();
 	_nodeContactObject.setCollisionShape(&_nodeContactSphere);
+	setDistanceMode((int) DistanceMode::BulletVariant);
+	m_collisionMode = CollisionMode::Base;
 }
 
 void btCable::updateLength(btScalar dt)
@@ -1218,9 +1220,7 @@ void btCable::anchorConstraintPlacement()
 
 void btCable::distanceConstraint(int currentIter)
 {
-	// distanceConstraintBulletVariant();
-	distanceConstraintBullet();
-	// distanceConstraintXPBD();
+	(this->*m_distanceFunction)();
 }
 
 void btCable::distanceConstraintBullet()
@@ -1735,13 +1735,13 @@ btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 nor
 	btVector3 impulse = -(normal * jn + tangentDir * jt) / m_sst.sdt;
 
 	btScalar k = 1.0f;
-	if (collisionMode == CollisionMode::Linear && penetrationDistance > penetrationMin)
+	if (m_collisionMode == CollisionMode::Linear && penetrationDistance > penetrationMin)
 	{
 		btScalar distanceTot = penetrationMax - penetrationMin;
 		btScalar ratio = (penetrationDistance - penetrationMin) / distanceTot;
 		k = Lerp(this->collisionStiffnessMin, this->collisionStiffnessMax, min(1.0, ratio));		
 	}
-	else if (collisionMode == CollisionMode::Curve && spline)
+	else if (m_collisionMode == CollisionMode::Curve && spline)
 	{
 		k = spline->eval(penetrationDistance);
 
@@ -1798,7 +1798,7 @@ void btCable::setMaxTension(btScalar maxTension)
 
 void btCable::setCollisionMode(int mode)
 {
-	collisionMode = (CollisionMode)mode;
+	m_collisionMode = (CollisionMode)mode;
 }
 
 btScalar btCable::getRestLength()
@@ -1935,7 +1935,7 @@ int btCable::getCableState()
 
 int btCable::getCollisionMode()
 {
-	return (int)collisionMode;
+	return (int)m_collisionMode;
 }
 
 void btCable::appendNode(const btVector3& x, btScalar m)
@@ -2101,6 +2101,28 @@ void btCable::setCollisionResponseActive(bool active)
 int btCable::getGrowingState()
 {
 	return m_growingState;
+}
+
+void btCable::setDistanceMode(int mode)
+{
+	m_distanceMode = (DistanceMode)mode;
+	switch(m_distanceMode)
+	{
+		case DistanceMode::Bullet:
+			m_distanceFunction = &btCable::distanceConstraintBullet;
+			break;
+		case DistanceMode::BulletVariant:
+			m_distanceFunction = &btCable::distanceConstraintBulletVariant;
+			break;
+		case DistanceMode::XPBD:
+			m_distanceFunction = &btCable::distanceConstraintXPBD;
+			break;
+	}
+}
+
+int btCable::getDistanceMode()
+{
+	return (int)m_distanceMode;
 }
 
 #pragma endregion
