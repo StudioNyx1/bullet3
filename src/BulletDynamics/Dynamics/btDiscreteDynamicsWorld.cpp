@@ -205,6 +205,8 @@ btDiscreteDynamicsWorld::btDiscreteDynamicsWorld(btDispatcher* dispatcher, btBro
 	  m_latencyMotionStateInterpolation(true)
 
 {
+	m_globalFrameCounter = 0;
+	
 	if (!m_constraintSolver)
 	{
 		void* mem = btAlignedAlloc(sizeof(btSequentialImpulseConstraintSolver), 16);
@@ -554,6 +556,8 @@ void btDiscreteDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
 	{
 		(*m_internalPreTickCallback)(this, timeStep);
 	}
+	
+	m_globalFrameCounter++;
 
 	///apply gravity, predict motion
 	predictUnconstraintMotion(timeStep);
@@ -1213,7 +1217,7 @@ void btDiscreteDynamicsWorld::integrateTransforms(btScalar timeStep)
 	{
 		btCollisionObject* co = getCollisionObjectArray()[i];
 		btRigidBody* rb = btRigidBody::upcast(co);
-		if (rb) rb->updateKinematicChildren(timeStep);	
+		if (rb) rb->updateBulletChildren(timeStep, m_globalFrameCounter);	
 	}
 
 	///this should probably be switched on by default, but it is not well tested yet
@@ -1265,7 +1269,7 @@ void btDiscreteDynamicsWorld::predictUnconstraintMotion(btScalar timeStep)
 			// body->applyDamping(timeStep);
 
 			body->predictIntegratedTransform(timeStep, body->getInterpolationWorldTransform());
-			body->updateKinematicChildrenInterpolated(timeStep);
+			body->updateBulletChildrenInterpolated(timeStep, m_globalFrameCounter);
 		}
 	}
 }

@@ -105,7 +105,8 @@ public:
 	int m_anchorsCount{0};
 
 	// to synchronize the bodies of the kinematics (for Unity)
-	std::vector<btRigidBody*> m_kinematicChildren;
+	btRigidBody* m_parent;
+	std::vector<btRigidBody*> m_Children;
 	btRigidBody* m_cableCollision;
 	btRigidBody* m_redirectionTarget;
 	btTransform m_localTransform;
@@ -122,6 +123,12 @@ protected:
 	btVector3 m_pushVelocity;
 	btVector3 m_turnVelocity;
 
+private:
+	uint64_t m_lastUpdateFrame = 0; // Last frame where the hierarchy was updated
+	uint64_t m_lastInterpolatedUpdateFrame = 0; // Last frame where the interpolated hierarchy was updated
+	void updateBulletChildrenRecursive(btScalar timeStep, unsigned int currentFrame);
+	void updateBulletChildrenInterpolatedRecursive(btScalar timeStep, unsigned int currentFrame);
+	
 public:
 	///The btRigidBodyConstructionInfo structure provides information to create a rigid body. Setting mass to zero creates a fixed (non-dynamic) rigid body.
 	///For dynamic objects, you can use the collision shape to approximate the local inertia tensor, otherwise use the zero vector (default argument)
@@ -194,6 +201,29 @@ public:
 
 	virtual ~btRigidBody()
 	{
+		// If I am a child, remove myself from my parent's list to prevent crashes
+		if (m_parent)
+		{
+			for (size_t i = 0; i < m_parent->m_Children.size(); i++)
+			{
+				if (m_parent->m_Children[i] == this)
+				{
+					m_parent->m_Children.erase(m_parent->m_Children.begin() + i);
+					break;
+				}
+			}
+		}
+
+		// If I am a parent, tell my children they are now orphans
+		// This prevents children from trying to access a dead parent later
+		for (size_t i = 0; i < m_Children.size(); i++)
+		{
+			if (m_Children[i])
+			{
+				m_Children[i]->m_parent = nullptr;
+			}
+		}
+		
 		//No constraints should point to this rigidbody
 		//Remove constraints from the dynamics world before you delete the related rigidbodies.
 		btAssert(m_constraintRefs.size() == 0);
@@ -256,8 +286,8 @@ public:
 		m_upperLimitDistanceImpact = upperLimit;
 	}
 
-	void updateKinematicChildren(btScalar timeStep);
-	void updateKinematicChildrenInterpolated(btScalar timeStep);
+	void updateBulletChildren(btScalar timeStep, unsigned int currentFrame);
+	void updateBulletChildrenInterpolated(btScalar timeStep, unsigned int currentFrame);
 
 	void updateCableCollision(btScalar timeStep);
 

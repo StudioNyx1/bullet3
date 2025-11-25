@@ -104,7 +104,7 @@ void btRigidBody::setupRigidBody(const btRigidBody::btRigidBodyConstructionInfo&
 	m_pushVelocity.setZero();
 	m_turnVelocity.setZero();
 
-	m_kinematicChildren = {};
+	m_Children = {};
 	m_cableCollision = nullptr;
 	m_redirectionTarget = nullptr;
 	m_localTransform = btTransform::getIdentity();
@@ -116,37 +116,99 @@ void btRigidBody::predictIntegratedTransform(btScalar timeStep, btTransform& pre
 	btTransformUtil::integrateTransform(m_worldTransform, m_linearVelocity, m_angularVelocity, timeStep, predictedTransform);
 }
 
-void btRigidBody::updateKinematicChildren(btScalar timeStep)
+void btRigidBody::updateBulletChildren(btScalar timeStep, unsigned int currentFrame)
 {
-	for (int i = 0; i < m_kinematicChildren.size(); ++i)
+	// Ignore static or kinematic objects as they will be updated by their parent
+	if (this->isStaticOrKinematicObject())
 	{
-		btRigidBody* kinematic = m_kinematicChildren[i];
+		return;
+	}
+	
+	// 1. Traverse up to find the top-most parent (Root)
+	btRigidBody* root = this;
+	while (root->m_parent != nullptr)
+	{
+		root = root->m_parent;
+	}
+
+	// 2. Check if the root has already been updated this frame.
+	// If the root is updated, it means the whole hierarchy below it is also done.
+	if (root->m_lastUpdateFrame == currentFrame)
+	{
+		return;
+	}
+
+	// 3. Start the recursive update
+	root->updateBulletChildrenRecursive(timeStep, currentFrame);
+}
+
+void btRigidBody::updateBulletChildrenRecursive(btScalar timeStep, unsigned int currentFrame)
+{
+	// Mark this body as updated for this frame
+	m_lastUpdateFrame = currentFrame;
+	
+	for (auto kinematic : m_Children)
+	{
 		if (!kinematic->isStaticOrKinematicObject()) continue;
 
-		// World transform kinematic = WordlTransform Parent * LocalTransform Kinematic	
+		// World transform kinematic = WorldTransform Parent * LocalTransform Kinematic	
+		// Note: 'getWorldTransform()' here refers to 'this' (the parent), which is already updated.
 		btTransform res = getWorldTransform() * kinematic->m_localTransform;
+		
 		kinematic->setInterpolationWorldTransform(kinematic->getWorldTransform());
 		kinematic->setWorldTransform(res);
 		kinematic->getMotionState()->setWorldTransform(res);
 
-		// Care: can lead to infinite loop
-		kinematic->updateKinematicChildren(timeStep);
+		// Recurse down the tree using the internal helper
+		kinematic->updateBulletChildrenRecursive(timeStep, currentFrame);
 	}
 }
 
-void btRigidBody::updateKinematicChildrenInterpolated(btScalar timeStep)
+void btRigidBody::updateBulletChildrenInterpolated(btScalar timeStep, unsigned int currentFrame)
 {
-	for (int i = 0; i < m_kinematicChildren.size(); ++i)
+	// Ignore static or kinematic objects as they will be updated by their parent
+	if (this->isStaticOrKinematicObject())
 	{
-		btRigidBody* kinematic = m_kinematicChildren[i];
+		return;
+	}
+	
+	// 1. Traverse up to find the top-most parent (Root)
+	btRigidBody* root = this;
+	while (root->m_parent != nullptr)
+	{
+		root = root->m_parent;
+	}
+	
+	// 2. Check if the root has already been updated this frame.
+	// If the root is updated, it means the whole hierarchy below it is also done.
+	if (root->m_lastInterpolatedUpdateFrame == currentFrame)
+	{
+		return;
+	}
+
+	// 3. Start the recursive update from the root
+	root->updateBulletChildrenInterpolatedRecursive(timeStep, currentFrame);
+}
+
+void btRigidBody::updateBulletChildrenInterpolatedRecursive(btScalar timeStep, unsigned int currentFrame)
+{
+	// Mark this body as updated for this frame
+	m_lastInterpolatedUpdateFrame = currentFrame;
+	
+	for (auto kinematic : m_Children)
+	{
 		if (!kinematic->isStaticOrKinematicObject()) continue;
 
-		// World transform kinematic = WordlTransform Parent * LocalTransform Kinematic	
-		btTransform res = getInterpolationWorldTransform() * kinematic->m_localTransform;
-		kinematic->setInterpolationWorldTransform(res);
+		// World transform kinematic = WorldTransform Parent * LocalTransform Kinematic	
+		// Note: 'getWorldTransform()' here refers to 'this' (the parent), which is already updated.
+		btTransform res = getWorldTransform() * kinematic->m_localTransform;
+		
+		kinematic->setInterpolationWorldTransform(kinematic->getWorldTransform());
+		kinematic->setWorldTransform(res);
+		kinematic->getMotionState()->setWorldTransform(res);
 
-		// Care: can lead to infinite loop
-		kinematic->updateKinematicChildrenInterpolated(timeStep);
+		// Recurse down the tree using the internal helper
+		kinematic->updateBulletChildrenInterpolatedRecursive(timeStep, currentFrame);
 	}
 }
 

@@ -71,6 +71,8 @@ protected:
 	btSpinMutex m_predictiveManifoldsMutex;  // used to synchronize threads creating predictive contacts
 
 	int m_clampedSimulationSteps;
+	
+	uint64_t m_globalFrameCounter; // Accounts from both frames and subframes;
 
 	virtual void predictUnconstraintMotion(btScalar timeStep);
 
