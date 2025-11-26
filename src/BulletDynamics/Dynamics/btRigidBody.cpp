@@ -124,9 +124,9 @@ void btRigidBody::updateBulletChildren(btScalar timeStep, unsigned int currentFr
 		return;
 	}
 	
-	// 1. Traverse up to find the top-most parent (Root)
+	// 1. Traverse up to find the top-most dynamic parent
 	btRigidBody* root = this;
-	while (root->m_parent != nullptr)
+	while (root->m_parent != nullptr && !root->m_parent->isStaticOrKinematicObject())
 	{
 		root = root->m_parent;
 	}
@@ -172,9 +172,9 @@ void btRigidBody::updateBulletChildrenInterpolated(btScalar timeStep, unsigned i
 		return;
 	}
 	
-	// 1. Traverse up to find the top-most parent (Root)
+	// 1. Traverse up to find the top-most dynamic parent
 	btRigidBody* root = this;
-	while (root->m_parent != nullptr)
+	while (root->m_parent != nullptr && !root->m_parent->isStaticOrKinematicObject())
 	{
 		root = root->m_parent;
 	}
