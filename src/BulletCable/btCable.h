@@ -248,7 +248,6 @@ private:
 	bool useBending = true;
 	bool useGravity = true;
 	bool useCollision = true;
-	bool doAnchorPlacement = false;
 	btScalar m_linearMass = 1.0;
 	btScalar m_maxTension = -1.0;
 
