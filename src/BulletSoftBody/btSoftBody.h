@@ -505,6 +505,7 @@ public:
 		btVector3 m_totalTension;       // calculated tension for all the substeps
 		btScalar m_dist;			    // Last distance known between anchor posiiton and node position
 		btScalar m_bodyMassRatio;       // Body added mass to node
+		bool m_anchorPlacement;			// Apply (or not) the AnchorConstraintPlacement's method
 	};
 	/* Note			*/
 	struct Note : Element
