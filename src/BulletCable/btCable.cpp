@@ -178,7 +178,7 @@ void btCable::PrepareSolver()
 
 		// Node's masses
 		const double invMassNode = n->m_im;
-		const double massNode = invMassNode < FLT_EPSILON ? 0.0 : 1.0 / invMassNode;
+		const double massNode = invMassNode < DBL_EPSILON ? 0.0 : 1.0 / invMassNode;
 
 		// Body's masses
 		const double invMassBody = b->getInvMass();
