@@ -267,7 +267,10 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 void btCable::EndConstraintsSolve()
 {
-	anchorConstraintPlacement();
+	if (m_useAnchorConstraintPlacement)
+	{
+		anchorConstraintPlacement();
+	}
 
 	for (int i = 0; i < m_anchors.size(); ++i)
 	{
@@ -2102,6 +2105,11 @@ void btCable::setCollisionResponseActive(bool active)
 int btCable::getGrowingState()
 {
 	return m_growingState;
+}
+
+void btCable::setUseAnchorConstraintPlacement(bool status)
+{
+	m_useAnchorConstraintPlacement = status;
 }
 
 void btCable::setDistanceMode(int mode)

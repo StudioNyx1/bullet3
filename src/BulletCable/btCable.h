@@ -358,6 +358,7 @@ public:
 	CollisionMode m_collisionMode;
 	DistanceMode m_distanceMode;
 	DistanceFunction m_distanceFunction; // avoid a lot of "if/switch" statements
+	bool m_useAnchorConstraintPlacement;
 
 	btScalar WantedDistance = 0;
 	btScalar WantedSpeed = 0;
@@ -525,6 +526,8 @@ public:
 
 	void setDistanceMode(int mode);
 	int getDistanceMode();
+
+	void setUseAnchorConstraintPlacement(bool status);
 
 #pragma endregion
 };
