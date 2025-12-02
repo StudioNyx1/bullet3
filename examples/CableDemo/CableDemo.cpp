@@ -147,7 +147,7 @@ public:
 	btScalar posY;
 	btScalar margin;
 
-	int substepSolver = 1;
+	int substepSolver = 4;
 	btAlignedObjectArray<btSoftSoftCollisionAlgorithm*> m_SoftSoftCollisionAlgorithms;
 
 	btAlignedObjectArray<btSoftRididCollisionAlgorithm*> m_SoftRigidCollisionAlgorithms;
@@ -2399,7 +2399,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 
 	btRigidBody* claw = pdemo->createRigidBody(0, trClaw, cylShape, 159);
 	claw->m_redirectionTarget = a18;
-	a18->m_kinematicChildren.push_back(claw);
+	a18->m_Children.push_back(claw);
 	claw->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 6.5, 0));
 
 	btRigidBody* clawCC = pdemo->createCableRigidBody(0, trClaw, cylShape, 123456);
@@ -3999,6 +3999,75 @@ static void Init_FixedJoint(CableDemo* pdemo)
 	btFixedConstraint* fixed = pdemo->createFixedConstraint(*rod, *cube, frameA, frameB, 256);
 }
 
+static void Init_ImpulseAnchor(CableDemo* pdemo)
+{
+	// Shape
+	btCollisionShape* updownBoxShape = new btBoxShape(btVector3(0.4, 0.1, 0.1));
+	btCollisionShape* lefrightBoxShape = new btBoxShape(btVector3(0.1, 0.4, 0.1));
+	btTransform upBoxTransform(btMatrix3x3::getIdentity(), btVector3(0,0.3,0));
+	btTransform downBoxTransform(btMatrix3x3::getIdentity(), btVector3(0,-0.3,0));
+	btTransform leftBoxTransform(btMatrix3x3::getIdentity(), btVector3(-0.3,0,0));
+	btTransform rightBoxTransform(btMatrix3x3::getIdentity(), btVector3(0.3, 0, 0));
+
+	btCompoundShape* ringShape = new btCompoundShape(false);
+	ringShape->addChildShape(upBoxTransform, updownBoxShape);
+	ringShape->addChildShape(downBoxTransform, updownBoxShape);
+	ringShape->addChildShape(leftBoxTransform, lefrightBoxShape);
+	ringShape->addChildShape(rightBoxTransform, lefrightBoxShape);
+
+	btBoxShape* a18Shape = new btBoxShape(btVector3(0.6, 2, 0.6));
+
+	// Masses
+	btScalar massRingLest(10);
+	btScalar massRingA18(0);
+	btScalar massA18(10000);
+
+	// Transform
+	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 10, 0));
+	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, 5, 0));
+	btTransform transformRingA18(btQuaternion(btVector3(0,1,0), 3.14/2.0), btVector3(0, 5-0.3, 0));
+	btTransform transformA18(btMatrix3x3::getIdentity(), btVector3(0, 5-2.35-0.3, 0));
+
+	// RB
+	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1,0.1,0.1)));
+	attachPoint->setCollisionFlags(2); // attachPoint->getCollisionFlags();
+	attachPoint->setSleepingThresholds(0, 0);
+	attachPoint->setMassProps(0, btVector3(0,0,0));
+
+	btRigidBody* ringLest = pdemo->createRigidBody(massRingLest, transformRingLest, ringShape);
+	ringLest->setSleepingThresholds(0, 0);
+	// ringLest->updateMassAtImpact(true, massRingLest, 1000, 0.001, 1);
+
+	btRigidBody* a18 = pdemo->createRigidBody(massA18, transformA18, a18Shape);
+	a18->setSleepingThresholds(0, 0);
+
+	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
+	ringA18->setSleepingThresholds(0, 0);
+	ringA18->m_redirectionTarget = a18;
+	ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.35, 0));
+	a18->m_Children.push_back(ringA18);
+
+	
+	// Cable's Waypoints
+	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
+	waypointPos.push_back(transformRingLest.getOrigin() + btVector3(0,0.3,0));
+	waypointPos.push_back(transformAttachPoint.getOrigin());
+
+	// Cable
+	btCable* cable = pdemo->createCableWaypoint(50, 50, 10, waypointPos, ringLest, attachPoint, true, true);
+	cable->setUseLRA(false);
+
+	cable->m_anchors[0].m_bodyMassRatio = 0.0;
+	cable->m_anchors[1].m_bodyMassRatio = 0.0;
+
+	cable->getCollisionShape()->setMargin(0.01f);
+	cable->setCableRadius(0.05f);
+
+	//pdemo->SetCameraPosition(btVector3(0, -3, 0));
+	pdemo->m_cable = cable;
+
+}
+
 void (*demofncs[])(CableDemo*) =
 	{
 		Init_CableForceDown,
@@ -4028,7 +4097,8 @@ void (*demofncs[])(CableDemo*) =
 		Init_BallJoint,
 		Init_FixedJoint,
 		Init_RayCast,
-		Init_Collision
+		Init_Collision,
+		Init_ImpulseAnchor
 };
 
 ////////////////////////////////////
