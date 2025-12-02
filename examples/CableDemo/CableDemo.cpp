@@ -668,14 +668,20 @@ public:
 				auto node = anchor.m_node;
 				auto body = anchor.m_body;
 
+				const btScalar distanceReal = cable->getLength();
+				const btScalar distanceRest = cable->getRestLength();
+
 				cout << "Anchor[" << i << "]-Node[" << node->index << "]:" << "\n\t"
 					<< "Mass (Body):" << 1.0 / body->getInvMass() << "\n\t"
 					<< "Last Tension: " << anchor.m_lastTension.length() << "\n\t"
 					<< "Total Tension: " << anchor.m_totalTension.length() / substepSolver << "\n\t"
 					<< "Distance Anchor-Node: " << node->m_x.distance(body->getWorldTransform() * anchor.m_local) << "\n\t"
-					<< "Distance Cable: " << cable->getRestLength() << "\n\t"
+					 << "Distance Cable (Rest): " << distanceRest << "\n\t"
+					 << "Distance Cable (Real): " << distanceReal << "\n\t"
+					 << "Delta Distance Cable (Real - Rest): " << distanceReal - distanceRest << "\n\t"
 					<< "Mass Cable: " << cable->getTotalMass() << "\n\t"
 					<< "Mass Node: " << 1.0 / node->m_im << "\n\t"
+					<< "Substeps count: " << substepSolver << "\n\t"
 					<< endl;
 			}
 		}
@@ -4047,23 +4053,23 @@ static void Init_Stability(CableDemo* pdemo)
 	// Objet A (Lest)
 	btRigidBody* ringLest = pdemo->createRigidBody(massRingLest, transformRingLest, ringShape);
 	ringLest->setSleepingThresholds(0, 0);
-	// ringLest->updateMassAtImpact(true, massRingLest, 1000, 0.001, 1);
+	//ringLest->updateMassAtImpact(true, massRingLest, 1000, 0.001, 1);
 
-	// // Object B (A18's claws)
-	// btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
-	// ringA18->setSleepingThresholds(0, 0);
-	// 
-	// // Objet C (A18)
-	// btRigidBody* a18 = pdemo->createRigidBody(massA18, transformA18, a18Shape);
-	// a18->setSleepingThresholds(0, 0);
-	// 
-	// // Object B's set up
-	// ringA18->m_redirectionTarget = a18;
-	// ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.35, 0));
-	// a18->m_Children.push_back(ringA18);
+	// Object B (A18's claws)
+	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
+	ringA18->setSleepingThresholds(0, 0);
+	
+	// Objet C (A18)
+	btRigidBody* a18 = pdemo->createRigidBody(massA18, transformA18, a18Shape);
+	a18->setSleepingThresholds(0, 0);
+	 
+	// Object B's set up
+	ringA18->m_redirectionTarget = a18;
+	ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.35, 0));
+	a18->m_Children.push_back(ringA18);
 
 	// Object D (ground)
-	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion::getIdentity(), btVector3(0,4,0)), new btBoxShape(btVector3(10,0.2,10)));
+	//btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion::getIdentity(), btVector3(0,4,0)), new btBoxShape(btVector3(10,0.2,10)));
 
 	// Cable's Waypoints
 	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
@@ -4077,13 +4083,15 @@ static void Init_Stability(CableDemo* pdemo)
 
 	// Cable
 	btCable* cable = pdemo->createCableWaypoint(resolution, iteration, linearMass, waypointPos, ringLest, attachPoint, true, true);
+	cable->getCollisionShape()->setMargin(0.025);
+	cable->setCableRadius(0.05);
 	cable->setUseBending(false);
 	cable->setUseLRA(false);
 	cable->m_anchors[0].m_bodyMassRatio = 0.0;
-	cable->m_anchors[1].m_bodyMassRatio = 0.0;
+	cable->m_anchors[1].m_bodyMassRatio = 0;
+	cable->m_materials[0]->m_kLST = 1.0;
 	cable->setDistanceMode(2);
-	cable->getCollisionShape()->setMargin(0.025);
-	cable->setCableRadius(0.05);
+	cable->setUseAnchorConstraintPlacement(false);
 
 	// Add the current cable to allow the user to debug it
 	pdemo->m_cable = cable;
