@@ -126,28 +126,63 @@ public:
 	// In your main simulation tick, pause normal stepping when in cable-step mode.
 	void tick(btScalar dt, int subStep, btScalar fixedTimeStep)
 	{
-		if (m_cableStep.enabled)
+		// Normal path
 		{
-			// Don't run the full physics step while visually stepping iterations.
-			// Only draw the current state.
+			if (m_cableStep.enabled)
+			{
+				// Don't run the full physics step while visually stepping iterations.
+				// Only draw the current state.
+				renderSingleFrame();
+				return;
+			}
+
+			current_ticks = clock();
+
+			// Normal simulation path
+			m_dynamicsWorld->stepSimulation(dt, subStep, fixedTimeStep);
+
+			delta_ticks = clock() - current_ticks;
 			renderSingleFrame();
-			return;
 		}
-		
-		current_ticks = clock();
-		
-		// Normal simulation path
-		m_dynamicsWorld->stepSimulation(dt, subStep, fixedTimeStep);
-		
-		delta_ticks = clock() - current_ticks;
-		renderSingleFrame();
+
+		//// Benchmark
+		//{
+		//	// Warm-up step to avoid cold start overhead
+		//	m_dynamicsWorld->stepSimulation(dt, subStep, fixedTimeStep);
+		//	
+		//	// Simulate many steps to smooth out timing noise
+		//	const int iterations = 10;
+
+		//	btClock timer;
+		//	timer.reset();
+		//	for (int i = 0; i < iterations; i++)
+		//	{
+		//		m_dynamicsWorld->stepSimulation(dt, subStep, fixedTimeStep);
+		//	}
+
+		//	const btScalar ms = timer.getTimeMilliseconds();
+		//	const btScalar deltaFrame = ms / iterations;
+		//	cumulatedDelta += deltaFrame;
+		//	const btScalar deltaAverage = cumulatedDelta / tickCount;
+		//	std::cout << "(Tick = " << tickCount << ") --> substeps=" << subStep
+		//			  << " Time=" << deltaFrame << " ms."
+		//			  << " Average Time=" << deltaAverage << " ms."
+		//		      << std::endl;
+		//	tickCount++;
+
+		//	renderSingleFrame();
+		//}
 	}
+
+	// Benchmark
+	int tickCount = 1;
+	btScalar cumulatedDelta = 0;
 	
 	btScalar posX;
 	btScalar posY;
 	btScalar margin;
 
-	int substepSolver = 4;
+	int substepSolver = 1; 
 	btAlignedObjectArray<btSoftSoftCollisionAlgorithm*> m_SoftSoftCollisionAlgorithms;
 
 	btAlignedObjectArray<btSoftRididCollisionAlgorithm*> m_SoftRigidCollisionAlgorithms;
@@ -1919,6 +1954,185 @@ static void Init_TestCableCollisionMt(CableDemo* pdemo)
 	cable4->setCollisionParameters(1, 2);
 	cable4->setCollisionMargin(0.005);
 }
+
+static void Init_TestBenchmarkSubsteps(CableDemo* pdemo)
+{
+	// Benchmark
+	int tickCount = 1;
+	btScalar cumulatedDelta = 0;
+
+	// Setup
+	btVector3 boxSize(1.5f, 1.5f, 1.5f);
+	float sphereMass = 0.01f;
+	float boxMass = 0.01f;
+	float sphereRadius = 1.5f;
+	float capsuleHalf = 2.0f;
+	float capsuleRadius = 1.0f;
+	float capsuleMass = 1.0f;
+
+	{
+		int size = 5;
+		int height = 5;
+
+		const float cubeSize = boxSize[0];
+		float spacing = 0.5f;
+		btVector3 pos(0.0f, 10, 0.0f);
+		float offset = -size * (cubeSize * 1.0f + spacing) * 0.5f;
+
+		int numBodies = 0;
+
+		for (int k = 0; k < height; k++)
+		{
+			for (int j = 0; j < size; j++)
+			{
+				pos[2] = offset + (float)j * (cubeSize * 1.0f + spacing);
+				for (int i = 0; i < size; i++)
+				{
+					pos[0] = offset + (float)i * (cubeSize * 1.0f + spacing);
+					btVector3 bpos = btVector3(0, 0, 0) + btVector3(5.0f, 1.0f, 5.0f) * pos;
+					int idx = rand() % 9;
+					btTransform trans;
+					trans.setIdentity();
+					trans.setOrigin(bpos);
+
+					switch (idx)
+					{
+						case 0:
+						case 1:
+						case 2:
+						{
+							float r = 0.5f * (idx + 1);
+							btBoxShape* boxShape = new btBoxShape(boxSize * r);
+							pdemo->createRigidBody(boxMass * r, trans, boxShape)->setSleepingThresholds(0, 0);
+						}
+						break;
+
+						case 3:
+						case 4:
+						case 5:
+						{
+							float r = 0.5f * (idx - 3 + 1);
+							btSphereShape* sphereShape = new btSphereShape(sphereRadius * r);
+							pdemo->createRigidBody(sphereMass * r, trans, sphereShape)->setSleepingThresholds(0, 0);
+						}
+						break;
+
+						case 6:
+						case 7:
+						case 8:
+						{
+							float r = 0.5f * (idx - 6 + 1);
+							btCapsuleShape* capsuleShape = new btCapsuleShape(capsuleRadius * r, capsuleHalf * r);
+							pdemo->createRigidBody(capsuleMass * r, trans, capsuleShape)->setSleepingThresholds(0, 0);
+
+
+						}
+						break;
+					}
+
+					numBodies++;
+				}
+			}
+			offset -= 0.05f * spacing * (size - 1);
+			spacing *= 0.5f;
+			pos[1] += (cubeSize * 1.0f + spacing);
+		}
+	}
+
+	// OG Cable test
+	// Shape
+	btCollisionShape* shape = new btBoxShape(btVector3(0.5, 0.5, 0.5));
+
+	// Position / Rotation
+	btVector3 positionKinematic(0, 8.1, -3);
+	btVector3 positionPhysic(0, 8.1, 4);
+	btVector3 positionWall(0, 7, 0);
+	btVector3 positionAnotherWall(0, 9, 0);
+	btQuaternion rotation(0, 0, 0, 1);
+
+	// Transform
+	btTransform transformKinematic;
+	transformKinematic.setIdentity();
+	transformKinematic.setRotation(rotation);
+	transformKinematic.setOrigin(positionKinematic);
+
+	btTransform transformPhysic;
+	transformPhysic.setIdentity();
+	transformPhysic.setRotation(rotation);
+	transformPhysic.setOrigin(positionPhysic);
+
+	btTransform transformWall;
+	transformWall.setIdentity();
+	transformWall.setOrigin(positionWall);
+
+	btTransform transformAnotherWall;
+	transformAnotherWall.setIdentity();
+	transformAnotherWall.setOrigin(positionAnotherWall);
+
+	// Resolution's cables
+	int resolution = 50;
+	int iteration = 50;
+
+	// Create the rigidbodys
+	btRigidBody* kinematic = pdemo->createRigidBody(0, transformKinematic, shape);
+	btRigidBody* physic = pdemo->createRigidBody(100, transformPhysic, shape);
+
+	btRigidBody* wall = pdemo->createCableRigidBody(0, transformWall, new btBoxShape(btVector3(10, 1, 1)));
+	wall->getCollisionShape()->setMargin(0);
+
+	btRigidBody* anotherWall = pdemo->createCableRigidBody(0, transformAnotherWall, new btBoxShape(btVector3(5, 0.1, 10)));
+	anotherWall->getCollisionShape()->setMargin(0);
+	anotherWall->setSleepingThresholds(0, 0);
+
+	// Anchor's positions
+	btVector3 anchorPositionKinematic = positionKinematic + btVector3(0, 0, 0);
+	btVector3 anchorPositionKinematic2 = positionKinematic + btVector3(0.5, 0, 0);
+	btVector3 anchorPositionKinematic3 = positionKinematic + btVector3(-0.5, 0, 0);
+	btVector3 anchorPositionKinematic4 = positionKinematic + btVector3(-1, 0, 0);
+	btVector3 anchorPositionKinematic5 = positionKinematic + btVector3(-2, 0, 0);
+	btVector3 anchorPositionPhysic = positionPhysic + btVector3(0, 0, 0);
+	btVector3 anchorPositionPhysic2 = positionPhysic + btVector3(0.5, 0, 0);
+	btVector3 anchorPositionPhysic3 = positionPhysic + btVector3(-0.5, 0, 0);
+	btVector3 anchorPositionPhysic4 = positionPhysic + btVector3(1, 0, 0);
+	btVector3 anchorPositionPhysic5 = positionPhysic + btVector3(2, 0, 0);
+
+	btCable* cable = pdemo->createCable(resolution, iteration, 1.61, anchorPositionKinematic, anchorPositionPhysic, physic, kinematic);
+	cable->setUseCollision(true);
+	cable->setUseLRA(false);
+	cable->getCollisionShape()->setMargin(0.005);
+	cable->setCollisionParameters(1, 2);
+	cable->setCollisionMargin(0.005);
+	pdemo->SetCameraPosition(btVector3(0, 10, 0));
+
+	btCable* cable2 = pdemo->createCable(resolution, iteration, 1.61, anchorPositionKinematic2, anchorPositionPhysic2, physic, kinematic);
+	cable2->setUseCollision(true);
+	cable2->setUseLRA(false);
+	cable2->getCollisionShape()->setMargin(0.005);
+	cable2->setCollisionParameters(1, 2);
+	cable2->setCollisionMargin(0.005);
+
+	btCable* cable3 = pdemo->createCable(resolution, iteration, 1.61, anchorPositionKinematic3, anchorPositionPhysic3, physic, kinematic);
+	cable3->setUseCollision(true);
+	cable3->setUseLRA(false);
+	cable3->getCollisionShape()->setMargin(0.005);
+	cable3->setCollisionParameters(1, 2);
+	cable3->setCollisionMargin(0.005);
+
+	btCable* cable4 = pdemo->createCable(resolution, iteration, 1.61, anchorPositionKinematic4, anchorPositionPhysic4, physic, kinematic);
+	cable4->setUseCollision(true);
+	cable4->setUseLRA(false);
+	cable4->getCollisionShape()->setMargin(0.005);
+	cable4->setCollisionParameters(1, 2);
+	cable4->setCollisionMargin(0.005);
+
+	btCable* cable5 = pdemo->createCable(resolution, iteration, 1.61, anchorPositionKinematic5, anchorPositionPhysic5, physic, kinematic);
+	cable5->setUseCollision(true);
+	cable5->setUseLRA(false);
+	cable5->getCollisionShape()->setMargin(0.005);
+	cable5->setCollisionParameters(1, 2);
+	cable5->setCollisionMargin(0.005);
+}	
+
 
 static void initLock(CableDemo* pdemo)
 {
@@ -4127,7 +4341,8 @@ void (*demofncs[])(CableDemo*) =
 	Init_FixedJoint,
 	Init_RayCast,
 	Init_Collision,
-	Init_Stability
+	Init_Stability,
+	Init_TestBenchmarkSubsteps,
 };
 
 ////////////////////////////////////
