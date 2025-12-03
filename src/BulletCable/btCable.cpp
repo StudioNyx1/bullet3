@@ -1157,29 +1157,30 @@ void btCable::anchorConstraint()
 	const btScalar dt = m_sst.sdt;
 	for (int i = 0, ni = this->m_anchors.size(); i < ni; ++i)
 	{
-		Anchor& a = m_anchors[i];
-		const btTransform& t = a.m_body->getWorldTransform();
-		Node& n = *a.m_node;
-		const btVector3 wa = t * a.m_local;
-		const btVector3 va = a.m_body->getVelocityInLocalPoint(a.m_c1) * dt;
-		const btVector3 vb = n.m_x - n.m_q_sub;
-		const btVector3 vr = (va - vb) + (wa - n.m_x) * kAHR;
-		btVector3 impulse = a.m_c0_massBalance * vr * a.m_influence;
+		Anchor& anchor = m_anchors[i];
+		btRigidBody& body = *anchor.m_body;
+		Node& node = *anchor.m_node;
 
-		btScalar currentTension = a.m_lastTension.length();
-		a.m_lastTension += impulse / dt;
-		a.m_totalTension += impulse / dt;
-		btScalar finalTension = a.m_lastTension.length();
+		const btVector3 wa = body.getWorldTransform() * anchor.m_local;
+		const btVector3 va = anchor.m_body->getVelocityInLocalPoint(anchor.m_c1) * dt;
+		const btVector3 vb = node.m_x - node.m_q_sub;
+		const btVector3 vr = (va - vb) + (wa - node.m_x) * kAHR;
+		btVector3 impulse = anchor.m_c0_massBalance * vr;
+
+		btScalar currentTension = anchor.m_lastTension.length();
+		anchor.m_lastTension += impulse / dt;
+		anchor.m_totalTension += impulse / dt;
+		btScalar finalTension = anchor.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
-			a.m_lastTension = a.m_lastTension.normalized() * m_maxTension;
-			impulse *= (a.m_lastTension.length() - currentTension) / (finalTension - currentTension);
+			anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
+			impulse *= (anchor.m_lastTension.length() - currentTension) / (finalTension - currentTension);
 		}
 
 		// Update anchor's data
-		a.m_dist = wa.distance(n.m_x);
-		n.m_x += impulse * a.m_c2_massBalance;
-		a.m_body->applyImpulse(-impulse, a.m_c1);
+		anchor.m_dist = wa.distance(node.m_x);
+		node.m_x += impulse * anchor.m_c2_massBalance;
+		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
 	}
 }
 
@@ -1190,34 +1191,34 @@ void btCable::anchorConstraintPlacement()
 
 	for (int i = 0, ni = this->m_anchors.size(); i < ni; ++i)
 	{
-		Anchor& a = m_anchors[i];
-		if (!a.m_anchorPlacement)
+		Anchor& anchor = m_anchors[i];
+		if (!anchor.m_anchorPlacement)
 		{
 			continue;
 		}
+		btRigidBody& body = *anchor.m_body;
+		Node& node = *anchor.m_node;
 
-		const btTransform& t = a.m_body->getWorldTransform();
-		Node& n = *a.m_node;
-		const btVector3 wa = t * a.m_local;
-		const btVector3 va = a.m_body->getVelocityInLocalPoint(a.m_c1) * dt;
-		const btVector3 vb = n.m_x - n.m_q_sub;
-		const btVector3 vr = (va - vb) + (wa - n.m_x) * kAHR;
-		btVector3 impulse = a.m_c0_massBalance * vr * a.m_influence;
+		const btVector3 wa = body.getWorldTransform() * anchor.m_local;
+		const btVector3 va = anchor.m_body->getVelocityInLocalPoint(anchor.m_c1) * dt;
+		const btVector3 vb = node.m_x - node.m_q_sub;
+		const btVector3 vr = (va - vb) + (wa - node.m_x) * kAHR;
+		btVector3 impulse = anchor.m_c0_massBalance * vr;
 
-		btScalar currentTension = a.m_lastTension.length();
-		a.m_lastTension += impulse / dt;
-		a.m_totalTension += impulse / dt;
-		btScalar finalTension = a.m_lastTension.length();
+		btScalar currentTension = anchor.m_lastTension.length();
+		anchor.m_lastTension += impulse / dt;
+		anchor.m_totalTension += impulse / dt;
+		btScalar finalTension = anchor.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
-			a.m_lastTension = a.m_lastTension.normalized() * m_maxTension;
-			impulse *= (a.m_lastTension.length() - currentTension) / (finalTension - currentTension);
+			anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
+			impulse *= (anchor.m_lastTension.length() - currentTension) / (finalTension - currentTension);
 		}
 
 		// Update anchor's data
-		a.m_dist = wa.distance(n.m_x);
-		n.m_x = wa;
-		a.m_body->applyImpulse(-impulse, a.m_c1);
+		anchor.m_dist = wa.distance(node.m_x);
+		node.m_x = wa;
+		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
 	}
 }
 
