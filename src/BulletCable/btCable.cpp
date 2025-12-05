@@ -67,7 +67,7 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	_nodeContactObject = btCollisionObject();
 	_nodeContactTransform = btTransform::getIdentity();
 	_nodeContactObject.setCollisionShape(&_nodeContactSphere);
-	setDistanceMode((int) DistanceMode::BulletVariant);
+	setDistanceMode((int) DistanceMode::Bullet);
 	m_collisionMode = CollisionMode::Base;
 }
 
@@ -1250,46 +1250,6 @@ void btCable::distanceConstraintBullet()
 	}
 }
 
-void btCable::distanceConstraintBulletVariant()
-{
-	BT_PROFILE("PSolve_Links");
-
-	Link* l;
-	Node* a;
-	Node* b;
-
-	for (int i = 0; i < m_links.size(); ++i)
-	{
-		l = &m_links[i];
-		a = l->m_n[0];
-		b = l->m_n[1];
-		if (!a->computeNodeConstraint && !b->computeNodeConstraint)
-			continue;
-
-		a->computeNodeConstraint = true;
-		b->computeNodeConstraint = true;
-
-		btVector3 AB = b->m_x - a->m_x;
-
-		if (AB.fuzzyZero())
-		{
-			continue;
-		}
-		btVector3 ABNormalized = AB.normalized();
-		btScalar normAB = AB.length();
-		btScalar stiffness = m_materials[0]->m_kLST;
-
-		btScalar sumInvMass = a->m_im + b->m_im;
-		if (sumInvMass >= SIMD_EPSILON)
-
-		{
-			btVector3 denom = 1 / sumInvMass * (normAB - l->m_rl) * ABNormalized;
-			a->m_x += (a->m_im * denom) * stiffness;
-			b->m_x -= (b->m_im * denom) * stiffness;
-		}
-	}
-}
-
 void btCable::distanceConstraintXPBD()
 {
 	BT_PROFILE("PSolve_Links");
@@ -2120,9 +2080,6 @@ void btCable::setDistanceMode(int mode)
 	{
 		case DistanceMode::Bullet:
 			m_distanceFunction = &btCable::distanceConstraintBullet;
-			break;
-		case DistanceMode::BulletVariant:
-			m_distanceFunction = &btCable::distanceConstraintBulletVariant;
 			break;
 		case DistanceMode::XPBD:
 			m_distanceFunction = &btCable::distanceConstraintXPBD;

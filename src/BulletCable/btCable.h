@@ -44,7 +44,6 @@ class btCable : public btSoftBody
 	enum class DistanceMode
 	{
 		Bullet = 0, // Original distance constraint from Bullet
-		BulletVariant, // Modified distance constraint evolving with node's masses 
 		XPBD // Modified distance constraint from XPBD
 	};
 
@@ -295,7 +294,6 @@ private:
 
 	void distanceConstraint(int currentIter);
 	void distanceConstraintBullet();
-	void distanceConstraintBulletVariant();
 	void distanceConstraintXPBD();
 
 	void distanceConstraintLock(int limMin, int limMax);
