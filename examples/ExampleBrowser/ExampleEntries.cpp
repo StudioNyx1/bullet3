@@ -309,8 +309,10 @@ static ExampleEntry gDefaultExamples[] =
 		ExampleEntry(1, "Test FixedJoint", "FixedJointCollisionTest", CableDemoCreateFunc, 25),
 		ExampleEntry(1, "Test RayCast", "", CableDemoCreateFunc, 26),
 		ExampleEntry(1, "Test Collision", "", CableDemoCreateFunc, 27),
-		ExampleEntry(1, "Test Stability", "", CableDemoCreateFunc, 28),
-		ExampleEntry(1, "Test Benchmark Substeps", "", CableDemoCreateFunc, 29),
+		ExampleEntry(1, "Test Stability Tension", "", CableDemoCreateFunc, 28),
+		ExampleEntry(1, "Test Stability A18", "", CableDemoCreateFunc, 29),
+		ExampleEntry(1, "Test Stability (OLD)", "", CableDemoCreateFunc, 30),
+		ExampleEntry(1, "Test Benchmark Substeps", "", CableDemoCreateFunc, 31),
 
 
 #endif  //INCLUDE_CLOTH_DEMOS
