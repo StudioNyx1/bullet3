@@ -56,6 +56,37 @@ class btSoftSoftCollisionAlgorithm;
 class btSoftRididCollisionAlgorithm;
 class btSoftRigidDynamicsWorld;
 
+struct StabilityData
+{
+	// Rigidbodies
+	btScalar A_mass{10.0};
+	btScalar B_mass{0.0};
+	btScalar C_mass{10.0};
+	btScalar Ground_offset{0.0};
+
+	// Anchors
+	btScalar A_massRatio{0.0};
+	btScalar D_massRatio{0.0};
+
+	// Cable
+	btScalar Cable_resolution{20};
+	btScalar Cable_iteration{100};
+	btScalar Cable_linearMass{10.0};
+	btScalar Cable_growSpeed{1.0};
+	btScalar Cable_length{1.0};
+	btScalar Cable_targetLength{1.0};
+	bool Cable_LRA{false};
+	bool Cable_AnchorPlacement{false};
+	btScalar Cable_DistanceMode{0};
+
+	// Used to reset to test init values
+	bool AutoResetTensionTest{false};
+};
+
+StabilityData StabilityTensionData{};
+StabilityData StabilityA18Data{};
+
+
 struct CableStepController
 {
 	bool   enabled = false;
@@ -67,6 +98,8 @@ class CableDemo : public CommonRigidBodyBase
 public:
 	btCable* m_cable = nullptr; // set this to the cable you want to inspect
 	CableStepController m_cableStep;
+
+	StabilityData* m_stabilityData{nullptr};
 
 	void toggleCableIterStepMode()
 	{
@@ -566,6 +599,21 @@ public:
 			getSoftDynamicsWorld()->m_nodeForces[i].y = waterNormalForce.getY();
 			getSoftDynamicsWorld()->m_nodeForces[i].z = waterNormalForce.getZ();
 			getSoftDynamicsWorld()->m_nodeForces[i].ma = addedMass;
+		}
+	}
+
+	void SetCableGrowSpeed(btScalar value)
+	{
+		growthSpeed = value;
+	}
+
+	void SetCableTargetLength(btScalar value)
+	{
+		growthDistance = value;
+
+		if (growthDistance < 0.0)
+		{
+			growthDistance = 0.0;
 		}
 	}
 
@@ -4311,6 +4359,513 @@ static void Init_Stability(CableDemo* pdemo)
 	pdemo->m_cable = cable;
 }
 
+static void Init_StabilityTension(CableDemo* pdemo)
+{
+	// Update shared data
+	auto& data = StabilityTensionData;
+	pdemo->m_stabilityData = &data;
+
+	// Test defaults
+	if (data.AutoResetTensionTest)
+	{
+		// Rigidbodies
+		data.A_mass = 100;
+		data.B_mass = 0.0;
+		data.C_mass = 100;
+		data.Ground_offset = 10.0;
+
+		// Anchors
+		data.A_massRatio = 0.0;
+		data.D_massRatio = 0.0;
+
+		// Distance
+		data.Cable_DistanceMode = 0;
+
+		// Cable
+		data.Cable_resolution = 20;
+		data.Cable_iteration = 100;
+		data.Cable_linearMass = 10;
+		data.Cable_length = 0.4;
+		data.Cable_targetLength = 1.0;
+		data.Cable_growSpeed = 1.0;
+		data.Cable_LRA = false;
+		data.Cable_AnchorPlacement = false;
+	}
+
+	// Shapes
+	btCollisionShape* updownBoxShape = new btBoxShape(btVector3(0.4, 0.1, 0.1));
+	btCollisionShape* lefrightBoxShape = new btBoxShape(btVector3(0.1, 0.4, 0.1));
+	btTransform upBoxTransform(btMatrix3x3::getIdentity(), btVector3(0, 0.3, 0));
+	btTransform downBoxTransform(btMatrix3x3::getIdentity(), btVector3(0, -0.3, 0));
+	btTransform leftBoxTransform(btMatrix3x3::getIdentity(), btVector3(-0.3, 0, 0));
+	btTransform rightBoxTransform(btMatrix3x3::getIdentity(), btVector3(0.3, 0, 0));
+	btCompoundShape* ringShape = new btCompoundShape(false);
+	ringShape->addChildShape(upBoxTransform, updownBoxShape);
+	ringShape->addChildShape(downBoxTransform, updownBoxShape);
+	ringShape->addChildShape(leftBoxTransform, lefrightBoxShape);
+	ringShape->addChildShape(rightBoxTransform, lefrightBoxShape);
+
+	btScalar waypointHeightShift = 0.3;
+	btScalar attachPointHeight = 5;
+	btScalar LestHeight = attachPointHeight - waypointHeightShift - data.Cable_length;
+
+	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, attachPointHeight, 0));
+	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, LestHeight, 0));
+
+	// Objet A (Lest)
+	btRigidBody* ringLest = pdemo->createRigidBody(data.A_mass, transformRingLest, ringShape);
+	ringLest->setSleepingThresholds(0, 0);
+
+	// Objet D (Cable attach point)
+	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1, 0.1, 0.1)));
+	attachPoint->setCollisionFlags(2);  // attachPoint->getCollisionFlags();
+	attachPoint->setSleepingThresholds(0, 0);
+	attachPoint->setMassProps(0, btVector3(0, 0, 0));
+
+	// Ground
+	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion::getIdentity(), 
+		                                         btVector3(0, LestHeight - data.Ground_offset - 0.4 - 0.2, 0)), 
+		                                         new btBoxShape(btVector3(10, 0.2, 10))
+	);
+
+	// Cable
+	// Waypoints
+	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
+	waypointPos.push_back(transformRingLest.getOrigin() + btVector3(0, waypointHeightShift, 0));
+	waypointPos.push_back(transformAttachPoint.getOrigin());
+
+	// Parameters
+	btCable* cable = pdemo->createCableWaypoint(data.Cable_resolution, data.Cable_iteration, data.Cable_linearMass, waypointPos, ringLest, attachPoint, true, true);
+	cable->getCollisionShape()->setMargin(0.025);
+	cable->setCableRadius(0.05);
+	cable->setUseBending(false);
+	cable->setUseLRA(data.Cable_LRA);
+	cable->m_anchors[0].m_bodyMassRatio = data.A_massRatio;
+	cable->m_anchors[1].m_bodyMassRatio = data.D_massRatio;
+	cable->m_materials[0]->m_kLST = 1.0;
+	cable->setDistanceMode(data.Cable_DistanceMode);
+	cable->setUseAnchorConstraintPlacement(data.Cable_AnchorPlacement);
+	pdemo->m_cable = cable;
+
+	// User controls
+	ButtonParams dataSelector("Lock", 0, true);
+	dataSelector.m_userPointer = pdemo;
+	dataSelector.m_initialState = data.AutoResetTensionTest < 0.5;
+	dataSelector.m_callback = [](int buttonId, bool buttonState, void* userPtr)
+	{
+		if (buttonId != 0)
+		{
+			return;
+		}
+
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_stabilityData->AutoResetTensionTest = buttonState ? 0 : 1;
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(dataSelector);
+
+	SliderParams sliderCableLength("Initial Length (Cable)", &data.Cable_length);
+	sliderCableLength.m_userPointer = pdemo;
+	sliderCableLength.m_minVal = 0.2;
+	sliderCableLength.m_maxVal = 8;
+	sliderCableLength.m_clampToIntegers = false;
+	sliderCableLength.m_clampToNotches = true;
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableLength, 0.2);
+
+	SliderParams sliderCableResolution("Resolution (Cable)", &data.Cable_resolution);
+	sliderCableResolution.m_userPointer = pdemo;
+	sliderCableResolution.m_minVal = 5;
+	sliderCableResolution.m_maxVal = 200;
+	sliderCableResolution.m_clampToIntegers = true;
+	sliderCableResolution.m_clampToNotches = true;
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableResolution, 5);
+
+	SliderParams sliderGroundOffset("Offset (Ground)", &data.Ground_offset);
+	sliderGroundOffset.m_userPointer = ground;
+	sliderGroundOffset.m_minVal = 0;
+	sliderGroundOffset.m_maxVal = 200;
+	sliderGroundOffset.m_clampToIntegers = true;
+	sliderGroundOffset.m_clampToNotches = true;
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderGroundOffset, 2);
+
+	ButtonParams lraSelector("LRA", 1, true);
+	lraSelector.m_userPointer = pdemo;
+	lraSelector.m_initialState = data.Cable_LRA;
+	lraSelector.m_callback = [](int buttonId, bool buttonState, void* userPtr)
+	{
+		if (buttonId != 1)
+		{
+			return;
+		}
+
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_stabilityData->Cable_LRA = buttonState;
+		pdemo->m_cable->setUseLRA(pdemo->m_stabilityData->Cable_LRA);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(lraSelector);
+
+	ButtonParams anchorPlacementSelector("AnchorPlacement", 2, true);
+	anchorPlacementSelector.m_userPointer = pdemo;
+	anchorPlacementSelector.m_initialState = data.Cable_AnchorPlacement;
+	anchorPlacementSelector.m_callback = [](int buttonId, bool buttonState, void* userPtr)
+	{
+		if (buttonId != 2)
+		{
+			return;
+		}
+
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_stabilityData->Cable_AnchorPlacement = buttonState;
+		pdemo->m_cable->setUseAnchorConstraintPlacement(pdemo->m_stabilityData->Cable_AnchorPlacement);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(anchorPlacementSelector);
+
+	SliderParams sliderMassA("Mass Lest (A)", &data.A_mass);
+	sliderMassA.m_userPointer = ringLest;
+	sliderMassA.m_minVal = 10;
+	sliderMassA.m_maxVal = 20000;
+	sliderMassA.m_clampToIntegers = true;
+	sliderMassA.m_clampToNotches = true;
+	sliderMassA.m_callback = [](float value, void* userPtr)
+	{
+		btRigidBody* lest = (btRigidBody*)userPtr;
+		lest->setMassProps(value, lest->getLocalInertia() * value * lest->getInvMass());
+		lest->updateInertiaTensor();
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassA, 100);
+
+	SliderParams sliderAMassRatio("MassRatio (A)", &data.A_massRatio);
+	sliderAMassRatio.m_userPointer = pdemo;
+	sliderAMassRatio.m_minVal = 0;
+	sliderAMassRatio.m_maxVal = 1;
+	sliderAMassRatio.m_clampToIntegers = false;
+	sliderAMassRatio.m_clampToNotches = true;
+	sliderAMassRatio.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* demo = (CableDemo*)userPtr;
+		demo->m_cable->m_anchors[0].m_bodyMassRatio = value;
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, 0.05);
+
+	SliderParams sliderCableLinearMass("Linear Mass (Cable)", &data.Cable_linearMass);
+	sliderCableLinearMass.m_userPointer = pdemo;
+	sliderCableLinearMass.m_minVal = 1;
+	sliderCableLinearMass.m_maxVal = 50;
+	sliderCableLinearMass.m_clampToIntegers = true;
+	sliderCableLinearMass.m_clampToNotches = true;
+	sliderCableLinearMass.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setLinearMass(value);
+		pdemo->m_cable->updateNodesMass();
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableLinearMass, 5);
+
+	SliderParams sliderCableTargetLength("Target Length (Cable)", &data.Cable_targetLength);
+	sliderCableTargetLength.m_userPointer = pdemo;
+	sliderCableTargetLength.m_minVal = 0.2;
+	sliderCableTargetLength.m_maxVal = 8;
+	sliderCableTargetLength.m_clampToIntegers = false;
+	sliderCableTargetLength.m_clampToNotches = true;
+	sliderCableTargetLength.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* demo = (CableDemo*)userPtr;
+		demo->SetCableTargetLength(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableTargetLength, 0.2);
+
+	SliderParams sliderCableGrowSpeed("Change Speed (Cable)", &data.Cable_growSpeed);
+	sliderCableGrowSpeed.m_userPointer = pdemo;
+	sliderCableGrowSpeed.m_minVal = -4;
+	sliderCableGrowSpeed.m_maxVal = 4;
+	sliderCableGrowSpeed.m_clampToIntegers = false;
+	sliderCableGrowSpeed.m_clampToNotches = true;
+	sliderCableGrowSpeed.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* demo = (CableDemo*)userPtr;
+		demo->SetCableGrowSpeed(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableGrowSpeed, 0.2);
+
+		SliderParams sliderCableSolverIteration("Solver iteration (Cable)", &data.Cable_iteration);
+	sliderCableSolverIteration.m_userPointer = pdemo;
+	sliderCableSolverIteration.m_minVal = 10;
+	sliderCableSolverIteration.m_maxVal = 200;
+	sliderCableSolverIteration.m_clampToIntegers = true;
+	sliderCableSolverIteration.m_clampToNotches = true;
+	sliderCableSolverIteration.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->m_cfg.piterations = value;
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableSolverIteration, 10);
+}
+
+static void Init_StabilityA18(CableDemo* pdemo)
+{
+	// Update shared data
+	auto& data = StabilityA18Data;
+	pdemo->m_stabilityData = &data;
+
+	// Test defaults
+	if (data.AutoResetTensionTest)
+	{
+		// Rigidbodies
+		data.A_mass = 100;
+		data.C_mass = 100;
+		data.Ground_offset = 10.0;
+
+		// Anchors
+		data.A_massRatio = 0.0;
+		data.D_massRatio = 0.0;
+
+		// Distance
+		data.Cable_DistanceMode = 0;
+
+		// Cable
+		data.Cable_resolution = 20;
+		data.Cable_iteration = 100;
+		data.Cable_linearMass = 10;
+		data.Cable_length = 0.4;
+		data.Cable_targetLength = 1.0;
+		data.Cable_growSpeed = 1.0;
+		data.Cable_LRA = false;
+		data.Cable_AnchorPlacement = false;
+	}
+
+	// Shapes
+	btCollisionShape* updownBoxShape = new btBoxShape(btVector3(0.4, 0.1, 0.1));
+	btCollisionShape* lefrightBoxShape = new btBoxShape(btVector3(0.1, 0.4, 0.1));
+	btTransform upBoxTransform(btMatrix3x3::getIdentity(), btVector3(0, 0.3, 0));
+	btTransform downBoxTransform(btMatrix3x3::getIdentity(), btVector3(0, -0.3, 0));
+	btTransform leftBoxTransform(btMatrix3x3::getIdentity(), btVector3(-0.3, 0, 0));
+	btTransform rightBoxTransform(btMatrix3x3::getIdentity(), btVector3(0.3, 0, 0));
+
+	btCompoundShape* ringShape = new btCompoundShape(false);
+	ringShape->addChildShape(upBoxTransform, updownBoxShape);
+	ringShape->addChildShape(downBoxTransform, updownBoxShape);
+	ringShape->addChildShape(leftBoxTransform, lefrightBoxShape);
+	ringShape->addChildShape(rightBoxTransform, lefrightBoxShape);
+
+	btBoxShape* a18Shape = new btBoxShape(btVector3(0.6, 2, 0.6));
+
+	btScalar waypointHeightShift = 0.3;
+	btScalar attachPointHeight = 5;
+	btScalar LestHeight = attachPointHeight - waypointHeightShift - data.Cable_length;
+
+	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, attachPointHeight, 0));
+	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, LestHeight, 0));
+	btTransform transformRingA18(btQuaternion(btVector3(0, 1, 0), SIMD_HALF_PI), btVector3(0, LestHeight - 0.3, 0));
+	btTransform transformA18(btMatrix3x3::getIdentity(), btVector3(0, transformRingA18.getOrigin().getY() - 2.0 - 0.3, 0));
+
+	// Objet A (Lest)
+	btRigidBody* ringLest = pdemo->createRigidBody(data.A_mass, transformRingLest, ringShape);
+	ringLest->setSleepingThresholds(0, 0);
+
+	// Objet C (A18)
+	btRigidBody* a18 = pdemo->createRigidBody(data.C_mass, transformA18, a18Shape);
+	a18->setSleepingThresholds(0, 0);
+
+	// Object B (Claw)
+	btRigidBody* ringA18 = pdemo->createRigidBody(data.B_mass, transformRingA18, ringShape);
+	ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.3, 0));
+	ringA18->m_redirectionTarget = a18;
+	a18->m_Children.push_back(ringA18);
+
+	// Objet D (Cable attach point)
+	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1, 0.1, 0.1)));
+	attachPoint->setCollisionFlags(2);  
+	attachPoint->setSleepingThresholds(0, 0);
+	attachPoint->setMassProps(0, btVector3(0, 0, 0));
+
+	// Ground
+	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion::getIdentity(), 
+		                                         btVector3(0, LestHeight - data.Ground_offset - 4 - 0.6 - 0.2, 0)),
+												 new btBoxShape(btVector3(10, 0.2, 10)));
+
+	// Cable
+	// Waypoints
+	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
+	waypointPos.push_back(transformRingLest.getOrigin() + btVector3(0, waypointHeightShift, 0));
+	waypointPos.push_back(transformAttachPoint.getOrigin());
+
+	// Parameters
+	btCable* cable = pdemo->createCableWaypoint(data.Cable_resolution, data.Cable_iteration, data.Cable_linearMass, waypointPos, ringLest, attachPoint, true, true);
+	cable->getCollisionShape()->setMargin(0.025);
+	cable->setCableRadius(0.05);
+	cable->setUseBending(false);
+	cable->setUseLRA(data.Cable_LRA);
+	cable->m_anchors[0].m_bodyMassRatio = data.A_massRatio;
+	cable->m_anchors[1].m_bodyMassRatio = data.D_massRatio;
+	cable->m_materials[0]->m_kLST = 1.0;
+	cable->setDistanceMode(data.Cable_DistanceMode);
+	cable->setUseAnchorConstraintPlacement(data.Cable_AnchorPlacement);
+	pdemo->m_cable = cable;
+
+	// User controls
+	ButtonParams dataSelector("Lock", 0, true);
+	dataSelector.m_userPointer = pdemo;
+	dataSelector.m_initialState = data.AutoResetTensionTest < 0.5;
+	dataSelector.m_callback = [](int buttonId, bool buttonState, void* userPtr)
+	{
+		if (buttonId != 0) { return; }
+
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_stabilityData->AutoResetTensionTest = buttonState ? 0 : 1;
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(dataSelector);
+
+	SliderParams sliderCableResolution("Resolution (Cable)", &data.Cable_resolution);
+	sliderCableResolution.m_userPointer = pdemo;
+	sliderCableResolution.m_minVal = 5;
+	sliderCableResolution.m_maxVal = 200;
+	sliderCableResolution.m_clampToIntegers = true;
+	sliderCableResolution.m_clampToNotches = true;
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableResolution, 5);
+
+	SliderParams sliderCableLength("Initial Length (Cable)", &data.Cable_length);
+	sliderCableLength.m_userPointer = pdemo;
+	sliderCableLength.m_minVal = 0.2;
+	sliderCableLength.m_maxVal = 8;
+	sliderCableLength.m_clampToIntegers = false;
+	sliderCableLength.m_clampToNotches = true;
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableLength, 0.2);
+
+	SliderParams sliderGroundOffset("Offset (Ground)", &data.Ground_offset);
+	sliderGroundOffset.m_userPointer = ground;
+	sliderGroundOffset.m_minVal = 0;
+	sliderGroundOffset.m_maxVal = 200;
+	sliderGroundOffset.m_clampToIntegers = true;
+	sliderGroundOffset.m_clampToNotches = true;
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderGroundOffset, 2);
+
+	ButtonParams lraSelector("LRA", 1, true);
+	lraSelector.m_userPointer = pdemo;
+	lraSelector.m_initialState = data.Cable_LRA;
+	lraSelector.m_callback = [](int buttonId, bool buttonState, void* userPtr)
+	{
+		if (buttonId != 1)
+		{
+			return;
+		}
+
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_stabilityData->Cable_LRA = buttonState;
+		pdemo->m_cable->setUseLRA(pdemo->m_stabilityData->Cable_LRA);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(lraSelector);
+
+	ButtonParams anchorPlacementSelector("AnchorPlacement", 2, true);
+	anchorPlacementSelector.m_userPointer = pdemo;
+	anchorPlacementSelector.m_initialState = data.Cable_AnchorPlacement;
+	anchorPlacementSelector.m_callback = [](int buttonId, bool buttonState, void* userPtr)
+	{
+		if (buttonId != 2)
+		{
+			return;
+		}
+
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_stabilityData->Cable_AnchorPlacement = buttonState;
+		pdemo->m_cable->setUseAnchorConstraintPlacement(pdemo->m_stabilityData->Cable_AnchorPlacement);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(anchorPlacementSelector);
+
+	SliderParams sliderMassA("Mass Lest (A)", &data.A_mass);
+	sliderMassA.m_userPointer = ringLest;
+	sliderMassA.m_minVal = 10;
+	sliderMassA.m_maxVal = 20000;
+	sliderMassA.m_clampToIntegers = true;
+	sliderMassA.m_clampToNotches = true;
+	sliderMassA.m_callback = [](float value, void* userPtr)
+	{
+		btRigidBody* lest = (btRigidBody*)userPtr;
+		lest->setMassProps(value, lest->getLocalInertia() * value * lest->getInvMass());
+		lest->updateInertiaTensor();
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassA, 100);
+
+	SliderParams sliderMassC("Mass A18 (C)", &data.C_mass);
+	sliderMassC.m_userPointer = a18;
+	sliderMassC.m_minVal = 10;
+	sliderMassC.m_maxVal = 20000;
+	sliderMassC.m_clampToIntegers = true;
+	sliderMassC.m_clampToNotches = true;
+	sliderMassC.m_callback = [](float value, void* userPtr)
+	{
+		btRigidBody* a18 = (btRigidBody*)userPtr;
+		a18->setMassProps(value, a18->getLocalInertia() * value * a18->getInvMass());
+		a18->updateInertiaTensor();
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassC, 100);
+
+	SliderParams sliderAMassRatio("MassRatio (A)", &data.A_massRatio);
+	sliderAMassRatio.m_userPointer = pdemo;
+	sliderAMassRatio.m_minVal = 0;
+	sliderAMassRatio.m_maxVal = 1;
+	sliderAMassRatio.m_clampToIntegers = false;
+	sliderAMassRatio.m_clampToNotches = true;
+	sliderAMassRatio.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* demo = (CableDemo*)userPtr;
+		demo->m_cable->m_anchors[0].m_bodyMassRatio = value;
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, 0.05);
+
+	SliderParams sliderCableLinearMass("Linear Mass (Cable)", &data.Cable_linearMass);
+	sliderCableLinearMass.m_userPointer = pdemo;
+	sliderCableLinearMass.m_minVal = 1;
+	sliderCableLinearMass.m_maxVal = 50;
+	sliderCableLinearMass.m_clampToIntegers = true;
+	sliderCableLinearMass.m_clampToNotches = true;
+	sliderCableLinearMass.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setLinearMass(value);
+		pdemo->m_cable->updateNodesMass();
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableLinearMass, 5);
+
+	SliderParams sliderCableTargetLength("Target Length (Cable)", &data.Cable_targetLength);
+	sliderCableTargetLength.m_userPointer = pdemo;
+	sliderCableTargetLength.m_minVal = 0.2;
+	sliderCableTargetLength.m_maxVal = 8;
+	sliderCableTargetLength.m_clampToIntegers = false;
+	sliderCableTargetLength.m_clampToNotches = true;
+	sliderCableTargetLength.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* demo = (CableDemo*)userPtr;
+		demo->SetCableTargetLength(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableTargetLength, 0.2);
+
+	SliderParams sliderCableGrowSpeed("Change Speed (Cable)", &data.Cable_growSpeed);
+	sliderCableGrowSpeed.m_userPointer = pdemo;
+	sliderCableGrowSpeed.m_minVal = -4;
+	sliderCableGrowSpeed.m_maxVal = 4;
+	sliderCableGrowSpeed.m_clampToIntegers = false;
+	sliderCableGrowSpeed.m_clampToNotches = true;
+	sliderCableGrowSpeed.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* demo = (CableDemo*)userPtr;
+		demo->SetCableGrowSpeed(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableGrowSpeed, 0.2);
+
+	SliderParams sliderCableSolverIteration("Solver iteration (Cable)", &data.Cable_iteration);
+	sliderCableSolverIteration.m_userPointer = pdemo;
+	sliderCableSolverIteration.m_minVal = 10;
+	sliderCableSolverIteration.m_maxVal = 200;
+	sliderCableSolverIteration.m_clampToIntegers = true;
+	sliderCableSolverIteration.m_clampToNotches = true;
+	sliderCableSolverIteration.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->m_cfg.piterations = value;
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableSolverIteration, 10);
+}
+
+
 void (*demofncs[])(CableDemo*) =
 {
 	Init_CableForceDown,
@@ -4341,6 +4896,8 @@ void (*demofncs[])(CableDemo*) =
 	Init_FixedJoint,
 	Init_RayCast,
 	Init_Collision,
+	Init_StabilityTension,
+	Init_StabilityA18,
 	Init_Stability,
 	Init_TestBenchmarkSubsteps,
 };
