@@ -246,6 +246,58 @@ void GwenParameterInterface::registerSliderFloatParameter(SliderParams& params)
 	m_gwenInternalData->m_curYposition += 22;
 }
 
+void GwenParameterInterface::registerSliderFloatParameter(SliderParams& params, double notchInterval)
+{
+	Gwen::Controls::TextBox* label = new Gwen::Controls::TextBox(m_gwenInternalData->m_demoPage->GetPage());
+	m_paramInternalData->m_textLabels.push_back(label);
+	//m_data->m_myControls.push_back(label);
+	label->SetText(params.m_name);
+	label->SetPos(10, 10 + 25);
+	label->SetWidth(210);
+	label->SetPos(10, m_gwenInternalData->m_curYposition);
+	m_gwenInternalData->m_curYposition += 22;
+
+	Gwen::Controls::HorizontalSlider* pSlider = new Gwen::Controls::HorizontalSlider(m_gwenInternalData->m_demoPage->GetPage());
+	m_paramInternalData->m_sliders.push_back(pSlider);
+	//m_data->m_myControls.push_back(pSlider);
+	pSlider->SetPos(10, m_gwenInternalData->m_curYposition);
+	pSlider->SetSize(200, 20);
+	if (params.m_clampToNotches)
+	{
+		int notchesCount = 1 + (params.m_maxVal - params.m_minVal) / notchInterval;
+		if (params.m_clampToIntegers)
+		{
+			params.m_minVal = int(params.m_minVal);
+		}
+		params.m_maxVal = params.m_minVal + notchesCount * notchInterval;
+		pSlider->SetNotchCount(notchesCount);
+		pSlider->SetClampToNotches(params.m_clampToNotches);
+	}
+	else if (params.m_clampToIntegers)
+	{
+		pSlider->SetNotchCount(int(params.m_maxVal - params.m_minVal));
+		pSlider->SetClampToNotches(true);
+	}
+	else
+	{
+		pSlider->SetNotchCount(16);  //float(params.m_maxVal-params.m_minVal)/100.f);
+		pSlider->SetClampToNotches(false);
+	}
+	pSlider->SetRange(params.m_minVal, params.m_maxVal);
+
+	pSlider->SetValue(*params.m_paramValuePointer);  //dimensions[i] );
+	char labelName[1024];
+	safe_printf(labelName, sizeof(labelName), "%s", params.m_name);  //axisNames[0]);
+	MySliderEventHandler<btScalar>* handler = new MySliderEventHandler<btScalar>(labelName, label, pSlider, params.m_paramValuePointer, params.m_callback, params.m_userPointer);
+	handler->m_showValue = params.m_showValues;
+	m_paramInternalData->m_sliderEventHandlers.push_back(handler);
+
+	pSlider->onValueChanged.Add(handler, &MySliderEventHandler<btScalar>::SliderMoved);
+	handler->SliderMoved(pSlider);
+	//	float v = pSlider->GetValue();
+	m_gwenInternalData->m_curYposition += 22;
+}
+
 void GwenParameterInterface::syncParameters()
 {
 	for (int i = 0; i < m_paramInternalData->m_sliderEventHandlers.size(); i++)

@@ -80,6 +80,7 @@ struct CommonParameterInterface
 {
 	virtual ~CommonParameterInterface() {}
 	virtual void registerSliderFloatParameter(SliderParams& params) = 0;
+	virtual void registerSliderFloatParameter(SliderParams& params, double notchInterval) = 0;
 	virtual void registerButtonParameter(ButtonParams& params) = 0;
 	virtual void registerComboBox(ComboBoxParams& params) = 0;
 
