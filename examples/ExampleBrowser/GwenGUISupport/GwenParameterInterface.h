@@ -12,6 +12,7 @@ struct GwenParameterInterface : public CommonParameterInterface
 	GwenParameterInterface(struct GwenInternalData* gwenInternalData);
 	virtual ~GwenParameterInterface();
 	virtual void registerSliderFloatParameter(SliderParams& params);
+	virtual void registerSliderFloatParameter(SliderParams& params, double notchInterval);
 	virtual void registerButtonParameter(ButtonParams& params);
 	virtual void registerComboBox(ComboBoxParams& params);
 
