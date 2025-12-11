@@ -367,6 +367,8 @@ public:
 	btScalar forceResponseCoef;
 	btVector3 m_gravity;
 
+	void setMassRatioActivationThreshold(btScalar offset);
+
 	void updateLength(btScalar dt);
 
 	void Grows(float dt);
