@@ -253,6 +253,10 @@ private:
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
 
+	btScalar m_tenseAccumulator = 0.0;
+	btScalar m_minAccumulator = 0.2;
+	btScalar m_maxAccumulator = 1.0;
+
 	MonotonicSpline1D* spline;
 
 	// Node forces members
