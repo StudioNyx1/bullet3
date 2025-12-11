@@ -71,6 +71,11 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	m_collisionMode = CollisionMode::Base;
 }
 
+void btCable::setMassRatioActivationThreshold(btScalar offset)
+{
+	m_minAccumulator = offset;
+}
+
 void btCable::updateLength(btScalar dt)
 {
 	if (WantedSpeed > 0)

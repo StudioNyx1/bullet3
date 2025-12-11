@@ -78,6 +78,7 @@ struct StabilityData
 	bool Cable_LRA{false};
 	bool Cable_AnchorPlacement{false};
 	btScalar Cable_DistanceMode{0};
+	btScalar Cable_massRatioActivationThreshold{0.0};
 
 	// Used to reset to test init values
 	bool AutoResetTensionTest{false};
@@ -4390,6 +4391,7 @@ static void Init_StabilityTension(CableDemo* pdemo)
 		data.Cable_growSpeed = 1.0;
 		data.Cable_LRA = false;
 		data.Cable_AnchorPlacement = false;
+		data.Cable_massRatioActivationThreshold = 0.0;
 	}
 
 	// Shapes
@@ -4445,6 +4447,7 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	cable->m_materials[0]->m_kLST = 1.0;
 	cable->setDistanceMode(data.Cable_DistanceMode);
 	cable->setUseAnchorConstraintPlacement(data.Cable_AnchorPlacement);
+	cable->setMassRatioActivationThreshold(data.Cable_massRatioActivationThreshold);
 	pdemo->m_cable = cable;
 
 	// User controls
@@ -4545,6 +4548,19 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, 0.05);
 
+	SliderParams sliderMassRationActivationThreshold("Mass ratio min threshold (Cable)", &data.Cable_massRatioActivationThreshold);
+	sliderMassRationActivationThreshold.m_userPointer = pdemo;
+	sliderMassRationActivationThreshold.m_minVal = 0;
+	sliderMassRationActivationThreshold.m_maxVal = 1.0;
+	sliderMassRationActivationThreshold.m_clampToIntegers = true;
+	sliderMassRationActivationThreshold.m_clampToNotches = true;
+	sliderMassRationActivationThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setMassRatioActivationThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassRationActivationThreshold, 0.05);
+
 	SliderParams sliderCableLinearMass("Linear Mass (Cable)", &data.Cable_linearMass);
 	sliderCableLinearMass.m_userPointer = pdemo;
 	sliderCableLinearMass.m_minVal = 1;
@@ -4629,6 +4645,7 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		data.Cable_growSpeed = 1.0;
 		data.Cable_LRA = false;
 		data.Cable_AnchorPlacement = false;
+		data.Cable_massRatioActivationThreshold = 0.0;
 	}
 
 	// Shapes
@@ -4698,6 +4715,7 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	cable->m_materials[0]->m_kLST = 1.0;
 	cable->setDistanceMode(data.Cable_DistanceMode);
 	cable->setUseAnchorConstraintPlacement(data.Cable_AnchorPlacement);
+	cable->setMassRatioActivationThreshold(data.Cable_massRatioActivationThreshold);
 	pdemo->m_cable = cable;
 
 	// User controls
@@ -4807,6 +4825,19 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		demo->m_cable->m_anchors[0].m_bodyMassRatio = value;
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, 0.05);
+
+	SliderParams sliderMassRationActivationThreshold("Mass ratio min threshold (Cable)", &data.Cable_massRatioActivationThreshold);
+	sliderMassRationActivationThreshold.m_userPointer = pdemo;
+	sliderMassRationActivationThreshold.m_minVal = 0;
+	sliderMassRationActivationThreshold.m_maxVal = 1.0;
+	sliderMassRationActivationThreshold.m_clampToIntegers = true;
+	sliderMassRationActivationThreshold.m_clampToNotches = true;
+	sliderMassRationActivationThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setMassRatioActivationThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassRationActivationThreshold, 0.05);
 
 	SliderParams sliderCableLinearMass("Linear Mass (Cable)", &data.Cable_linearMass);
 	sliderCableLinearMass.m_userPointer = pdemo;
