@@ -147,6 +147,9 @@ void btCable::PrepareSolver()
 {
 	int i, ni;
 
+	// Prepare cable
+	m_tenseAccumulator = 0.0;
+
 	// Prepare nodes
 	for (i = 0, ni = m_nodes.size(); i < ni; ++i)
 	{
@@ -1244,15 +1247,17 @@ void btCable::distanceConstraintBullet()
 			Node& a = *l.m_n[0];
 			Node& b = *l.m_n[1];
 			const btVector3 del = b.m_x - a.m_x;
-			const btScalar len = del.length2();
-			if (l.m_c1 + len > SIMD_EPSILON)
+			const btScalar len2 = del.length2();
+			if (l.m_c1 + len2 > SIMD_EPSILON)
 			{
-				const btScalar k = ((l.m_c1 - len) / (l.m_c0 * (l.m_c1 + len))) * stiffness;
+				const btScalar k = ((l.m_c1 - len2) / (l.m_c0 * (l.m_c1 + len2))) * stiffness;
 				a.m_x -= del * (k * a.m_im);
 				b.m_x += del * (k * b.m_im);
+				m_tenseAccumulator = max(m_tenseAccumulator, (len2 - l.m_c1) / l.m_c1);
 			}
 		}
 	}
+	m_tenseAccumulator = min(m_tenseAccumulator, m_maxAccumulator);
 }
 
 void btCable::distanceConstraintXPBD()
