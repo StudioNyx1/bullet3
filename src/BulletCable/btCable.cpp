@@ -57,7 +57,7 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	}
 	else
 	{
-		m_defaultRestLength = m_links.at(0).m_rl;
+		m_defaultRestLength = m_links.at(m_links.size() - 1 ).m_rl;
 	}
 
 	m_gravity = worldInfo->m_gravity;
@@ -424,6 +424,9 @@ void btCable::predictMotion(btScalar dt)
 {
 	cableState = Valid;
 	int i, ni;
+
+	// Grows/Shrinks the cable
+	updateLength(dt);
 
 	/* Update                */
 	if (m_bUpdateRtCst)
