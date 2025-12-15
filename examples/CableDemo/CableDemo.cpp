@@ -56,6 +56,13 @@ class btSoftSoftCollisionAlgorithm;
 class btSoftRididCollisionAlgorithm;
 class btSoftRigidDynamicsWorld;
 
+
+struct GlobalData
+{
+	btScalar substepsCount{4};
+};
+
+
 struct StabilityData
 {
 	// Rigidbodies
@@ -86,6 +93,7 @@ struct StabilityData
 
 StabilityData StabilityTensionData{};
 StabilityData StabilityA18Data{};
+GlobalData globals{};
 
 
 struct CableStepController
@@ -216,7 +224,7 @@ public:
 	btScalar posY;
 	btScalar margin;
 
-	int substepSolver = 1; 
+	int substepSolver;  // User controlled in globals.substepsCount
 	btAlignedObjectArray<btSoftSoftCollisionAlgorithm*> m_SoftSoftCollisionAlgorithms;
 
 	btAlignedObjectArray<btSoftRididCollisionAlgorithm*> m_SoftRigidCollisionAlgorithms;
@@ -4451,6 +4459,14 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	pdemo->m_cable = cable;
 
 	// User controls
+	SliderParams sliderSubsteps("Substeps count (Global)", &globals.substepsCount);
+	sliderSubsteps.m_userPointer = pdemo;
+	sliderSubsteps.m_minVal = 1;
+	sliderSubsteps.m_maxVal = 8;
+	sliderSubsteps.m_clampToIntegers = true;
+	sliderSubsteps.m_clampToNotches = true;
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderSubsteps, 1);
+
 	ButtonParams dataSelector("Lock", 0, true);
 	dataSelector.m_userPointer = pdemo;
 	dataSelector.m_initialState = data.AutoResetTensionTest < 0.5;
@@ -4719,6 +4735,14 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	pdemo->m_cable = cable;
 
 	// User controls
+	SliderParams sliderSubsteps("Substeps count (Global)", &globals.substepsCount);
+	sliderSubsteps.m_userPointer = pdemo;
+	sliderSubsteps.m_minVal = 1;
+	sliderSubsteps.m_maxVal = 8;
+	sliderSubsteps.m_clampToIntegers = true;
+	sliderSubsteps.m_clampToNotches = true;
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderSubsteps, 1);
+
 	ButtonParams dataSelector("Lock", 0, true);
 	dataSelector.m_userPointer = pdemo;
 	dataSelector.m_initialState = data.AutoResetTensionTest < 0.5;
@@ -5156,6 +5180,8 @@ void CableDemo::initPhysics()
 	m_softBodyWorldInfo.water_offset = 0;
 	m_softBodyWorldInfo.water_normal = btVector3(0, 0, 0);
 	m_softBodyWorldInfo.m_gravity.setValue(0, -9.81, 0);
+	// Sync both asked value and current used value
+	substepSolver = globals.substepsCount;
 	m_softBodyWorldInfo.numIteration = substepSolver;
 
 	m_autocam = false;
