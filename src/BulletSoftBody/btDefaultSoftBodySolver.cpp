@@ -67,7 +67,6 @@ bool btDefaultSoftBodySolver::checkInitialized()
 void btDefaultSoftBodySolver::solveConstraints(btScalar solverdt)
 {
 	// Solve constraints for non-solver softbodies
-	
 	omp_set_dynamic(0);      // Explicitly disable dynamic teams
 	omp_set_num_threads(numThread);  // Use numThread threads for all consecutive parallel regions
 	#pragma omp parallel for	
@@ -80,12 +79,6 @@ void btDefaultSoftBodySolver::solveConstraints(btScalar solverdt)
 		{
 			psb->solveConstraints();
 		}
-
-		// grows/shrinks only in physic
-		if (cable != nullptr && psb->isActive())
-		{
-			cable->updateLength(solverdt);
-		}
 		
 		if (cable != nullptr && psb->isActive())
 		{
@@ -97,15 +90,8 @@ void btDefaultSoftBodySolver::solveConstraints(btScalar solverdt)
 void btDefaultSoftBodySolver::solveConstraintsOneCable(btScalar solverdt, btCable *cable)
 {
 	// Solve constraints for non-solver softbodies
-	
 	omp_set_dynamic(0);      // Explicitly disable dynamic teams
 	omp_set_num_threads(1);  // Use numThread threads for all consecutive parallel regions
-
-	// grows/shrinks only in physic
-	if (cable != nullptr && cable->isActive())
-	{
-		cable->updateLength(solverdt);
-	}
 
 	if (cable->isActive())
 	{
@@ -120,7 +106,6 @@ void btDefaultSoftBodySolver::copySoftBodyToVertexBuffer(const btSoftBody *const
 	// TODO: check for DX11 buffers. Take all offsets into the same DX11 buffer
 	// and use them together on a single kernel call if possible by setting up a
 	// per-cloth target buffer array for the copy kernel.
-
 	if (vertexBuffer->getBufferType() == btVertexBufferDescriptor::CPU_BUFFER)
 	{
 		const btAlignedObjectArray<btSoftBody::Node> &clothVertices(softBody->m_nodes);
