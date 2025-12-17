@@ -499,133 +499,131 @@ void btCable::predictMotion(btScalar dt)
 
 void btCable::Grows(float dt)
 {
-	if (!m_world)
-	{
-		return;
-	}
+	int sizeNode = m_nodes.size();
+	int lastIndexNode = sizeNode - 1;
 
-	int totalNumNodes = ((btSoftRigidDynamicsWorld*)m_world)->getTotalNumNodes();
-	double rl = m_links.at(m_links.size() - 1).m_rl;
-	double distance = dt * WantedSpeed + rl;
-	int nodeSize = m_nodes.size();
+	int sizeLink = m_links.size();
+	int lastIndexLink = sizeLink - 1;
+	Link& lastLink = m_links.at(lastIndexLink);
 
-	// If there is a target length we don t extend rl more than necessary
+	// Get the all distances needed
+	btScalar lengthToAdd = dt * abs(WantedSpeed);
+	btScalar currentLinkRL = lastLink.m_rl;
+	btScalar newLinkRL = currentLinkRL + lengthToAdd;
+	btScalar totalLengthRL = getRestLength();
+	btScalar currentCableRL = getLinkRestLength(lastIndexLink);
+	btScalar maxRL = currentCableRL * 2.0;
+
+	// If there is a target length we don't extend rl more than necessary
 	if (WantedDistance > 0)
 	{
 		btScalar value = WantedDistance - getRestLength();
 		if (value > FLT_EPSILON && value < dt * WantedSpeed)
 		{
-			distance = value + rl;
+			newLinkRL = value + currentLinkRL;
 			WantedSpeed = 0;
 		}
 	}
 
-	// base restLength on the link
-	double linkRestLength = getLinkRestLength(m_links.size() - 1);
-
-	// Check if we had to had a node
-	if (distance > linkRestLength * 2)
+	// if we had to add a node
+	while (newLinkRL > maxRL)
 	{
-		// Node number limits
-		if (totalNumNodes >= m_worldInfo->maxNodeNumber || nodeSize >= m_worldInfo->maxNodeNumberPerCable)
+		// Limit the node's number
+		if (((btSoftRigidDynamicsWorld*)m_world)->getTotalNumNodes() >= m_worldInfo->maxNodeNumber || sizeNode >= m_worldInfo->maxNodeNumberPerCable)
 		{
+			newLinkRL = maxRL;
 			m_growingState = 4;
-			return;
+			WantedSpeed = 0;
+			break;
+		}			
+		
+		// Get the affected anchor to modify it after the node and links removing
+		Anchor* anchor = nullptr;
+		for (int i = 0; i < m_anchors.size(); i++)
+		{
+			Anchor* currentAnchor = &m_anchors.at(i);
+			// Look up for its new node's data
+			if (currentAnchor->m_node->index == lastIndexNode)
+			{
+				anchor = currentAnchor;
+				break;
+			}
 		}
+
+		// Get the nodes
+		Node* lastNode = &m_nodes[lastIndexNode];
+		Node* newNode = nullptr;
+		Node* beforeNewNode = &m_nodes[lastIndexNode - 1];
+
+		// Remove the last link
+		m_links.removeAtIndex(lastIndexLink);
+		lastIndexLink--;
+		sizeLink--;
+
+		// Calculate the new node's position
+		btVector3 dirCable = (lastNode->m_x - beforeNewNode->m_x).normalized();
+		btVector3 newNodePos = beforeNewNode->m_x + dirCable * currentCableRL;
+
+		// Create the new node again
+		appendNode(newNodePos, 1.0);		
+		lastIndexNode++;
+		sizeNode++;		
+		
+		// Swap the new node and the node-1
+		m_nodes.swap(lastIndexNode - 1, lastIndexNode);
+
+		// Get the nodes
+		lastNode = &m_nodes[lastIndexNode];
+		newNode = &m_nodes[lastIndexNode - 1];
+		beforeNewNode = &m_nodes[lastIndexNode - 2];
+
+		// Set the indexex
+		lastNode->index = lastIndexNode;
+		newNode->index = lastIndexNode - 1; 
+		beforeNewNode->index = lastIndexNode - 2;
+
+		// Re-synchronize the anchor's node
+		if (anchor)
+		{
+			anchor->m_node = lastNode;
+		}
+
+		// Calculte the before new node's mass
+		btScalar beforelastNodeMass = m_linearMass * 0.5f * (currentCableRL + (lastIndexLink < 0 ? 0.0 : m_links.at(lastIndexLink).m_rl));
+		setMass(lastIndexNode - 2, beforelastNodeMass);
+
+		// Update the new node's and before new node's velocities
+		newNode->m_v = beforeNewNode->m_v;
+		beforeNewNode->m_v = ((lastIndexNode < 3 ? btVector3(0,0,0) : m_nodes[lastIndexNode - 3].m_v) + beforeNewNode->m_v) * 0.5;
+
+		// Create the two links (n and n-1)
+		appendLink(lastIndexNode - 2, lastIndexNode - 1, m_materials[0]);
+		lastIndexLink++;
+		sizeLink++;
+		appendLink(lastIndexNode - 1, lastIndexNode, m_materials[0]);
+		lastIndexLink++;
+		sizeLink++;
+
+		newLinkRL -= currentCableRL;
 	}
 
-	m_links.at(m_links.size() - 1).m_rl = distance;
-	m_links.at(m_links.size() - 1).m_c1 = distance * distance;
+	// Set the Rest Length
+	m_links.at(lastIndexLink).m_rl = newLinkRL;
+	m_links.at(lastIndexLink).m_c1 = newLinkRL * newLinkRL;
 
-	btScalar firstNodeMass = m_linearMass * 0.5f * distance;
-
-	// Update mass
-	setMass(nodeSize - 1, firstNodeMass);
-	if (nodeSize > 2)
+	// Set the mass for the last-1 node
+	btScalar firstNodeMass = m_linearMass * 0.5f * newLinkRL;
+	setMass(lastIndexNode, firstNodeMass);
+	if (sizeNode > 2)
 	{
-		btScalar linkMass = firstNodeMass + m_linearMass * 0.5f * (m_links[m_links.size() - 2].m_rl);
-		setMass(nodeSize - 2, linkMass);
+		btScalar linkMass = firstNodeMass + m_linearMass * 0.5f * (m_links[lastIndexLink - 1].m_rl);
+		setMass(lastIndexNode - 1, linkMass);
 	}
 	else
 	{
-		setMass(nodeSize - 2, firstNodeMass);
+		setMass(lastIndexNode - 1, firstNodeMass);
 	}
 
-	// Case when we need to add at least 1 node
-	while (distance > linkRestLength * 2)
-	{
-		if (totalNumNodes >= m_worldInfo->maxNodeNumber || nodeSize >= m_worldInfo->maxNodeNumberPerCable)
-		{
-			m_growingState = 4;
-			return;
-		}
-
-		Node* node0 = &m_nodes[nodeSize - 1];
-		Node* node1 = &m_nodes[nodeSize - 2];
-
-		btVector3 dir = node0->m_x - node1->m_x;
-		dir.normalize();
-		dir *= linkRestLength;
-
-		// Save last node position (will be new node's position)
-		btVector3 positionLastNode = node0->m_x;
-
-		// Set the node at the right place
-		btVector3 positionPreviousNode = node1->m_x + dir;
-		ResetNodePosition(nodeSize - 1, positionPreviousNode);
-
-		node0->m_battach = 0;
-
-		// Create the new node
-		this->appendNode(positionLastNode, 1 / node0->m_im);
-		nodeSize++;
-
-		// Set the velocity
-		Node* newNode = &m_nodes[nodeSize - 1];
-		newNode->m_v = m_nodes.at(nodeSize - 2).m_v;
-		m_nodes.at(nodeSize - 2).m_v = (m_nodes.at(nodeSize - 3).m_v + m_nodes.at(nodeSize - 2).m_v) * 0.5;
-		appendLink(m_nodes.size() - 2, m_nodes.size() - 1, m_materials[0]);
-
-		// Split rest length onto the 2 last links
-		m_links[m_links.size() - 2].m_rl = linkRestLength;
-		m_links[m_links.size() - 2].m_c1 = linkRestLength * linkRestLength;
-
-		m_links[m_links.size() - 1].m_rl = distance - linkRestLength;
-		m_links[m_links.size() - 1].m_c1 = (distance - linkRestLength) * (distance - linkRestLength);
-
-		// Swap anchor if needed
-		for (int i = 0; i < m_anchors.size(); i++)
-		{
-			Anchor* a = &m_anchors.at(i);
-			if (a->m_node != nullptr)
-			{
-				// If its the anchor on the previous last node
-				if (a->m_node->index == m_nodes.size() - 2)
-				{
-					newNode->m_battach = -1;
-					a->m_node = &m_nodes.at(m_nodes.size() - 1);
-				}
-			}
-		}
-		distance -= linkRestLength;
-
-		// Update Mass
-		btScalar firstNodeMass = m_linearMass * 0.5f * distance;
-		setMass(nodeSize - 1, firstNodeMass);
-		btScalar LinkMassWithRl = 0.5 * m_links[m_links.size() - 2].m_rl * m_linearMass;
-		setMass(nodeSize - 2, LinkMassWithRl + firstNodeMass);
-		// If there is only 2 links
-		if (nodeSize == 3)
-		{
-			setMass(nodeSize - 3, LinkMassWithRl);
-		}
-		// Normal case
-		else
-		{
-			btScalar LinkMassBefore = 0.5 * m_links[m_links.size() - 3].m_rl * m_linearMass;
-			setMass(nodeSize - 3, LinkMassWithRl + LinkMassBefore);
-		}
-	}
 	m_growingState = 1;
 }
 
@@ -729,7 +727,7 @@ void btCable::Shrinks(float dt)
 		newLinkRL += currentCableRL;
 	}
 
-	// Set the Rest Length and set the mass
+	// Set the Rest Length
 	m_links.at(lastIndexLink).m_rl = newLinkRL;
 	m_links.at(lastIndexLink).m_c1 = newLinkRL * newLinkRL;
 
