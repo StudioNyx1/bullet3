@@ -71,8 +71,9 @@ struct StabilityData
 	btScalar C_mass{100.0};
 	btScalar Ground_offset{0.4};
 
-	// Anchors
+	// Tweaks
 	btScalar A_massRatio{0.0};
+	btScalar A_MassImpact{0.0};
 	btScalar D_massRatio{0.0};
 
 	// Cable
@@ -2292,7 +2293,8 @@ static void Init_TestSupportA18(CableDemo* pdemo)
 	LestTransform.setIdentity();
 	LestTransform.setOrigin(btVector3(0, -3, 0));
 	btRigidBody* Lest = pdemo->createRigidBody(10, LestTransform, cylander);
-	Lest->updateMassAtImpact(true, 10, 704, 0, 0.1);
+	Lest->setupMassAtImpact(10, 704, 0, 0.1);
+	Lest->activeMassAtImpact(true);
 
 	//btVector3 positionWall(2, 0.8,0);
 	//btTransform transformWall;
@@ -4382,6 +4384,7 @@ static void Init_StabilityTension(CableDemo* pdemo)
 		data.B_mass = 0.0;
 		data.C_mass = 100.0;
 		data.Ground_offset = 0.4;
+		data.A_MassImpact = 0.0;
 
 		// Anchors
 		data.A_massRatio = 0.02;
@@ -4426,6 +4429,8 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	// Objet A (Lest)
 	btRigidBody* ringLest = pdemo->createRigidBody(data.A_mass, transformRingLest, ringShape);
 	ringLest->setSleepingThresholds(0, 0);
+	ringLest->setupMassAtImpact(data.A_mass, 200, 0.0, 0.2);
+	ringLest->activeMassAtImpact(data.A_MassImpact > 0.0 ? true : false);
 
 	// Objet D (Cable attach point)
 	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1, 0.1, 0.1)));
@@ -4557,6 +4562,19 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassA, stepMassA);
 
+	SliderParams sliderMassImpactA("MassAtImpact (A)", &data.A_MassImpact);
+	sliderMassImpactA.m_userPointer = ringLest;
+	sliderMassImpactA.m_minVal = 0;
+	sliderMassImpactA.m_maxVal = 1;
+	sliderMassImpactA.m_clampToIntegers = true;
+	sliderMassImpactA.m_clampToNotches = false;
+	sliderMassImpactA.m_callback = [](float value, void* userPtr)
+	{
+		btRigidBody* lest = (btRigidBody*)userPtr;
+		lest->activeMassAtImpact(value > 0.0 ? true : false);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassImpactA, 1);
+
 	SliderParams sliderAMassRatio("MassRatio (A)", &data.A_massRatio);
 	btScalar stepAMassRatio = 0.02;
 	sliderAMassRatio.m_userPointer = pdemo;
@@ -4656,6 +4674,7 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		data.A_mass = 100;
 		data.C_mass = 100;
 		data.Ground_offset = 10.0;
+		data.A_MassImpact = 0.0;
 
 		// Anchors
 		data.A_massRatio = 0.0;
@@ -4704,6 +4723,8 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	// Objet A (Lest)
 	btRigidBody* ringLest = pdemo->createRigidBody(data.A_mass, transformRingLest, ringShape);
 	ringLest->setSleepingThresholds(0, 0);
+	ringLest->setupMassAtImpact(data.A_mass, 200, 0.0, 0.2);
+	ringLest->activeMassAtImpact(data.A_MassImpact > 0.0 ? true : false);
 
 	// Objet C (A18)
 	btRigidBody* a18 = pdemo->createRigidBody(data.C_mass, transformA18, a18Shape);
@@ -4850,6 +4871,19 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		a18->updateInertiaTensor();
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassC, 100);
+
+	SliderParams sliderMassImpactA("MassAtImpact (A)", &data.A_MassImpact);
+	sliderMassImpactA.m_userPointer = ringLest;
+	sliderMassImpactA.m_minVal = 0;
+	sliderMassImpactA.m_maxVal = 1;
+	sliderMassImpactA.m_clampToIntegers = true;
+	sliderMassImpactA.m_clampToNotches = false;
+	sliderMassImpactA.m_callback = [](float value, void* userPtr)
+	{
+		btRigidBody* lest = (btRigidBody*)userPtr;
+		lest->activeMassAtImpact(value > 0.0 ? true : false);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassImpactA, 1);
 
 	SliderParams sliderAMassRatio("MassRatio (A)", &data.A_massRatio);
 	sliderAMassRatio.m_userPointer = pdemo;
