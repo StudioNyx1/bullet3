@@ -101,6 +101,7 @@ void btRigidBody::setupRigidBody(const btRigidBody::btRigidBodyConstructionInfo&
 	m_deltaLinearVelocity.setZero();
 	m_deltaAngularVelocity.setZero();
 	m_invMass = m_inverseMass * m_linearFactor;
+	m_lowerLimitMassImpact = m_inverseMass < 0.0 ? 0.0 : 1.0 / m_inverseMass;
 	m_pushVelocity.setZero();
 	m_turnVelocity.setZero();
 
@@ -278,7 +279,8 @@ void btRigidBody::setGravity(const btVector3& acceleration)
 {
 	if (m_inverseMass != btScalar(0.0))
 	{
-		m_gravity = acceleration * (btScalar(1.0) / m_inverseMass);
+		// m_gravity = acceleration * (btScalar(1.0) / m_inverseMass);
+		m_gravity = acceleration * m_lowerLimitMassImpact;
 	}
 	m_gravity_acceleration = acceleration;
 }
