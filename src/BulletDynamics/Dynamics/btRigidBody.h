@@ -59,6 +59,28 @@ enum btRigidBodyFlags
 ///Deactivated (sleeping) rigid bodies don't take any processing time, except a minor broadphase collision detection impact (to allow active objects to activate/wake up sleeping objects)
 class btRigidBody : public btCollisionObject
 {
+	/// Group all data associated with MassAtImpact in a single location
+	struct MassAtImpactData
+	{
+		// State
+		bool IsActive{false};
+
+		// Backups
+		btVector3 InertiaLocalBackup;
+		btScalar MassBackup;
+		btScalar lastNodeAnchorDistance;
+
+		// User (Used to keep track of the requested values)
+		btScalar LowerUserMass;
+		btScalar UpperUserMass;  
+		
+		// Curve (User adjusted values)
+		btScalar LowerMass;
+		btScalar UpperMass;
+		btScalar LowerLimitDistance;
+		btScalar UpperLimitDistance;
+	};
+
 	btMatrix3x3 m_invInertiaTensorWorld;
 	btVector3 m_linearVelocity;
 	btVector3 m_angularVelocity;
@@ -233,59 +255,32 @@ public:
 protected:
 	///setupRigidBody is only used internally by the constructor
 	void setupRigidBody(const btRigidBodyConstructionInfo& constructionInfo);
-	bool m_canChangedMassAtImpact;
-	bool m_impacted;
-	btScalar m_lowerLimitMassImpact;
-	btScalar m_upperLimitMassImpact;
-	btScalar m_lowerLimitDistanceImpact;
-	btScalar m_upperLimitDistanceImpact;
+
+private:
+	MassAtImpactData m_massImpactData{};
+
+	/// This is internal to MassAtImpact and should not be used for anything else directly
+	void setMassPropsNoGravity(btScalar mass, const btVector3& inertia);
+
+	void syncMassAtImpact();
 
 public:
+	void activeMassAtImpact(bool isActive);
 
-	bool canChangedMassAtImpact()
+	inline bool IsMassAtImpactActive()
 	{
-		return m_canChangedMassAtImpact;
+		return m_massImpactData.IsActive;
 	}
 
-	bool isImpacted()
-	{
-		return m_impacted;
-	}
+	void backupMassProps();
 
-	void changeImpacted(bool impacted)
-	{
-		m_impacted = impacted;
-	}
+	void restoreMassProps();
 
-	btScalar getLowerLimitMassImpact()
-	{
-		return m_lowerLimitMassImpact;
-	}
+	void setupMassAtImpact(btScalar lowerMass, btScalar upperMass, btScalar lowerLimitDistance, btScalar upperLimitDistance);
 
-	btScalar getUpperLimitMassImpact()
-	{
-		return m_upperLimitMassImpact;
-	}
-
-	btScalar getLowerLimitDistanceImpact()
-	{
-		return m_lowerLimitDistanceImpact;
-	}
-
-	btScalar getUpperLimitDistanceImpact()
-	{
-		return m_upperLimitDistanceImpact;
-	}
-
-	void updateMassAtImpact(bool impacted, btScalar lowerMass, btScalar upperMass, btScalar lowerLimit, btScalar upperLimit)
-	{ 
-		m_canChangedMassAtImpact = impacted;
-		m_impacted = true;
-		m_lowerLimitMassImpact = lowerMass;
-		m_upperLimitMassImpact = upperMass;
-		m_lowerLimitDistanceImpact = lowerLimit;
-		m_upperLimitDistanceImpact = upperLimit;
-	}
+	void storeAnchorLastState(btScalar anchorNodeDistance);
+	
+	void applyMassAtImpact();
 
 	void updateBulletChildren(btScalar timeStep, unsigned int currentFrame);
 	void updateBulletChildrenInterpolated(btScalar timeStep, unsigned int currentFrame);
@@ -375,8 +370,6 @@ public:
 	}
 
 	void setMassProps(btScalar mass, const btVector3& inertia);
-
-	void setLowerLimitMassImpact(btScalar mass);
 
 	const btVector3& getLinearFactor() const
 	{

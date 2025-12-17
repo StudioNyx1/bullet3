@@ -27,6 +27,12 @@ btScalar gDeactivationTime = btScalar(2.);
 bool gDisableDeactivation = false;
 static int uniqueId = 0;
 
+
+btScalar btLerp(const btScalar& a, const btScalar& b, btScalar t)
+{
+	return a + (b - a) * t;
+}
+
 btRigidBody::btRigidBody(const btRigidBody::btRigidBodyConstructionInfo& constructionInfo)
 {
 	setupRigidBody(constructionInfo);
@@ -108,6 +114,10 @@ void btRigidBody::setupRigidBody(const btRigidBody::btRigidBodyConstructionInfo&
 	m_cableCollision = nullptr;
 	m_redirectionTarget = nullptr;
 	m_localTransform = btTransform::getIdentity();
+
+	// Init massAtImpact
+	backupMassProps();
+	setupMassAtImpact(m_massImpactData.MassBackup, m_massImpactData.MassBackup, 0.0, 1.0);
 }
 
 void btRigidBody::predictIntegratedTransform(btScalar timeStep, btTransform& predictedTransform)
@@ -485,6 +495,20 @@ void btRigidBody::proceedToTransform(const btTransform& newTrans)
 
 void btRigidBody::setMassProps(btScalar mass, const btVector3& inertia)
 {
+	setMassPropsNoGravity(mass, inertia);
+	
+	//Fg = m * a
+	m_gravity = mass * m_gravity_acceleration;
+
+	if (m_massImpactData.IsActive)
+	{
+		backupMassProps();
+		syncMassAtImpact();
+	}
+}
+
+void btRigidBody::setMassPropsNoGravity(btScalar mass, const btVector3& inertia)
+{
 	if (mass == btScalar(0.))
 	{
 		m_collisionFlags |= btCollisionObject::CF_STATIC_OBJECT;
@@ -496,9 +520,6 @@ void btRigidBody::setMassProps(btScalar mass, const btVector3& inertia)
 		m_inverseMass = btScalar(1.0) / mass;
 	}
 
-	//Fg = m * a
-	m_gravity = mass * m_gravity_acceleration;
-
 	m_invInertiaLocal.setValue(inertia.x() != btScalar(0.0) ? btScalar(1.0) / inertia.x() : btScalar(0.0),
 							   inertia.y() != btScalar(0.0) ? btScalar(1.0) / inertia.y() : btScalar(0.0),
 							   inertia.z() != btScalar(0.0) ? btScalar(1.0) / inertia.z() : btScalar(0.0));
@@ -506,9 +527,102 @@ void btRigidBody::setMassProps(btScalar mass, const btVector3& inertia)
 	m_invMass = m_linearFactor * m_inverseMass;
 }
 
-void btRigidBody::setLowerLimitMassImpact(btScalar mass)
+void btRigidBody::setupMassAtImpact(btScalar lowerMass, btScalar upperMass, btScalar lowerLimitDistance, btScalar upperLimitDistance)
 {
-	m_lowerLimitMassImpact = mass;
+	m_massImpactData.LowerUserMass = lowerMass;
+	m_massImpactData.UpperUserMass = upperMass;
+	m_massImpactData.LowerLimitDistance = btMax(lowerLimitDistance, 0.0);
+	m_massImpactData.UpperLimitDistance = btMax(upperLimitDistance, m_massImpactData.LowerLimitDistance);
+}
+
+void btRigidBody::syncMassAtImpact()
+{
+	m_massImpactData.LowerMass = btMax(m_massImpactData.MassBackup, m_massImpactData.LowerUserMass);
+	m_massImpactData.UpperMass = btMax(m_massImpactData.UpperUserMass, m_massImpactData.LowerMass);
+
+	// Force reset to avoid mixing different setups
+	m_massImpactData.lastNodeAnchorDistance = 0.0;
+}
+
+void btRigidBody::activeMassAtImpact(bool isActive)
+{
+	// Update mass properties on state change only
+	if (m_massImpactData.IsActive == isActive)
+	{
+		return;
+	}
+
+	m_massImpactData.IsActive = isActive;
+
+	if (m_massImpactData.IsActive)
+	{
+		// On activation make sure to sync true mass
+		backupMassProps();
+		syncMassAtImpact();
+	}
+	else
+	{
+		// On deactivation make sure to restore mass
+		restoreMassProps();
+	}
+}
+
+void btRigidBody::backupMassProps()
+{
+	m_massImpactData.MassBackup = getMass();
+	m_massImpactData.InertiaLocalBackup = getLocalInertia();
+}
+
+void btRigidBody::storeAnchorLastState(btScalar anchorNodeDistance)
+{
+	// Keep track of the last anchor node distance
+	// In case of multiple anchor on the same body we assume the worst case (max required)
+	m_massImpactData.lastNodeAnchorDistance = btMax(anchorNodeDistance, m_massImpactData.lastNodeAnchorDistance);
+}
+
+void btRigidBody::applyMassAtImpact()
+{
+	// Safety net
+	if (m_anchorsCount < 1.0)
+	{
+		return;
+	}
+
+	// @TODO(BenH) add new bool to enable/disable this mechanic (cable tendu ou non)
+
+	// Match massRatio application
+	btScalar ratio = 0.0;
+	if (m_massImpactData.lastNodeAnchorDistance > m_massImpactData.LowerLimitDistance)
+	{
+		// Compute mass change based on the distance between anchor and closest node
+		btScalar anchorNodeDistanceRange = m_massImpactData.UpperLimitDistance - m_massImpactData.LowerLimitDistance;
+		btScalar rawRatio = btClamped((m_massImpactData.lastNodeAnchorDistance - m_massImpactData.LowerLimitDistance) / anchorNodeDistanceRange, 0.0, 1.0);
+		
+		// Select transition dynamic
+		ratio = rawRatio;
+		// ratio = 1.0 - pow(max(0.0, abs(rawRatio - 1.0) * 1.1 - 0.1), 3);
+		// ratio = 1.0 - pow(1.0 - rawRatio, 3);								// easeOutCubic
+		// ratio = sqrt(1.0 - pow(rawRatio - 1.0, 2.0));						// easeOutCirc
+		// ratio = rawRatio * rawRatio;										    // easeInQuad
+		// ratio = rawRatio * rawRatio * rawRatio * rawRatio;					// easeInQuart
+	}
+
+	// Change only the body mass and inertia without altering the resulting gravity force
+	btScalar newMass = btLerp(m_massImpactData.LowerMass, m_massImpactData.UpperMass, ratio);
+	if (btFabs(newMass - getMass()) > DBL_EPSILON)
+	{
+		setMassPropsNoGravity(newMass, newMass * getLocalInertia() * m_inverseMass);
+		updateInertiaTensor();
+	}
+
+	// Reset to make sure data is not persistent
+	m_massImpactData.lastNodeAnchorDistance = 0.0;
+}
+
+void btRigidBody::restoreMassProps()
+{
+	setMassProps(m_massImpactData.MassBackup, m_massImpactData.InertiaLocalBackup);
+	updateInertiaTensor();
 }
 
 void btRigidBody::updateInertiaTensor()
