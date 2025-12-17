@@ -343,6 +343,9 @@ void btCable::EndConstraintsSolve()
 		}
 	}
 
+	// Grows/Shrinks only in physic
+	updateLength(m_sst.sdt);
+
 	_nodePairContact.clear();
 }
 
