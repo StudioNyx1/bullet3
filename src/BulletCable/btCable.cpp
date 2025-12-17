@@ -681,45 +681,49 @@ void btCable::Shrinks(float dt)
 	// if we had to delete a node
 	while (newLinkRL < minRL)
 	{
-		// Delete a node, two links and append a new link
-		if (sizeNode > 2)
+		// Limit the link size when they are 2 nodes only
+		if (sizeNode <= 2)
 		{
-			// Get the affected anchor to modify it after the node and links removing
-			Anchor* anchor = nullptr;
-			for (int i = 0; i < m_anchors.size(); i++)
+			newLinkRL = minRL;
+			WantedSpeed = 0;
+			break;
+		}
+
+		// Get the affected anchor to modify it after the node and links removing
+		Anchor* anchor = nullptr;
+		for (int i = 0; i < m_anchors.size(); i++)
+		{
+			Anchor* currentAnchor = &m_anchors.at(i);
+			// Look up for its new node's data
+			if (currentAnchor->m_node->index == lastIndexNode)
 			{
-				Anchor* currentAnchor = &m_anchors.at(i);
-				// Look up for its new node's data
-				if (currentAnchor->m_node->index == lastIndexNode)
-				{
-					anchor = currentAnchor;
-					break;
-				}
+				anchor = currentAnchor;
+				break;
 			}
+		}
 
-			// Remove the last link and last-1 links
-			for (int i = 0; i < 2; ++i)
-			{
-				m_links.removeAtIndex(lastIndexLink);
-				lastIndexLink--;
-				sizeLink--;
-			}
+		// Remove the last link and the last-1 link
+		m_links.removeAtIndex(lastIndexLink);
+		lastIndexLink--;
+		sizeLink--;
+		m_links.removeAtIndex(lastIndexLink);
+		lastIndexLink--;
+		sizeLink--;
 
-			// Remove the last-1 node
-			removeNodeAt(lastIndexNode - 1);
-			lastIndexNode--;
-			sizeNode--;
+		// Remove the last-1 node
+		removeNodeAt(lastIndexNode - 1);
+		lastIndexNode--;
+		sizeNode--;
 
-			// Add the new link between the last-2 node (which currenlty last-1) and the last node
-			appendLink(lastIndexNode - 1, lastIndexNode, m_materials[0]);
-			lastIndexLink++;
-			sizeLink++;
+		// Add the new link between the last-2 node (which currenlty last-1) and the last node
+		appendLink(lastIndexNode - 1, lastIndexNode, m_materials[0]);
+		lastIndexLink++;
+		sizeLink++;
 
-			// Re-synchronize the anchor's node
-			if (anchor)
-			{
-				anchor->m_node = &m_nodes.at(lastIndexNode);
-			}
+		// Re-synchronize the anchor's node
+		if (anchor)
+		{
+			anchor->m_node = &m_nodes.at(lastIndexNode);
 		}
 
 		newLinkRL += currentCableRL;
