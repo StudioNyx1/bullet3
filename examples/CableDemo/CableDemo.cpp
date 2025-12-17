@@ -4552,7 +4552,8 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	sliderMassA.m_callback = [](float value, void* userPtr)
 	{
 		btRigidBody* lest = (btRigidBody*)userPtr;
-		lest->setMassProps(value, lest->getLocalInertia());
+		lest->setMassProps(value, lest->getLocalInertia() * value * lest->getInvMass());
+		lest->updateInertiaTensor();
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassA, stepMassA);
 
@@ -4831,7 +4832,8 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	sliderMassA.m_callback = [](float value, void* userPtr)
 	{
 		btRigidBody* lest = (btRigidBody*)userPtr;
-		lest->setMassProps(value, lest->getLocalInertia());
+		lest->setMassProps(value, lest->getLocalInertia() * value * lest->getInvMass());
+		lest->updateInertiaTensor();
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassA, 100);
 
@@ -4844,7 +4846,8 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	sliderMassC.m_callback = [](float value, void* userPtr)
 	{
 		btRigidBody* a18 = (btRigidBody*)userPtr;
-		a18->setMassProps(value, a18->getLocalInertia());
+		a18->setMassProps(value, a18->getLocalInertia() * value * a18->getInvMass());
+		a18->updateInertiaTensor();
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassC, 100);
 
