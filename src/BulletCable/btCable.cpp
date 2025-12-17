@@ -1160,8 +1160,21 @@ void btCable::anchorConstraint()
 		const btVector3 va = anchor.m_body->getVelocityInLocalPoint(anchor.m_c1) * dt;
 		const btVector3 vb = node.m_x - node.m_q_sub;
 		const btVector3 vr = (va - vb) + (wa - node.m_x) * kAHR;
-		btVector3 impulse = anchor.m_c0_massBalance * vr;
+		btVector3 impulseBullet = anchor.m_c0 * vr;
+		btVector3 impulseMassBalance = anchor.m_c0_massBalance * vr;
 
+		btScalar ratio = 0.0;
+		if (m_tenseAccumulator > m_minAccumulator)
+		{
+			btScalar x = btClamped((m_tenseAccumulator - m_minAccumulator) / (m_maxAccumulator - m_minAccumulator), 0.0, 1.0);
+			// ratio = m_tenseAccumulator;
+			ratio = x;
+			// ratio = 1.0 - btPow(1.0 - m_tenseAccumulator, 4.0);
+			// ratio = btPow(x, 4.0);
+		}
+		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, ratio);
+
+		// Clamp the calculated impulse
 		btScalar currentTension = anchor.m_lastTension.length();
 		anchor.m_lastTension += impulse / dt;
 		anchor.m_totalTension += impulse / dt;
@@ -1173,8 +1186,8 @@ void btCable::anchorConstraint()
 		}
 
 		// Update anchor's data
+		node.m_x += impulseMassBalance * anchor.m_c2_massBalance; // lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
 		anchor.m_dist = wa.distance(node.m_x);
-		node.m_x += impulse * anchor.m_c2_massBalance;
 		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
 	}
 }
@@ -1195,11 +1208,22 @@ void btCable::anchorConstraintPlacement()
 		Node& node = *anchor.m_node;
 
 		const btVector3 wa = body.getWorldTransform() * anchor.m_local;
-		const btVector3 va = anchor.m_body->getVelocityInLocalPoint(anchor.m_c1) * dt;
-		const btVector3 vb = node.m_x - node.m_q_sub;
-		const btVector3 vr = (va - vb) + (wa - node.m_x) * kAHR;
-		btVector3 impulse = anchor.m_c0_massBalance * vr;
+		const btVector3 vr = (wa - node.m_x) * kAHR;
+		btVector3 impulseBullet = anchor.m_c0 * vr;
+		btVector3 impulseMassBalance = anchor.m_c0_massBalance * vr;
 
+		btScalar ratio = 0.0;
+		if (m_tenseAccumulator > m_minAccumulator)
+		{
+			btScalar x = btClamped((m_tenseAccumulator - m_minAccumulator) / (m_maxAccumulator - m_minAccumulator), 0.0, 1.0);
+			// ratio = m_tenseAccumulator;
+			ratio = x;
+			// ratio = 1.0 - btPow(1.0 - m_tenseAccumulator, 4.0);
+			// ratio = btPow(x, 4.0);
+		}
+		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, ratio);
+
+		// Clamp the calculated impulse
 		btScalar currentTension = anchor.m_lastTension.length();
 		anchor.m_lastTension += impulse / dt;
 		anchor.m_totalTension += impulse / dt;
@@ -1211,8 +1235,8 @@ void btCable::anchorConstraintPlacement()
 		}
 
 		// Update anchor's data
+		node.m_x += impulseMassBalance * anchor.m_c2_massBalance; // lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
 		anchor.m_dist = wa.distance(node.m_x);
-		node.m_x = wa;
 		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
 	}
 }
