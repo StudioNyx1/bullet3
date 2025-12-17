@@ -349,6 +349,12 @@ void btDiscreteDynamicsWorld::clearForces()
 		//need to check if next line is ok
 		//it might break backward compatibility (people applying forces on sleeping objects get never cleared and accumulate on wake-up
 		body->clearForces();
+
+		// Make sure each body mass is restored to the original state
+		if (body->isActive() && body->IsMassAtImpactActive())
+		{
+			body->restoreMassProps();
+		}
 	}
 }
 
@@ -1264,6 +1270,12 @@ void btDiscreteDynamicsWorld::predictUnconstraintMotion(btScalar timeStep)
 
 			body->predictIntegratedTransform(timeStep, body->getInterpolationWorldTransform());
 			body->updateBulletChildrenInterpolated(timeStep, m_globalFrameCounter);
+
+			// Tweak mass for rigidbody/rigidbody collisions
+			if (body->IsMassAtImpactActive())
+			{
+				body->applyMassAtImpact();
+			}
 		}
 	}
 }

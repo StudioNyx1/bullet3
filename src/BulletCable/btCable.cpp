@@ -188,7 +188,7 @@ void btCable::PrepareSolver()
 		const double invMassNode = n->m_im;
 		const double massNode = invMassNode < DBL_EPSILON ? 0.0 : 1.0 / invMassNode;
 
-		// Body's masses
+		// Get mass as normal
 		const double invMassBody = b->getInvMass();
 		const double massBody = b->getMass();
 
@@ -275,43 +275,22 @@ void btCable::solveSingleCableIteration(int currentIter)
 
 void btCable::EndConstraintsSolve()
 {
-	if (m_useAnchorConstraintPlacement)
-	{
-		anchorConstraintPlacement();
-	}
-
+	// Account for MassAtImpact
 	for (int i = 0; i < m_anchors.size(); ++i)
 	{
 		Anchor& anchor = this->m_anchors[i];
 		btRigidBody* body = anchor.m_body;
-		Node* node = anchor.m_node;
 
-		bool isImpacted = body->isImpacted();
-		bool canChangeMass = body->canChangedMassAtImpact();
-		bool isStaticOrKinematic = body->isStaticOrKinematicObject();
+		if (body->isStaticOrKinematicObject()) continue;
 
-		if (isStaticOrKinematic) continue;
+		if (!body->IsMassAtImpactActive()) continue;
 
-		if (canChangeMass)
-		{
-			btScalar limit = body->getUpperLimitDistanceImpact() - body->getLowerLimitDistanceImpact();
-			btScalar ratio = Clamp((anchor.m_dist - body->getLowerLimitDistanceImpact()) / limit, 0.0, 1.0);
-			btScalar func = 1.0 - pow(1.0 - ratio, 3);									// easeOutCubic
-			// btScalar func = sqrt(1.0 - pow(ratio - 1.0, 2.0));						// easeOutCirc
-			// btScalar func = ratio * ratio;											// easeInQuad
-			// btScalar func = ratio * ratio * ratio * ratio;							// easeInQuart
-			btScalar newMass = Lerp(body->getLowerLimitMassImpact(), body->getUpperLimitMassImpact(), func);
-			body->setMassProps(newMass, newMass * body->getLocalInertia() * body->getInvMass());
-			body->updateInertiaTensor();
-			body->setGravity(m_worldInfo->m_gravity * (body->getLowerLimitMassImpact() / newMass));
-		}
-		else if (isImpacted)
-		{
-			body->setMassProps(body->getLowerLimitMassImpact(), body->getLowerLimitMassImpact() * body->getLocalInertia() * body->getInvMass());
-			body->updateInertiaTensor();
-			body->changeImpacted(false);
-			body->setGravity(m_worldInfo->m_gravity);
-		}
+		body->storeAnchorLastState(anchor.m_dist);
+	}
+
+	if (m_useAnchorConstraintPlacement)
+	{
+		anchorConstraintPlacement();
 	}
 
 	// TODO @BenH: Add better manifolds
