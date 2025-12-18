@@ -1176,13 +1176,15 @@ void btCable::anchorConstraint()
 		// Clamp the calculated impulse
 		btScalar currentTension = anchor.m_lastTension.length();
 		anchor.m_lastTension += impulse / dt;
-		anchor.m_totalTension += impulse / dt;
 		btScalar finalTension = anchor.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
 			anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
 			impulse *= (anchor.m_lastTension.length() - currentTension) / (finalTension - currentTension);
 		}
+
+		// Account for max tension constraint when updating average tension during this frame
+		anchor.m_totalTension += impulse / dt;
 
 		// Update anchor's data
 		node.m_x += impulseMassBalance * anchor.m_c2_massBalance; // lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
@@ -1225,13 +1227,15 @@ void btCable::anchorConstraintPlacement()
 		// Clamp the calculated impulse
 		btScalar currentTension = anchor.m_lastTension.length();
 		anchor.m_lastTension += impulse / dt;
-		anchor.m_totalTension += impulse / dt;
 		btScalar finalTension = anchor.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
 			anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
 			impulse *= (anchor.m_lastTension.length() - currentTension) / (finalTension - currentTension);
 		}
+		
+		// Account for max tension constraint when updating average tension during this frame
+		anchor.m_totalTension += impulse / dt;
 
 		// Update anchor's data
 		node.m_x += impulseMassBalance * anchor.m_c2_massBalance; // lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
@@ -1806,7 +1810,7 @@ btVector3 btCable::getTensionAt(int index)
 {
 	int size = m_anchors.size();
 	if (index < size && index >= 0)
-		return m_anchors[index].m_lastTension;
+		return m_anchors[index].m_totalTension;
 	else
 		return btVector3(0, 0, 0);
 }
