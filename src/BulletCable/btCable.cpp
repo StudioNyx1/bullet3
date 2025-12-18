@@ -1156,13 +1156,15 @@ void btCable::anchorConstraint()
 
 		btScalar currentTension = anchor.m_lastTension.length();
 		anchor.m_lastTension += impulse / dt;
-		anchor.m_totalTension += impulse / dt;
 		btScalar finalTension = anchor.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
 			anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
 			impulse *= (anchor.m_lastTension.length() - currentTension) / (finalTension - currentTension);
 		}
+
+		// Account for max tension constraint when updating average tension during this frame
+		anchor.m_totalTension += impulse / dt;
 
 		// Update anchor's data
 		anchor.m_dist = wa.distance(node.m_x);
@@ -1194,13 +1196,15 @@ void btCable::anchorConstraintPlacement()
 
 		btScalar currentTension = anchor.m_lastTension.length();
 		anchor.m_lastTension += impulse / dt;
-		anchor.m_totalTension += impulse / dt;
 		btScalar finalTension = anchor.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
 			anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
 			impulse *= (anchor.m_lastTension.length() - currentTension) / (finalTension - currentTension);
 		}
+		
+		// Account for max tension constraint when updating average tension during this frame
+		anchor.m_totalTension += impulse / dt;
 
 		// Update anchor's data
 		anchor.m_dist = wa.distance(node.m_x);
@@ -1773,11 +1777,13 @@ btScalar btCable::getLength()
 
 btVector3 btCable::getTensionAt(int index)
 {
-	int size = m_anchors.size();
-	if (index < size && index >= 0)
-		return m_anchors[index].m_lastTension;
-	else
-		return btVector3(0, 0, 0);
+	btVector3 tension = btVector3(0, 0, 0);
+	if (index < m_anchors.size() && index >= 0)
+	{
+		tension = m_anchors[index].m_totalTension / (btScalar) m_world->GetSubIteration();
+	}
+
+	return tension;
 }
 
 btVector3 btCable::getLocalAnchorWithNode(int indexNode)
