@@ -263,8 +263,8 @@ void btRigidBody::saveKinematicState(btScalar timeStep)
 
 void btRigidBody::syncKinematicState()
 {
-	m_interpolationWorldTransform = m_previousWorldTransform;
 	m_previousWorldTransform = m_worldTransform;
+	m_interpolationWorldTransform = m_previousWorldTransform;
 	m_interpolationLinearVelocity = m_linearVelocity;
 	m_interpolationAngularVelocity = m_angularVelocity;
 }
