@@ -677,7 +677,7 @@ void btCable::Shrinks(float dt)
 	}
 
 	//  Avoid adjusting the length when creating a cable with a rest length shorter than the minimum length
-	if (totalLengthRL < minRL && sizeNode <= 2)
+	if (totalLengthRL < minRL)
 	{
 		newLinkRL = currentLinkRL;
 		m_growingState = 2;
@@ -751,7 +751,7 @@ void btCable::Shrinks(float dt)
 				anchor->m_node = &m_nodes.at(lastIndexNode);
 			}
 
-			newLinkRL = m_links.at(lastIndexLink).m_rl;
+			newLinkRL += currentCableRL;
 		}
 	}
 
