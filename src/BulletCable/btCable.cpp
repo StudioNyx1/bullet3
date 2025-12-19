@@ -644,25 +644,6 @@ void btCable::Shrinks(float dt)
 	btScalar currentCableRL = getLinkRestLength(lastIndexLink);
 	btScalar minRL = currentCableRL * 0.5;
 
-	// To avoid shrink to much
-	if (totalLengthRL - lengthToRemove < minRL)
-	{
-		newLinkRL = minRL;
-		m_growingState = 2;
-		WantedSpeed = 0;
-	}
-
-	// We cannot remove an anchor
-	if (m_nodes.at(lastIndexNode - 1).m_battach != 0)
-	{
-		// Minimum shrink lenght
-		if (newLinkRL < minRL)
-		{
-			newLinkRL = minRL;
-			m_growingState = 3;
-			WantedSpeed = 0;
-		}
-	}
 
 	// If there is a target length, we don't extend newRL more than necessary
 	if (WantedDistance > 0)
@@ -676,55 +657,83 @@ void btCable::Shrinks(float dt)
 		}
 	}
 
-	// if we had to delete a node
-	while (newLinkRL < minRL)
+	//  Avoid adjusting the length when creating a cable with a rest length shorter than the minimum length
+	if (totalLengthRL < minRL && sizeNode <= 2)
 	{
-		// Limit the link size when they are 2 nodes only
-		if (sizeNode <= 2)
+		newLinkRL = currentLinkRL;
+		m_growingState = 2;
+		WantedSpeed = 0;
+	}
+	// To avoid shrink to much
+	else if (totalLengthRL - lengthToRemove < minRL)
+	{
+		newLinkRL = minRL;
+		m_growingState = 2;
+		WantedSpeed = 0;
+	}
+	// We cannot remove an anchor
+	else if (m_nodes.at(lastIndexNode - 1).m_battach != 0)
+	{
+		// Minimum shrink lenght
+		if (newLinkRL < minRL)
 		{
 			newLinkRL = minRL;
+			m_growingState = 3;
 			WantedSpeed = 0;
-			break;
 		}
-
-		// Get the affected anchor to modify it after the node and links removing
-		Anchor* anchor = nullptr;
-		for (int i = 0; i < m_anchors.size(); i++)
+	}
+	else 
+	{
+		// if we had to delete a node
+		while (newLinkRL < minRL)
 		{
-			Anchor* currentAnchor = &m_anchors.at(i);
-			// Look up for its new node's data
-			if (currentAnchor->m_node->index == lastIndexNode)
+			// Limit the link size when they are 2 nodes only
+			if (sizeNode <= 2)
 			{
-				anchor = currentAnchor;
+				newLinkRL = minRL;
+				WantedSpeed = 0;
 				break;
 			}
+
+			// Get the affected anchor to modify it after the node and links removing
+			Anchor* anchor = nullptr;
+			for (int i = 0; i < m_anchors.size(); i++)
+			{
+				Anchor* currentAnchor = &m_anchors.at(i);
+				// Look up for its new node's data
+				if (currentAnchor->m_node->index == lastIndexNode)
+				{
+					anchor = currentAnchor;
+					break;
+				}
+			}
+
+			// Remove the last link and the last-1 link
+			m_links.removeAtIndex(lastIndexLink);
+			lastIndexLink--;
+			sizeLink--;
+			m_links.removeAtIndex(lastIndexLink);
+			lastIndexLink--;
+			sizeLink--;
+
+			// Remove the last-1 node
+			removeNodeAt(lastIndexNode - 1);
+			lastIndexNode--;
+			sizeNode--;
+
+			// Add the new link between the last-2 node (which currenlty last-1) and the last node
+			appendLink(lastIndexNode - 1, lastIndexNode, m_materials[0]);
+			lastIndexLink++;
+			sizeLink++;
+
+			// Re-synchronize the anchor's node
+			if (anchor)
+			{
+				anchor->m_node = &m_nodes.at(lastIndexNode);
+			}
+
+			newLinkRL = m_links.at(lastIndexLink).m_rl;
 		}
-
-		// Remove the last link and the last-1 link
-		m_links.removeAtIndex(lastIndexLink);
-		lastIndexLink--;
-		sizeLink--;
-		m_links.removeAtIndex(lastIndexLink);
-		lastIndexLink--;
-		sizeLink--;
-
-		// Remove the last-1 node
-		removeNodeAt(lastIndexNode - 1);
-		lastIndexNode--;
-		sizeNode--;
-
-		// Add the new link between the last-2 node (which currenlty last-1) and the last node
-		appendLink(lastIndexNode - 1, lastIndexNode, m_materials[0]);
-		lastIndexLink++;
-		sizeLink++;
-
-		// Re-synchronize the anchor's node
-		if (anchor)
-		{
-			anchor->m_node = &m_nodes.at(lastIndexNode);
-		}
-
-		newLinkRL += currentCableRL;
 	}
 
 	// Set the Rest Length
