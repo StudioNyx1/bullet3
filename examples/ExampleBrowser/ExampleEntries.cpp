@@ -40,6 +40,7 @@
 #include "../VoronoiFracture/VoronoiFractureDemo.h"
 #include "../SoftDemo/SoftDemo.h"
 #include "../CableDemo/CableDemo.h"
+#include "../Collision/CollisionDemo.h"
 #include "../Constraints/ConstraintDemo.h"
 #include "../Vehicles/Hinge2Vehicle.h"
 #include "../Importers/ImportBullet/SerializeSetup.h"
@@ -207,6 +208,7 @@ static ExampleEntry gDefaultExamples[] =
 
 		ExampleEntry(0, "Collision"),
 		ExampleEntry(1, "Spheres & Plane C-API (Bullet2)", "Collision C-API using Bullet 2.x backend", CollisionTutorialBullet2CreateFunc, TUT_SPHERE_PLANE_BULLET2),
+		ExampleEntry(1, "Cube collision", "Cube collision", CubeCollisionCreateFunc),
 //ExampleEntry(1, "Spheres & Plane C-API (Bullet3)", "Collision C-API using Bullet 3.x backend", CollisionTutorialBullet2CreateFunc,TUT_SPHERE_PLANE_RTB3),
 
         ExampleEntry(0, "Deformabe Body"),
