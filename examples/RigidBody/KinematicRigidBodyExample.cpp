@@ -94,30 +94,9 @@ void KinematicRigidBodyExample::initPhysics()
 	groundTransform.setOrigin(btVector3(0, -halfExtentsY, 0));
 	m_collisionShapes.push_back(groundShape);
 
-
-
 	{
 		btScalar mass(0.);
-		//rigidbody is dynamic if and only if mass is non zero, otherwise static
-		bool isDynamic = (mass != 0.f);
-
-		btVector3 localInertia(0, 0, 0);
-
-#ifdef USE_MOTIONSTATE
-		btDefaultMotionState* myMotionState = new btDefaultMotionState(groundTransform);
-		btRigidBody::btRigidBodyConstructionInfo cInfo(mass, myMotionState, groundShape, localInertia);
-		m_groundBody = new btRigidBody(cInfo);
-#else
-		m_groundBody = new btRigidBody(mass, 0, shape, localInertia);
-		m_groundBody->setWorldTransform(startTransform);
-#endif  //
-
-		m_groundBody->setUserIndex(-1);
-		
-		m_groundBody->forceActivationState(DISABLE_DEACTIVATION);
-		m_groundBody->setCollisionFlags(btCollisionObject::CF_KINEMATIC_OBJECT | btCollisionObject::CF_STATIC_OBJECT);
-		m_dynamicsWorld->addRigidBody(m_groundBody);
-		
+		m_groundBody = createRigidBody(mass, groundTransform, groundShape);
 	}
 	m_dynamicsWorld->setInternalTickCallback(kinematicPreTickCallback, m_groundBody, true);
 	{
