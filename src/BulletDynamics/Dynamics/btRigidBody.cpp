@@ -212,6 +212,32 @@ void btRigidBody::updateBulletChildrenInterpolatedRecursive(btScalar timeStep, u
 	}
 }
 
+void btRigidBody::addBulletChild(btRigidBody* child)
+{
+	// Ensure we don't add null
+	if (!child) return;
+
+	m_Children.push_back(child);
+    
+	// Link the child to the parent
+	child->m_parent = this;
+}
+
+void btRigidBody::removeBulletChild(btRigidBody* child)
+{
+	for (int index = 0; index < m_Children.size(); index++)
+	{
+		if (m_Children[index] == child) 
+		{
+			// Unlink the child from the parent
+			child->m_parent = nullptr;
+
+			m_Children.erase(m_Children.begin() + index);
+			return;
+		}
+	}
+}
+
 void btRigidBody::updateCableCollision(btScalar timeStep)
 {
 	if (m_cableCollision != NULL)

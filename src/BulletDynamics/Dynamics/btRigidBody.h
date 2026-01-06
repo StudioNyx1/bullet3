@@ -288,6 +288,8 @@ public:
 
 	void updateBulletChildren(btScalar timeStep, unsigned int currentFrame);
 	void updateBulletChildrenInterpolated(btScalar timeStep, unsigned int currentFrame);
+	void addBulletChild(btRigidBody* child);
+	void removeBulletChild(btRigidBody* child);
 
 	void updateCableCollision(btScalar timeStep);
 
