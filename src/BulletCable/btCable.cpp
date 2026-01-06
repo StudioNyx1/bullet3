@@ -1808,11 +1808,13 @@ btScalar btCable::getLength()
 
 btVector3 btCable::getTensionAt(int index)
 {
-	int size = m_anchors.size();
-	if (index < size && index >= 0)
-		return m_anchors[index].m_totalTension;
-	else
-		return btVector3(0, 0, 0);
+	btVector3 tension = btVector3(0, 0, 0);
+	if (index < m_anchors.size() && index >= 0)
+	{
+		tension = m_anchors[index].m_totalTension / (btScalar) m_world->GetSubIteration();
+	}
+
+	return tension;
 }
 
 btVector3 btCable::getLocalAnchorWithNode(int indexNode)
