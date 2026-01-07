@@ -1815,6 +1815,7 @@ void btCable::updateNodesMass()
 		node0->m_im = 1.0f / mass0;
 		node1->m_im = 1.0f / mass1;
 	}
+	m_bUpdateRtCst = true;
 }
 
 void btCable::setCollisionParameters(int substepSolverCollisionDelay, int substepNarrowCollisionDelay)
