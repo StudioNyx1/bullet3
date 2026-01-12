@@ -262,8 +262,20 @@ void btRigidBody::updateCableCollision(btScalar timeStep)
 
 void btRigidBody::saveKinematicVelocity(btScalar timeStep)
 {
+	bool needUpdate;
+	if (m_parent == nullptr)
+	{
+		// If this body has no parent, we need to recalculate velocity because it may have moved
+		needUpdate = true;
+	}
+	else
+	{
+		// If this body is considered has child of dynamic body and moved by his parent
+		needUpdate = m_hasMovedWithChildrenUpdate;
+	}
+
 	//todo: clamp to some (user definable) safe minimum timestep, to limit maximum angular/linear velocities
-	if (timeStep != btScalar(0.) && m_hasMovedWithChildrenUpdate)
+	if (timeStep != btScalar(0.) && needUpdate)
 	{
 		btVector3 linVel, angVel;
 		btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep, linVel, angVel);
