@@ -316,24 +316,28 @@ private:
 			b3Printf("Object %i - %s", i, GetPrintState(colfFlag, colfType, activationState).c_str());
 		}
 
-		PrintManifoldInformation();
-
+		PrintVelocities("BEFORE");
 		if (m_dynamicsWorld)
 		{
 			m_dynamicsWorld->stepSimulation(deltaTime);
 		}
-
-		
-
-		/*for (int i = 0; i < count; i++)
-		{
-			btRigidBody* rb = (btRigidBody*)collisionArray[i];
-			b3Printf("AFTER - Object %i - y %f", i, rb->getCenterOfMassTransform().getOrigin().getY());
-		}*/
+		PrintManifoldInformation();
+		PrintVelocities("AFTER");
 
 		b3Printf("Object count: %i", count);
 		b3Printf("Manifold number: %i",m_dispatcher->getNumManifolds());
 		b3Printf("Manifold cache number: %i", m_dispatcher->getNumManifoldsCache());
+	}
+
+	void PrintVelocities(string frameMoment)
+	{
+		btCollisionObjectArray collisionArray = m_dynamicsWorld->getCollisionObjectArray();
+		int count = m_dynamicsWorld->getNumCollisionObjects();
+		for (int i = 0; i < count; i++)
+		{
+			btRigidBody* rb = (btRigidBody*)collisionArray[i];
+			b3Printf(" %s : - Object %i - vel.y %f - pos %f", frameMoment.c_str(), i, rb->getLinearVelocity().getY(), rb->getWorldTransform().getOrigin().getY());
+		}
 	}
 
 	void PrintManifoldInformation()
@@ -346,8 +350,8 @@ private:
 			btRigidBody* rb0 = (btRigidBody*)manifold->getBody0();
 			btRigidBody* rb1 = (btRigidBody*)manifold->getBody1();
 
-			b3Printf("Manifold %i - body0 mass %f - body1 mass %f", i, rb0->getMass(), rb1->getMass() );
-			b3Printf("Manifold %i - body0 vel %f - body1 vel %f", i, rb0->getLinearVelocity().getY(), rb1->getLinearVelocity().getY());
+			b3Printf("Manifold %i - body0 : mass %f - vel %f - pos %f ", i, rb0->getMass(), rb0->getLinearVelocity().getY(), rb0->getWorldTransform().getOrigin().getY() );
+			b3Printf("Manifold %i - body1 : mass %f - vel %f - pos %f ", i, rb1->getMass(), rb1->getLinearVelocity().getY(), rb1->getWorldTransform().getOrigin().getY() );
 
 			for (int j = 0; j < numContact; j++)
 			{
@@ -397,7 +401,7 @@ private:
 	void Init_KinematicFallDemo()
 	{
 		// Shape
-		btCollisionShape* boxShape = new btBoxShape(btVector3(0.25, 0.25, 0.25));
+		btCollisionShape* boxShape = new btBoxShape(btVector3(0.5, 0.5, 0.5));
 
 		// Masses
 		btScalar massKinematic(0);
@@ -416,7 +420,9 @@ private:
 		transformPhysic.setRotation(rotation);
 
 		// Positions
-		btVector3 positionKinematic(0, 3, 0);
+		//btVector3 positionKinematic(0, 6378137 + 3, 0);
+		//btVector3 positionPhysic(0, 6378137, 0);
+		btVector3 positionKinematic(0,  3, 0);
 		btVector3 positionPhysic(0, 0, 0);
 		transformKinematic.setOrigin(positionKinematic);
 		transformPhysic.setOrigin(positionPhysic);
