@@ -128,6 +128,7 @@ private:
 	uint64_t m_lastInterpolatedUpdateFrame = 0; // Last frame where the interpolated hierarchy was updated
 	void updateBulletChildrenRecursive(btScalar timeStep, unsigned int currentFrame);
 	void updateBulletChildrenInterpolatedRecursive(btScalar timeStep, unsigned int currentFrame);
+	bool m_hasMovedWithChildrenUpdate = false;
 	
 public:
 	///The btRigidBodyConstructionInfo structure provides information to create a rigid body. Setting mass to zero creates a fixed (non-dynamic) rigid body.

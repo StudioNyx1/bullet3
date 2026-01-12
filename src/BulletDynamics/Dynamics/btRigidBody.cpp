@@ -123,7 +123,7 @@ void btRigidBody::updateBulletChildren(btScalar timeStep, unsigned int currentFr
 	{
 		return;
 	}
-	
+
 	// 1. Traverse up to find the top-most dynamic parent
 	btRigidBody* root = this;
 	while (root->m_parent != nullptr && !root->m_parent->isStaticOrKinematicObject())
@@ -161,6 +161,9 @@ void btRigidBody::updateBulletChildrenRecursive(btScalar timeStep, unsigned int 
 
 		// Recurse down the tree using the internal helper
 		kinematic->updateBulletChildrenRecursive(timeStep, currentFrame);
+
+		// Need velocity update later
+		m_hasMovedWithChildrenUpdate = true;
 	}
 }
 
@@ -171,7 +174,7 @@ void btRigidBody::updateBulletChildrenInterpolated(btScalar timeStep, unsigned i
 	{
 		return;
 	}
-	
+
 	// 1. Traverse up to find the top-most dynamic parent
 	btRigidBody* root = this;
 	while (root->m_parent != nullptr && !root->m_parent->isStaticOrKinematicObject())
@@ -209,6 +212,9 @@ void btRigidBody::updateBulletChildrenInterpolatedRecursive(btScalar timeStep, u
 
 		// Recurse down the tree using the internal helper
 		kinematic->updateBulletChildrenInterpolatedRecursive(timeStep, currentFrame);
+
+		// Need velocity update later
+		m_hasMovedWithChildrenUpdate = true;
 	}
 }
 
@@ -257,12 +263,14 @@ void btRigidBody::updateCableCollision(btScalar timeStep)
 void btRigidBody::saveKinematicVelocity(btScalar timeStep)
 {
 	//todo: clamp to some (user definable) safe minimum timestep, to limit maximum angular/linear velocities
-	if (timeStep != btScalar(0.))
+	if (timeStep != btScalar(0.) && m_hasMovedWithChildrenUpdate)
 	{
 		btVector3 linVel, angVel;
 		btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep, linVel, angVel);
 		m_linearVelocity = linVel;
 		m_angularVelocity = angVel;
+
+		m_hasMovedWithChildrenUpdate = false;
 	}
 }
 
