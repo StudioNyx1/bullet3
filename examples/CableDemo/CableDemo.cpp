@@ -2399,7 +2399,7 @@ static void Init_TestCollisionFallingA18Constraint(CableDemo* pdemo)
 
 	btRigidBody* claw = pdemo->createRigidBody(0, trClaw, cylShape, 159);
 	claw->m_redirectionTarget = a18;
-	a18->m_kinematicChildren.push_back(claw);
+	a18->m_Children.push_back(claw);
 	claw->m_localTransform = btTransform(btMatrix3x3::getIdentity(), btVector3(0, 6.5, 0));
 
 	btRigidBody* clawCC = pdemo->createCableRigidBody(0, trClaw, cylShape, 123456);
