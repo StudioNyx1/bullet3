@@ -51,21 +51,21 @@ IF (BUILD_SHARED_LIBS)
 		IF (WIN32)
                 TARGET_LINK_LIBRARIES(
                         BulletExampleBrowserLib Bullet3Common BulletSoftBody BulletDynamics BulletCollision BulletInverseDynamicsUtils
-                        BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
+                        BulletCable BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
                         ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY}
                 )
 		ELSE(WIN32)
         IF(APPLE)
                  TARGET_LINK_LIBRARIES(
                                 BulletExampleBrowserLib Bullet3Common BulletSoftBody BulletDynamics BulletCollision BulletInverseDynamicsUtils
-                                BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
+                                BulletCable BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
                                 ${COCOA} ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY}
                  )
 				ELSE(APPLE)
                  FIND_PACKAGE(Threads)
                  TARGET_LINK_LIBRARIES(
                                 BulletExampleBrowserLib Bullet3Common BulletSoftBody BulletDynamics BulletCollision BulletInverseDynamicsUtils
-                                BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
+                                BulletCable BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
                                 ${CMAKE_THREAD_LIBS_INIT} ${DL}
                         )
         ENDIF(APPLE)
@@ -92,7 +92,7 @@ INCLUDE_DIRECTORIES(
 
 
 LINK_LIBRARIES(
-        BulletExampleBrowserLib Bullet3Common BulletSoftBody BulletDynamics BulletCollision BulletInverseDynamicsUtils BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
+        BulletExampleBrowserLib Bullet3Common BulletSoftBody BulletDynamics BulletCollision BulletInverseDynamicsUtils BulletCable BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
 )
 
 
@@ -231,6 +231,10 @@ SET(BulletExampleBrowser_SRCS
 	../Evolution/NN3DWalkersTimeWarpBase.h
 	../ExtendedTutorials/NewtonsRopeCradle.cpp
 	../ExtendedTutorials/NewtonsRopeCradle.h
+	../CableDemo/CableDemo.cpp
+	../CableDemo/CableDemo.h
+	../Collision/CollisionDemo.cpp
+	../Collision/CollisionDemo.h
 	../Collision/CollisionSdkC_Api.cpp
 	../Collision/CollisionSdkC_Api.h
 	../Collision/CollisionTutorialBullet2.cpp
