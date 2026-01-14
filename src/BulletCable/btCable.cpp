@@ -209,8 +209,13 @@ void btCable::PrepareSolver()
 			a.m_totalTension = btVector3(0, 0, 0);
 		}
 
-		// When a node's mass is greater than 5% of the attached body's mass, we cancel out the AnchorConstraintPlacement
-		a.m_anchorPlacement = massBody < FLT_EPSILON ? true : (tweakedMass / massBody < 5.0 / 100.0);
+		// We activate AnchorConstraintPlacement if :
+		//	- the attached body is a kinematic one
+		//  - the node's mass is lower than 5% of the body's mass
+		//  - the bodyMassRatio is not activated
+		a.m_anchorPlacement = massBody < FLT_EPSILON ? 
+			true : a.m_bodyMassRatio > 0.0 ?
+			false : (massNode / massBody < 5.0 / 100.0);
 	}
 
 	// Prepare contacts
