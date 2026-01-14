@@ -28,7 +28,9 @@ subject to the following restrictions:
 #ifdef BT_DEBUG
 #include <stdio.h>
 #endif
+
 #include <BulletCable/btCable.h>
+#include <BulletCollision/NarrowPhaseCollision/CustomManifold.h>
 
 btCollisionDispatcher::btCollisionDispatcher(btCollisionConfiguration* collisionConfiguration) : m_dispatcherFlags(btCollisionDispatcher::CD_USE_RELATIVE_CONTACT_BREAKING_THRESHOLD),
 																								 m_collisionConfiguration(collisionConfiguration)
@@ -298,28 +300,10 @@ void btCollisionDispatcher::freeCollisionAlgorithm(void* ptr)
 	}
 }
 
-
-void btCollisionDispatcher::releaseCachedManifold(btPersistentManifold* manifold)
-{
-	//btAssert( !btThreadsAreRunning() );
-	
-	clearManifold(manifold);
-	// batch updater will update manifold pointers array after finishing, so
-	// only need to update array when not batch-updating
-	int findIndex = manifold->m_index1a;
-	btAssert(findIndex < m_collidedManifoldsCache.size());
-	m_collidedManifoldsCache.swap(findIndex, m_collidedManifoldsCache.size() - 1);
-	m_collidedManifoldsCache[findIndex]->m_index1a = findIndex;
-	m_collidedManifoldsCache.pop_back();
-
-	manifold->freeContactPoint();
-	free(manifold);
-}
-
-
 void btCollisionDispatcher::addManifoldToCache(btPersistentManifold* manifold)
 {
-	m_collidedManifoldsCache.push_back(manifold);
+	CustomManifold* customManifold = new CustomManifold(manifold);
+	m_collidedManifoldsCache.push_back(customManifold);
 }
 
 void btCollisionDispatcher::addParticlesManifold(btPersistentManifold* manifold)
@@ -329,7 +313,6 @@ void btCollisionDispatcher::addParticlesManifold(btPersistentManifold* manifold)
 
 void btCollisionDispatcher::ClearManifoldsCache()
 {
-	releaseAllCachedManifolds();
 	m_collidedManifoldsCache.clear();
 }
 
@@ -337,17 +320,6 @@ void btCollisionDispatcher::ClearParticlesManifolds()
 {
 	releaseAllParticlesManifolds();
 	m_particlesManifolds.clear();
-}
-
-void btCollisionDispatcher::releaseAllCachedManifolds()
-{
-	//btAssert( !btThreadsAreRunning() );
-	
-	for (int i = 0; i < m_collidedManifoldsCache.size(); ++i)
-	{
-		delete m_collidedManifoldsCache[i];  // If elements were dynamically allocated
-											 //releaseManifold(m_collidedManifoldsCache[i]); // Or just set each element to nullptr
-	}
 }
 
 void btCollisionDispatcher::releaseAllParticlesManifolds()
@@ -360,13 +332,12 @@ void btCollisionDispatcher::releaseAllParticlesManifolds()
 	}
 }
 
-
 int btCollisionDispatcher::getNumManifoldsCache() const
 {
 	return int(m_collidedManifoldsCache.size());
 }
 
-btPersistentManifold* btCollisionDispatcher::getManifoldsCacheByIndexInternal(int index)
+CustomManifold* btCollisionDispatcher::getManifoldsCacheByIndexInternal(int index)
 {
 	btAssert(index>=0);
 	btAssert(index<m_collidedManifoldsCache.size());

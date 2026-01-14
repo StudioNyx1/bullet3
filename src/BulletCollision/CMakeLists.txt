@@ -99,6 +99,7 @@ SET(BulletCollision_SRCS
 	NarrowPhaseCollision/btSubSimplexConvexCast.cpp
 	NarrowPhaseCollision/btVoronoiSimplexSolver.cpp
 	NarrowPhaseCollision/btPolyhedralContactClipping.cpp
+	NarrowPhaseCollision/CustomManifold.cpp
 )
 
 SET(Root_HDRS
@@ -241,6 +242,7 @@ SET(NarrowPhaseCollision_HDRS
 	NarrowPhaseCollision/btSubSimplexConvexCast.h
 	NarrowPhaseCollision/btVoronoiSimplexSolver.h
 	NarrowPhaseCollision/btPolyhedralContactClipping.h
+	NarrowPhaseCollision/CustomManifold.h
 )
 
 SET(BulletCollision_HDRS

@@ -605,10 +605,7 @@ void btDiscreteDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
 			}
 			else
 			{
-				btPersistentManifold* newManifold = new btPersistentManifold;
-				*newManifold = *manifold;
-				newManifold->CopyContactsFromManifold(manifold);			
-				m_dispatcher1->addManifoldToCache(newManifold);
+				m_dispatcher1->addManifoldToCache(manifold);
 			}
 		}
 	}

@@ -168,6 +168,11 @@ public:
 		return m_positionWorldOnB;
 	}
 
+	const btVector3& getNormalWorldOnB() const
+	{
+		return m_normalWorldOnB;
+	}
+
 	void setDistance(btScalar dist)
 	{
 		m_distance1 = dist;

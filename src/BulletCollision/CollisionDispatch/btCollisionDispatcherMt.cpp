@@ -25,6 +25,7 @@ subject to the following restrictions:
 #include "BulletCollision/CollisionDispatch/btCollisionConfiguration.h"
 #include "BulletCollision/CollisionDispatch/btCollisionObjectWrapper.h"
 #include <BulletCable/btCable.h>
+#include <BulletCollision/NarrowPhaseCollision/CustomManifold.h>
 
 btCollisionDispatcherMt::btCollisionDispatcherMt(btCollisionConfiguration* config, int grainSize)
 	: btCollisionDispatcher(config)
@@ -110,43 +111,23 @@ void btCollisionDispatcherMt::releaseManifold(btPersistentManifold* manifold)
 	}
 }
 
-void btCollisionDispatcherMt::releaseCachedManifold(btPersistentManifold* manifold)
-{
-	//btAssert( !btThreadsAreRunning() );
-	
-	// if (!m_batchUpdating)
-	// {
-		// batch updater will update manifold pointers array after finishing, so
-		// only need to update array when not batch-updating
-		// int findIndex = manifold->m_index1a;
-		// btAssert(findIndex < m_collidedManifoldsCache.size());
-		// m_collidedManifoldsCache.swap(findIndex, m_collidedManifoldsCache.size() - 1);
-		// m_collidedManifoldsCache[findIndex]->m_index1a = findIndex;
-		// m_collidedManifoldsCache.pop_back();
-	// } else {
-	// 	m_batchReleasePtr[btGetCurrentThreadIndex()].push_back(manifold);
-	// 	return;
-	// }
-
-	manifold->freeContactPoint();
-	free(manifold);
-}
-
-
 void btCollisionDispatcherMt::addManifoldToCache(btPersistentManifold* manifold)
 {
-	for (int i = 0; i < m_collidedManifoldsCache.size(); i++)
+	int contactCount = manifold->getNumContacts();
+	if (contactCount > 0)
 	{
-		bool isAlreadyInCache = m_collidedManifoldsCache.at(i)->getBody0() == manifold->getBody0() || m_collidedManifoldsCache.at(i)->getBody0() == manifold->getBody1();
-		isAlreadyInCache = isAlreadyInCache && (m_collidedManifoldsCache.at(i)->getBody1() == manifold->getBody0() || m_collidedManifoldsCache.at(i)->getBody1() == manifold->getBody1());
-		
-		if (isAlreadyInCache && manifold->getNumContacts() > 0)
+		int cacheIndex = isPairInCache(m_collidedManifoldsCache, manifold);
+		if (cacheIndex != -1)
 		{
-			m_collidedManifoldsCache.removeAtIndex(i);
-			break;
+			m_collidedManifoldsCache[cacheIndex]->addPoint(manifold);
+		}
+		else
+		{
+			CustomManifold* customManifold = new CustomManifold(manifold);
+			m_collidedManifoldsCache.push_back(customManifold);
 		}
 	}
-	m_collidedManifoldsCache.push_back(manifold);
+	
 }
 
 void btCollisionDispatcherMt::addParticlesManifold(btPersistentManifold* manifold)
@@ -165,32 +146,29 @@ void btCollisionDispatcherMt::addParticlesManifold(btPersistentManifold* manifol
 	m_particlesManifolds.push_back(manifold);
 }
 
-void btCollisionDispatcherMt::ClearManifoldsCache()
+int btCollisionDispatcherMt::isPairInCache(const btAlignedObjectArray<CustomManifold*> manifoldCache, const btPersistentManifold* newManifold)
 {
-	releaseAllCachedManifolds();
-	m_collidedManifoldsCache.clear();
-}
+	const btCollisionObject* newObj0 = newManifold->getBody0();
+	const btCollisionObject* newObj1 = newManifold->getBody1();
 
-void btCollisionDispatcherMt::releaseAllCachedManifolds()
-{
-	//btAssert( !btThreadsAreRunning() );
-
-	while (	m_collidedManifoldsCache.size() > 0)
+	for (int i = 0; i < manifoldCache.size(); i++)
 	{
-		btPersistentManifold* manifold = m_collidedManifoldsCache[m_collidedManifoldsCache.size()-1];
-		m_collidedManifoldsCache.pop_back();
-
-		manifold->freeContactPoint();
-		if (m_persistentManifoldPoolAllocator->validPtr(manifold))
+		const btCollisionObject* cacheObj0 = manifoldCache.at(i)->getBody0();
+		const btCollisionObject* cacheObj1 = manifoldCache.at(i)->getBody1();
+		bool isCachePair0 = cacheObj0 == newObj0 || cacheObj0 == newObj1; // Object 0 in cache is either new Object 0 or 1
+		bool isCachePair1 = cacheObj1 == newObj0 || cacheObj1 == newObj1; // Object 1 in cache is either new Object 0 or 1
+		 
+		if (isCachePair0 && isCachePair1)
 		{
-			m_persistentManifoldPoolAllocator->freeMemory(manifold);
-		}
-		else
-		{
-			btAlignedFree(manifold);
+			return i;
 		}
 	}
-	
+	return -1;
+}
+
+void btCollisionDispatcherMt::ClearManifoldsCache()
+{
+	m_collidedManifoldsCache.clear();
 }
 
 void btCollisionDispatcherMt::ClearParticlesManifolds()
@@ -227,10 +205,10 @@ int btCollisionDispatcherMt::getNumManifoldsCache() const
 	return int(m_collidedManifoldsCache.size());
 }
 
-btPersistentManifold* btCollisionDispatcherMt::getManifoldsCacheByIndexInternal(int index)
+CustomManifold* btCollisionDispatcherMt::getManifoldsCacheByIndexInternal(int index)
 {
 	btAssert(index>=0);
-	btAssert(index<m_collidedManifoldsCache.size());
+	btAssert(index< m_collidedManifoldsCache.size());
 	return m_collidedManifoldsCache[index];
 }
 
