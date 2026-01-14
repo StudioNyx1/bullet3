@@ -4439,7 +4439,7 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	attachPoint->setMassProps(0, btVector3(0, 0, 0));
 
 	// Ground
-	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion::getIdentity(), 
+	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion(btVector3(1,0,0), 0.0), //SIMD_PI / 100.0), 
 		                                         btVector3(0, LestHeight - data.Ground_offset - 0.4 - 0.2, 0)), 
 		                                         new btBoxShape(btVector3(10, 0.2, 10))
 	);
@@ -4500,7 +4500,7 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	SliderParams sliderCableResolution("Resolution (Cable)", &data.Cable_resolution);
 	btScalar stepCableResolution = 1.0;
 	sliderCableResolution.m_userPointer = pdemo;
-	sliderCableResolution.m_minVal = 5;
+	sliderCableResolution.m_minVal = 2;
 	sliderCableResolution.m_maxVal = 200 - stepCableResolution;
 	sliderCableResolution.m_clampToIntegers = true;
 	sliderCableResolution.m_clampToNotches = true;
@@ -4543,7 +4543,7 @@ static void Init_StabilityTension(CableDemo* pdemo)
 
 		CableDemo* pdemo = (CableDemo*)userPtr;
 		pdemo->m_stabilityData->Cable_AnchorPlacement = buttonState;
-		pdemo->m_cable->setUseAnchorConstraintPlacement(pdemo->m_stabilityData->Cable_LRA);
+		pdemo->m_cable->setUseAnchorConstraintPlacement(pdemo->m_stabilityData->Cable_AnchorPlacement);
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(anchorPlacementSelector);
 
@@ -4589,7 +4589,7 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, stepAMassRatio);
 
-	SliderParams sliderMassRationActivationThreshold("Mass ratio min threshold (Cable)", &data.Cable_massRatioActivationThreshold);
+	SliderParams sliderMassRationActivationThreshold("Mass ratio min (Cable)", &data.Cable_massRatioActivationThreshold);
 	btScalar stepMassRationActivationThreshold = 0.02;
 	sliderMassRationActivationThreshold.m_userPointer = pdemo;
 	sliderMassRationActivationThreshold.m_minVal = 0;
