@@ -4723,7 +4723,7 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	// Objet A (Lest)
 	btRigidBody* ringLest = pdemo->createRigidBody(data.A_mass, transformRingLest, ringShape);
 	ringLest->setSleepingThresholds(0, 0);
-	ringLest->setupMassAtImpact(data.A_mass, 200, 0.0, 0.2);
+	ringLest->setupMassAtImpact(data.A_mass, 1000, 0.0, 1.0);
 	ringLest->activeMassAtImpact(data.A_MassImpact > 0.0 ? true : false);
 
 	// Objet C (A18)
@@ -4769,12 +4769,13 @@ static void Init_StabilityA18(CableDemo* pdemo)
 
 	// User controls
 	SliderParams sliderSubsteps("Substeps count (Global)", &globals.substepsCount);
+	btScalar stepSubsteps = 1.0;
 	sliderSubsteps.m_userPointer = pdemo;
-	sliderSubsteps.m_minVal = 1;
-	sliderSubsteps.m_maxVal = 8;
+	sliderSubsteps.m_minVal = 1.0;
+	sliderSubsteps.m_maxVal = 8.0 - stepSubsteps;
 	sliderSubsteps.m_clampToIntegers = true;
 	sliderSubsteps.m_clampToNotches = true;
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderSubsteps, 1);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderSubsteps, stepSubsteps);
 
 	ButtonParams dataSelector("Lock", 0, true);
 	dataSelector.m_userPointer = pdemo;
@@ -4789,28 +4790,31 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(dataSelector);
 
 	SliderParams sliderCableResolution("Resolution (Cable)", &data.Cable_resolution);
+	btScalar stepCableResolition = 1.0;
 	sliderCableResolution.m_userPointer = pdemo;
-	sliderCableResolution.m_minVal = 5;
-	sliderCableResolution.m_maxVal = 200;
+	sliderCableResolution.m_minVal = 5.0;
+	sliderCableResolution.m_maxVal = 200.0 - stepCableResolition;
 	sliderCableResolution.m_clampToIntegers = true;
 	sliderCableResolution.m_clampToNotches = true;
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableResolution, 5);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableResolution, stepCableResolition);
 
 	SliderParams sliderCableLength("Initial Length (Cable)", &data.Cable_length);
+	btScalar stepCableLength = 0.25;
 	sliderCableLength.m_userPointer = pdemo;
-	sliderCableLength.m_minVal = 0.2;
-	sliderCableLength.m_maxVal = 8;
+	sliderCableLength.m_minVal = 0.25;
+	sliderCableLength.m_maxVal = 15.0 - stepCableLength;
 	sliderCableLength.m_clampToIntegers = false;
 	sliderCableLength.m_clampToNotches = true;
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableLength, 0.2);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableLength, stepCableLength);
 
 	SliderParams sliderGroundOffset("Offset (Ground)", &data.Ground_offset);
+	btScalar stepGroundOffset = 0.25;
 	sliderGroundOffset.m_userPointer = ground;
-	sliderGroundOffset.m_minVal = 0;
-	sliderGroundOffset.m_maxVal = 200;
+	sliderGroundOffset.m_minVal = -20.0;
+	sliderGroundOffset.m_maxVal = 20.0 - stepGroundOffset;
 	sliderGroundOffset.m_clampToIntegers = true;
 	sliderGroundOffset.m_clampToNotches = true;
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderGroundOffset, 2);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderGroundOffset, stepGroundOffset);
 
 	ButtonParams lraSelector("LRA", 1, true);
 	lraSelector.m_userPointer = pdemo;
@@ -4845,50 +4849,54 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	pdemo->getGUIHelper()->getParameterInterface()->registerButtonParameter(anchorPlacementSelector);
 
 	SliderParams sliderMassA("Mass Lest (A)", &data.A_mass);
+	btScalar stepMassA = 100.0;
 	sliderMassA.m_userPointer = ringLest;
-	sliderMassA.m_minVal = 10;
-	sliderMassA.m_maxVal = 20000;
-	sliderMassA.m_clampToIntegers = true;
-	sliderMassA.m_clampToNotches = true;
+	sliderMassA.m_minVal = 10.0;
+	sliderMassA.m_maxVal = 10000.0;
+	sliderMassA.m_clampToIntegers = false;
+	sliderMassA.m_clampToNotches = false;
 	sliderMassA.m_callback = [](float value, void* userPtr)
 	{
 		btRigidBody* lest = (btRigidBody*)userPtr;
 		lest->setMassProps(value, lest->getLocalInertia() * value * lest->getInvMass());
 		lest->updateInertiaTensor();
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassA, 100);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassA, stepMassA);
 
 	SliderParams sliderMassC("Mass A18 (C)", &data.C_mass);
+	btScalar stepMassC = 200.0;
 	sliderMassC.m_userPointer = a18;
-	sliderMassC.m_minVal = 10;
-	sliderMassC.m_maxVal = 20000;
-	sliderMassC.m_clampToIntegers = true;
-	sliderMassC.m_clampToNotches = true;
+	sliderMassC.m_minVal = 10.0;
+	sliderMassC.m_maxVal = 30000.0;
+	sliderMassC.m_clampToIntegers = false;
+	sliderMassC.m_clampToNotches = false;
 	sliderMassC.m_callback = [](float value, void* userPtr)
 	{
 		btRigidBody* a18 = (btRigidBody*)userPtr;
 		a18->setMassProps(value, a18->getLocalInertia() * value * a18->getInvMass());
 		a18->updateInertiaTensor();
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassC, 100);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassC, stepMassC);
 
 	SliderParams sliderMassImpactA("MassAtImpact (A)", &data.A_MassImpact);
+	btScalar stepMassImpactA = 1.0;
 	sliderMassImpactA.m_userPointer = ringLest;
-	sliderMassImpactA.m_minVal = 0;
-	sliderMassImpactA.m_maxVal = 1;
+	sliderMassImpactA.m_minVal = 0.0;
+	sliderMassImpactA.m_maxVal = 1.0 - stepMassImpactA;
 	sliderMassImpactA.m_clampToIntegers = true;
-	sliderMassImpactA.m_clampToNotches = false;
+	sliderMassImpactA.m_clampToNotches = true;
 	sliderMassImpactA.m_callback = [](float value, void* userPtr)
 	{
 		btRigidBody* lest = (btRigidBody*)userPtr;
 		lest->activeMassAtImpact(value > 0.0 ? true : false);
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassImpactA, 1);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassImpactA, stepMassImpactA);
 
 	SliderParams sliderAMassRatio("MassRatio (A)", &data.A_massRatio);
+	btScalar stepAMassRatio = 0.01;
 	sliderAMassRatio.m_userPointer = pdemo;
-	sliderAMassRatio.m_minVal = 0;
-	sliderAMassRatio.m_maxVal = 1;
+	sliderAMassRatio.m_minVal = 0.0;
+	sliderAMassRatio.m_maxVal = 1.0 - stepAMassRatio;
 	sliderAMassRatio.m_clampToIntegers = false;
 	sliderAMassRatio.m_clampToNotches = true;
 	sliderAMassRatio.m_callback = [](float value, void* userPtr)
@@ -4896,12 +4904,13 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		CableDemo* demo = (CableDemo*)userPtr;
 		demo->m_cable->m_anchors[0].m_bodyMassRatio = value;
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, 0.05);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, stepAMassRatio);
 
-	SliderParams sliderMassRationActivationThreshold("Mass ratio min threshold (Cable)", &data.Cable_massRatioActivationThreshold);
+	SliderParams sliderMassRationActivationThreshold("Mass ratio min (Cable)", &data.Cable_massRatioActivationThreshold);
+	btScalar stepMassRationActivationThreshold = 0.01;
 	sliderMassRationActivationThreshold.m_userPointer = pdemo;
-	sliderMassRationActivationThreshold.m_minVal = 0;
-	sliderMassRationActivationThreshold.m_maxVal = 1.0;
+	sliderMassRationActivationThreshold.m_minVal = 0.0;
+	sliderMassRationActivationThreshold.m_maxVal = 1.0 - stepMassRationActivationThreshold;
 	sliderMassRationActivationThreshold.m_clampToIntegers = true;
 	sliderMassRationActivationThreshold.m_clampToNotches = true;
 	sliderMassRationActivationThreshold.m_callback = [](float value, void* userPtr)
@@ -4909,26 +4918,28 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		CableDemo* pdemo = (CableDemo*)userPtr;
 		pdemo->m_cable->setMassRatioActivationThreshold(value);
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassRationActivationThreshold, 0.05);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassRationActivationThreshold, stepMassRationActivationThreshold);
 
 	SliderParams sliderCableLinearMass("Linear Mass (Cable)", &data.Cable_linearMass);
+	btScalar stepCableLinearMass = 0.25;
 	sliderCableLinearMass.m_userPointer = pdemo;
-	sliderCableLinearMass.m_minVal = 1;
-	sliderCableLinearMass.m_maxVal = 50;
-	sliderCableLinearMass.m_clampToIntegers = true;
-	sliderCableLinearMass.m_clampToNotches = true;
+	sliderCableLinearMass.m_minVal = 0.25;
+	sliderCableLinearMass.m_maxVal = 10.0;
+	sliderCableLinearMass.m_clampToIntegers = false;
+	sliderCableLinearMass.m_clampToNotches = false;
 	sliderCableLinearMass.m_callback = [](float value, void* userPtr)
 	{
 		CableDemo* pdemo = (CableDemo*)userPtr;
 		pdemo->m_cable->setLinearMass(value);
 		pdemo->m_cable->updateNodesMass();
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableLinearMass, 5);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableLinearMass, stepCableLinearMass);
 
 	SliderParams sliderCableTargetLength("Target Length (Cable)", &data.Cable_targetLength);
+	btScalar stepCableTargetLength = 0.25;
 	sliderCableTargetLength.m_userPointer = pdemo;
-	sliderCableTargetLength.m_minVal = 0.2;
-	sliderCableTargetLength.m_maxVal = 8;
+	sliderCableTargetLength.m_minVal = 0;
+	sliderCableTargetLength.m_maxVal = 15 - stepCableTargetLength;
 	sliderCableTargetLength.m_clampToIntegers = false;
 	sliderCableTargetLength.m_clampToNotches = true;
 	sliderCableTargetLength.m_callback = [](float value, void* userPtr)
@@ -4936,12 +4947,13 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		CableDemo* demo = (CableDemo*)userPtr;
 		demo->SetCableTargetLength(value);
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableTargetLength, 0.2);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableTargetLength, stepCableTargetLength);
 
 	SliderParams sliderCableGrowSpeed("Change Speed (Cable)", &data.Cable_growSpeed);
+	btScalar stepCableGrowSpeed = 0.25;
 	sliderCableGrowSpeed.m_userPointer = pdemo;
-	sliderCableGrowSpeed.m_minVal = -4;
-	sliderCableGrowSpeed.m_maxVal = 4;
+	sliderCableGrowSpeed.m_minVal = -5.0;
+	sliderCableGrowSpeed.m_maxVal = 5.0 - stepCableGrowSpeed;
 	sliderCableGrowSpeed.m_clampToIntegers = false;
 	sliderCableGrowSpeed.m_clampToNotches = true;
 	sliderCableGrowSpeed.m_callback = [](float value, void* userPtr)
@@ -4949,12 +4961,13 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		CableDemo* demo = (CableDemo*)userPtr;
 		demo->SetCableGrowSpeed(value);
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableGrowSpeed, 0.2);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableGrowSpeed, stepCableGrowSpeed);
 
 	SliderParams sliderCableSolverIteration("Solver iteration (Cable)", &data.Cable_iteration);
+	btScalar stepCableSolverIteration = 1.0;
 	sliderCableSolverIteration.m_userPointer = pdemo;
-	sliderCableSolverIteration.m_minVal = 10;
-	sliderCableSolverIteration.m_maxVal = 200;
+	sliderCableSolverIteration.m_minVal = 5.0;
+	sliderCableSolverIteration.m_maxVal = 200.0 - stepCableSolverIteration;
 	sliderCableSolverIteration.m_clampToIntegers = true;
 	sliderCableSolverIteration.m_clampToNotches = true;
 	sliderCableSolverIteration.m_callback = [](float value, void* userPtr)
@@ -4962,7 +4975,7 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		CableDemo* pdemo = (CableDemo*)userPtr;
 		pdemo->m_cable->m_cfg.piterations = value;
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableSolverIteration, 10);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderCableSolverIteration, stepCableSolverIteration);
 }
 
 
