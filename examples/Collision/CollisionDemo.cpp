@@ -13,6 +13,7 @@
 #include <BulletSoftBody/btSoftRigidDynamicsWorld.h>
 #include "BulletSoftBody/btSoftBodyRigidBodyCollisionConfiguration.h"
 #include <BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolverMt.h>
+#include <BulletCollision/NarrowPhaseCollision/CustomManifold.h>
 
 class CollisionDemo : public CommonRigidBodyBase
 {
@@ -316,17 +317,19 @@ private:
 			b3Printf("Object %i - %s", i, GetPrintState(colfFlag, colfType, activationState).c_str());
 		}
 
-		PrintVelocities("BEFORE");
+		//PrintVelocities("BEFORE");
 		if (m_dynamicsWorld)
 		{
 			m_dynamicsWorld->stepSimulation(deltaTime);
 		}
 		PrintManifoldInformation();
-		PrintVelocities("AFTER");
+		b3Printf("Cache");
+		PrintManifoldCacheInformation();
+		//PrintVelocities("AFTER");
 
-		b3Printf("Object count: %i", count);
-		b3Printf("Manifold number: %i",m_dispatcher->getNumManifolds());
-		b3Printf("Manifold cache number: %i", m_dispatcher->getNumManifoldsCache());
+		//b3Printf("Object count: %i", count);
+		//b3Printf("Manifold number: %i",m_dispatcher->getNumManifolds());
+		//b3Printf("Manifold cache number: %i", m_dispatcher->getNumManifoldsCache());
 	}
 
 	void PrintVelocities(string frameMoment)
@@ -361,6 +364,29 @@ private:
 			}
 		}
 	}
+
+	void PrintManifoldCacheInformation()
+	{
+		int manifoldCount = m_dispatcher->getNumManifoldsCache();
+		for (int i = 0; i < manifoldCount; i++)
+		{
+			CustomManifold* manifold = m_dispatcher->getManifoldsCacheByIndexInternal(i);
+			int numContact = manifold->getCount();
+			btRigidBody* rb0 = (btRigidBody*)manifold->getBody0();
+			btRigidBody* rb1 = (btRigidBody*)manifold->getBody1();
+
+			b3Printf("Manifold %i - body0 : mass %f - vel %f - pos %f ", i, rb0->getMass(), rb0->getLinearVelocity().getY(), rb0->getWorldTransform().getOrigin().getY());
+			b3Printf("Manifold %i - body1 : mass %f - vel %f - pos %f ", i, rb1->getMass(), rb1->getLinearVelocity().getY(), rb1->getWorldTransform().getOrigin().getY());
+
+			for (int j = 0; j < numContact; j++)
+			{
+				CustomManifoldPoint* point = manifold->getManifoldPoint(j);
+				btScalar impulse = point->GetImpulse();
+				b3Printf("Manifold %i - point %i - impulse %f", i, j, impulse);
+			}
+		}
+	}
+
 
 	// Physics cube fall on kinematic one
 	void Init_PhysicFallDemo()
