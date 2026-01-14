@@ -23,7 +23,7 @@ subject to the following restrictions:
 #define btCollisionObjectData btCollisionObjectFloatData
 #endif
 
-btScalar gContactBreakingThreshold = btScalar(0.02);
+btScalar gContactBreakingThreshold = btScalar(0.003);
 ContactDestroyedCallback gContactDestroyedCallback = 0;
 ContactProcessedCallback gContactProcessedCallback = 0;
 ContactStartedCallback gContactStartedCallback = 0;
