@@ -57,7 +57,7 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	}
 	else
 	{
-		m_defaultRestLength = m_links.at(0).m_rl;
+		m_defaultRestLength = m_links.at(m_links.size() - 1 ).m_rl;
 	}
 
 	m_gravity = worldInfo->m_gravity;
@@ -331,9 +331,6 @@ void btCable::EndConstraintsSolve()
 		}
 	}
 
-	// Grows/Shrinks only in physic
-	updateLength(m_sst.sdt);
-
 	_nodePairContact.clear();
 }
 
@@ -447,6 +444,9 @@ void btCable::predictMotion(btScalar dt)
 	cableState = Valid;
 	int i, ni;
 
+	// Grows/Shrinks the cable
+	updateLength(dt);
+
 	/* Update                */
 	if (m_bUpdateRtCst)
 	{
@@ -517,7 +517,10 @@ void btCable::predictMotion(btScalar dt)
 }
 
 void btCable::Grows(float dt)
-{
+{	
+	// Activate the constants' links constants
+	m_bUpdateRtCst = true;
+
 	int sizeNode = m_nodes.size();
 	int lastIndexNode = sizeNode - 1;
 
@@ -648,6 +651,9 @@ void btCable::Grows(float dt)
 
 void btCable::Shrinks(float dt)
 {
+	// Activate the constants' links constants
+	m_bUpdateRtCst = true;
+
 	int sizeNode = m_nodes.size();
 	int lastIndexNode = sizeNode - 1;
 
