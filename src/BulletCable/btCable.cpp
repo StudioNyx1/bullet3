@@ -1251,25 +1251,31 @@ void btCable::distanceConstraintBullet()
 {
 	BT_PROFILE("PSolve_Links");
 	const btScalar stiffness = m_materials[0]->m_kLST;
+	btScalar lengthAccumulator = 0.0;
+	btScalar restLengthAccumulator = 0.0;
 	for (int i = 0, ni = m_links.size(); i < ni; ++i)
 	{
 		Link& l = m_links[i];
-		if (l.m_c0 > 0)
+		const btScalar sumInvMass = l.m_c0;
+		if (sumInvMass > 0)
 		{
 			Node& a = *l.m_n[0];
 			Node& b = *l.m_n[1];
 			const btVector3 del = b.m_x - a.m_x;
 			const btScalar len2 = del.length2();
-			if (l.m_c1 + len2 > SIMD_EPSILON)
+			const btScalar rl2 = l.m_c1;
+			if (rl2 + len2 > SIMD_EPSILON)
 			{
-				const btScalar k = ((l.m_c1 - len2) / (l.m_c0 * (l.m_c1 + len2))) * stiffness;
+				const btScalar k = ((rl2 - len2) / (sumInvMass * (rl2 + len2))) * stiffness;
 				a.m_x -= del * (k * a.m_im);
 				b.m_x += del * (k * b.m_im);
-				m_tenseAccumulator = max(m_tenseAccumulator, (len2 - l.m_c1) / l.m_c1);
 			}
+			lengthAccumulator += len2;
+			restLengthAccumulator += rl2;
 		}
 	}
-	m_tenseAccumulator = min(m_tenseAccumulator, m_maxAccumulator);
+	// Calculate the strain of the cable
+	m_tenseAccumulator = (lengthAccumulator - restLengthAccumulator) / restLengthAccumulator;
 }
 
 void btCable::distanceConstraintXPBD()
