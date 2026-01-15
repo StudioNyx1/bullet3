@@ -4888,6 +4888,7 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	sliderMassImpactA.m_callback = [](float value, void* userPtr)
 	{
 		btRigidBody* lest = (btRigidBody*)userPtr;
+		lest->setupMassAtImpact(lest->getMass(), 1000, 0.0, 1.0);
 		lest->activeMassAtImpact(value > 0.0 ? true : false);
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassImpactA, stepMassImpactA);
