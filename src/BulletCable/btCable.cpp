@@ -1178,9 +1178,10 @@ void btCable::anchorConstraint()
 		{
 			btScalar x = btClamped((m_tenseAccumulator - m_minAccumulator) / (m_maxAccumulator - m_minAccumulator), 0.0, 1.0);
 			// ratio = m_tenseAccumulator;
-			ratio = x;
+			// ratio = x;
 			// ratio = 1.0 - btPow(1.0 - m_tenseAccumulator, 4.0);
-			// ratio = btPow(x, 4.0);
+			// ratio = btPow(x, 4);
+			ratio = btPow(x, 2);
 		}
 		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, ratio);
 
@@ -1229,9 +1230,10 @@ void btCable::anchorConstraintPlacement()
 		{
 			btScalar x = btClamped((m_tenseAccumulator - m_minAccumulator) / (m_maxAccumulator - m_minAccumulator), 0.0, 1.0);
 			// ratio = m_tenseAccumulator;
-			ratio = x;
+			// ratio = x;
 			// ratio = 1.0 - btPow(1.0 - m_tenseAccumulator, 4.0);
-			// ratio = btPow(x, 4.0);
+			// ratio = btPow(x, 4);
+			ratio = btPow(x, 2);
 		}
 		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, ratio);
 
