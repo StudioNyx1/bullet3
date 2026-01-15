@@ -1150,9 +1150,14 @@ public:
 		cable->setLinearMass(linearMass);
 		cable->setUseCollision(false);
 		if (bodyA != nullptr)
+		{
 			cable->appendAnchor(0, bodyA, anchorPos.at(0) - bodyA->getWorldTransform().getOrigin(), DisableCollisionOnA);
+		}
 		if (bodyB != nullptr)
+		{
 			cable->appendAnchor(cable->m_nodes.size() - 1, bodyB, anchorPos.at(s) - bodyB->getWorldTransform().getOrigin(), DisableCollisionOnB);
+		}
+
 		// Cable's config
 		//cable->setTotalMass(totalMass);
 		cable->updateNodesMass();
