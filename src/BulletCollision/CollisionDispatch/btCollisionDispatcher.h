@@ -46,7 +46,7 @@ protected:
 
 	btAlignedObjectArray<btPersistentManifold*> m_manifoldsPtr;
 	btAlignedObjectArray<CustomManifold*> m_collidedManifoldsCache;
-	btAlignedObjectArray<btPersistentManifold*> m_particlesManifolds;
+	btAlignedObjectArray<CustomManifold*> m_particlesManifolds;
 	
 	btNearCallback m_nearCallback;
 
@@ -167,13 +167,13 @@ public:
 		return m_persistentManifoldPoolAllocator;
 	}
 
-	virtual void releaseAllParticlesManifolds() override;
 	virtual int getNumManifoldsCache() const override;
 	virtual int getNumParticlesManifolds() const override;
 	virtual CustomManifold* getManifoldsCacheByIndexInternal(int index) override;
-	virtual btPersistentManifold* getParticlesManifoldsByIndexInternal(int index) override;
+	virtual CustomManifold* getParticlesManifoldsByIndexInternal(int index) override;
 	virtual void addManifoldToCache(btPersistentManifold* manifold) override;
 	virtual void addParticlesManifold(btPersistentManifold* manifold) override;
+	int isPairInCache(const btAlignedObjectArray<CustomManifold*> manifoldCache, const btPersistentManifold* newManifold);
 	virtual void ClearManifoldsCache() override;
 	virtual void ClearParticlesManifolds() override;
 	

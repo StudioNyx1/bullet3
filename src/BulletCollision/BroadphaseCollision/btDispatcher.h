@@ -108,14 +108,12 @@ public:
 	virtual void* allocateCollisionAlgorithm(int size) = 0;
 
 	virtual void freeCollisionAlgorithm(void* ptr) = 0;
-
-	virtual void releaseAllParticlesManifolds() = 0;
 	 
 	virtual int getNumManifoldsCache() const = 0;
 	virtual int getNumParticlesManifolds() const = 0;
 	 
 	virtual CustomManifold* getManifoldsCacheByIndexInternal(int index) = 0;
-	virtual btPersistentManifold* getParticlesManifoldsByIndexInternal(int index) = 0;
+	virtual CustomManifold* getParticlesManifoldsByIndexInternal(int index) = 0;
 	 
 	virtual void addManifoldToCache(btPersistentManifold* manifold) = 0;
 	virtual void addParticlesManifold(btPersistentManifold* manifold) = 0;

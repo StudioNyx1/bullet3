@@ -598,10 +598,7 @@ void btDiscreteDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
 		if(manifold->m_hasCollided)
 		{
 			if(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterGroup == 4 || manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterGroup == 4) {
-				btPersistentManifold* newManifold = new btPersistentManifold;
-				*newManifold = *manifold;
-				newManifold->CopyContactsFromManifold(manifold);
-				m_dispatcher1->addParticlesManifold(newManifold);
+				m_dispatcher1->addParticlesManifold(manifold);
 			}
 			else
 			{
