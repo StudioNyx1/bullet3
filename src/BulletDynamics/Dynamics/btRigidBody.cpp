@@ -163,7 +163,7 @@ void btRigidBody::updateBulletChildrenRecursive(btScalar timeStep, unsigned int 
 		kinematic->updateBulletChildrenRecursive(timeStep, currentFrame);
 
 		// Need velocity update later
-		m_hasMovedWithChildrenUpdate = true;
+		kinematic->m_hasMovedWithChildrenUpdate = true;
 	}
 }
 
@@ -214,7 +214,7 @@ void btRigidBody::updateBulletChildrenInterpolatedRecursive(btScalar timeStep, u
 		kinematic->updateBulletChildrenInterpolatedRecursive(timeStep, currentFrame);
 
 		// Need velocity update later
-		m_hasMovedWithChildrenUpdate = true;
+		kinematic->m_hasMovedWithChildrenUpdate = true;
 	}
 }
 
