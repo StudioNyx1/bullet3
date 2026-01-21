@@ -532,6 +532,13 @@ public:
 	int getDistanceMode();
 
 	void setUseAnchorConstraintPlacement(bool status);
+	
+	btScalar getTensionAccumulator() { return m_tenseAccumulator; }
+	btScalar getTensionMinAccumulator() { return m_minAccumulator; }
+	btScalar getTensionMaxAccumulator() { return m_maxAccumulator; }
+
+	void setTensionMinAccumulator(btScalar value) { m_minAccumulator = value; }
+	void setTensionMaxAccumulator(btScalar value) { m_maxAccumulator = value; }
 
 #pragma endregion
 };
