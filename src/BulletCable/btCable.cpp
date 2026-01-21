@@ -1337,7 +1337,11 @@ void btCable::distanceConstraintXPBD()
 		const btVector3 dxB = b->m_im * Cb_gradient * dLambda;
 		a->m_x += dxA;
 		b->m_x += dxB;
+
+		m_tenseAccumulator = max(m_tenseAccumulator, (L - l->m_rl) / l->m_rl);
 	}
+
+	m_tenseAccumulator = min(m_tenseAccumulator, m_maxAccumulator);
 }
 
 void btCable::LRAConstraint()
