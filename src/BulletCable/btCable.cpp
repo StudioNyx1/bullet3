@@ -71,11 +71,6 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	m_collisionMode = CollisionMode::Base;
 }
 
-void btCable::setMassRatioActivationThreshold(btScalar offset)
-{
-	m_minAccumulator = offset;
-}
-
 void btCable::updateLength(btScalar dt)
 {
 	if (WantedSpeed > 0)
@@ -147,8 +142,20 @@ void btCable::PrepareSolver()
 {
 	int i, ni;
 
-	// Prepare cable
-	m_tenseAccumulator = 0.0;
+	// Prepare cable stretch detection
+	// NOTE(Jeremy) Following parameters should never be reset to keep history across substeps/steps
+	// m_stretchHysteresis.enabled = false;
+	// m_cableStretchRatioDamped = 0.0;
+	// NOTE(Jeremy) Following parameters should never be reset to keep history across substeps/steps
+
+	// NOTE(Jeremy) Following parameters are computed at each iteration
+	// m_stretchHysteresis.frozen = false;
+	// m_stretchDamping.attenuation = 1.0
+	// m_linkStretchRatio = 0.0;
+	// m_cableStretchRatio = 0.0;
+	// m_lengthAccumulator = 0.0;
+	// m_restLengthAccumulator = 0.0;
+	// NOTE(Jeremy) Following parameters are computed at each iteration
 
 	// Prepare nodes
 	for (i = 0, ni = m_nodes.size(); i < ni; ++i)
@@ -247,6 +254,8 @@ void btCable::solveSingleCableIteration(int currentIter)
 	bool runContactConstraint = (currentIter + 1) % m_substepDelayCollisionSolver == 0 || lastStep;
 
 	updateNodeDeltaPos(currentIter);
+
+	m_massBalanceRatio = computeMassBalanceRatio();
 
 	anchorConstraint();
 
@@ -1147,6 +1156,7 @@ void btCable::anchorConstraint()
 	BT_PROFILE("PSolve_Anchors");
 	const btScalar kAHR = m_cfg.kAHR;
 	const btScalar dt = m_sst.sdt;
+
 	for (int i = 0, ni = this->m_anchors.size(); i < ni; ++i)
 	{
 		Anchor& anchor = m_anchors[i];
@@ -1160,16 +1170,8 @@ void btCable::anchorConstraint()
 		btVector3 impulseBullet = anchor.m_c0 * vr;
 		btVector3 impulseMassBalance = anchor.m_c0_massBalance * vr;
 
-		btScalar ratio = 0.0;
-		if (m_tenseAccumulator > m_minAccumulator)
-		{
-			btScalar x = btClamped((m_tenseAccumulator - m_minAccumulator) / (m_maxAccumulator - m_minAccumulator), 0.0, 1.0);
-			// ratio = m_tenseAccumulator;
-			ratio = x;
-			// ratio = 1.0 - btPow(1.0 - m_tenseAccumulator, 4.0);
-			// ratio = btPow(x, 4.0);
-		}
-		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, ratio);
+		// Account for mass balance
+		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, m_massBalanceRatio);
 
 		// Clamp the calculated impulse
 		btScalar currentTension = anchor.m_lastTension.length();
@@ -1194,7 +1196,7 @@ void btCable::anchorConstraint()
 				node.m_x += impulseMassBalance * anchor.m_c2_massBalance;
 				break;
 			case AnchorMode::LerpB2MB:
-				node.m_x += lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
+				node.m_x += lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, m_massBalanceRatio);
 				break;
 			case AnchorMode::OnPoint:
 				node.m_x = wa;
@@ -1249,17 +1251,169 @@ void btCable::anchorConstraintPlacement()
 	}
 }
 
+static bool SchmittHysteresis(bool state, btScalar x, btScalar lower, btScalar upper)
+{
+	if (state)
+	{
+		// Currently ON so check if we are crossing the lower bound
+		// Make activation higher priority
+		return x >= lower;
+	}
+	else
+	{
+		// Currently OFF so check if we are crossing the upper bound
+		// Make deactivation lower priority
+		return x >= upper;
+	}
+}
+
+
+static btScalar EMAFilter(btScalar previousDampedSignal, btScalar signal, btScalar lambda)
+{
+	// EMA (https://en.wikipedia.org/wiki/Exponential_smoothing)
+	btScalar dampedSignal = (1.0 - lambda) * previousDampedSignal + lambda * signal;
+
+	return dampedSignal;
+}
+
+static btScalar EMAFilterTimeIndependent(btScalar previousDampedSignal, btScalar signal, btScalar tau, btScalar dt)
+{
+	// EMA (https://en.wikipedia.org/wiki/Exponential_smoothing)
+	float smoothingRate = 1.0 - btExp(-dt / tau);
+	btScalar dampedSignal = previousDampedSignal + smoothingRate * (signal - previousDampedSignal);
+
+	return dampedSignal;
+}
+
+
+btScalar btCable::computeMassBalanceRatio()
+{
+	// Only enable mass balance feature if there is a stretch on the whole cable
+	// Required to avoid cases where a link is contracted and another is stretched
+	// (In this case applying the mass massBalanceRatio work against length target)
+	btScalar massBalanceRatio = 0.0;
+
+	// 1) Smooth raw measurement but trust more and more the solver result
+	switch (m_stretchBehavior.mode)
+	{
+		case btCable::StretchRatioMode::Cable:
+			// Use max stretch at cable level
+			m_cableStretchRatioDamped = EMAFilter(m_cableStretchRatioDamped, m_cableStretchRatio, m_stretchDamping.amountInv * m_stretchDamping.attenuation);
+			m_stretchRatio = m_cableStretchRatio;
+			m_stretchRatioDamped = m_cableStretchRatioDamped;
+			break;
+		case btCable::StretchRatioMode::Link:
+			// Use max stretch at link level but smooth it first
+			m_linkStretchRatioDamped = EMAFilter(m_linkStretchRatioDamped, m_linkStretchRatio, m_stretchDamping.amountInv * m_stretchDamping.attenuation);
+			m_stretchRatio = m_linkStretchRatio;
+			m_stretchRatioDamped = m_linkStretchRatioDamped;
+			break;
+		default:
+			// Use max mass massBalanceRatio all the time
+			m_stretchRatio = 1.0;
+			m_stretchRatioDamped = m_stretchRatio;
+			break;
+	}
+	
+	// 2) Avoid ON/OFF activation
+	if (m_stretchHysteresis.frozen)
+	{
+		// Keep massBalanceRatioEnabled last state once enough iterations are completed
+		// This is used to help convergence
+	}
+	else
+	{		
+		// Let activation state evolves freely to let solver stabilized to a an hysteresis side
+		m_stretchHysteresis.enabled = SchmittHysteresis(m_stretchHysteresis.enabled, m_stretchRatioDamped, m_stretchHysteresis.lowerBound, m_stretchHysteresis.upperBound);
+	}
+
+	// @TEST(jeremy) Bypass hysteresis behavior
+	//m_stretchHysteresis.enabled = m_cableStretchRatioDamped > m_stretchBehavior.min;
+	// @TEST(jeremy) Bypass hysteresis behavior
+
+	// 3) Select stretch ratio using user defined curve
+	if (m_stretchHysteresis.enabled)
+	{
+		// Select max ratio as default if min is larger than max
+		massBalanceRatio = 1.0;
+		if (m_stretchBehavior.max > m_stretchBehavior.min)
+		{
+			// Make sure user defined mass massBalanceRatio cannot overshoot
+			btScalar x = btClamped((m_stretchRatio - m_stretchBehavior.min) / (m_stretchBehavior.max - m_stretchBehavior.min), 0.0, 1.0);
+
+			// Select how mass balance ratio evolves toward the max value
+			switch (m_stretchBehavior.curve)
+			{
+				case btCable::StretchRatioCurve::Linear:
+					massBalanceRatio = x;
+					break;
+				case btCable::StretchRatioCurve::Quadratic:
+					massBalanceRatio = btPow(x, 2.0);
+					break;
+				case btCable::StretchRatioCurve::QuadraticInverse:
+					massBalanceRatio = 1.0 - btPow(1.0 - x, 2.0);
+					break;
+				case btCable::StretchRatioCurve::Quartic:
+					massBalanceRatio = btPow(x, 4.0);
+					break;
+				case btCable::StretchRatioCurve::QuarticInverse:
+					massBalanceRatio = 1.0 - btPow(1.0 - x, 4.0);
+					break;
+				default:
+					massBalanceRatio = 0.0;
+					break;
+			}
+		}
+	}
+
+	return massBalanceRatio;
+}
+
 void btCable::distanceConstraint(int currentIter)
 {
+	// Detect stabilization threshold
+	updateMassRatioDamping(currentIter);
+
+	// Reset accumulators before each distance constraint application
+	// This is required to avoid computing an average ratio across cumulative iterations
+	m_linkStretchRatio = 0.0;
+	m_cableStretchRatio = 0.0;
+	m_lengthAccumulator = 0.0;
+	m_restLengthAccumulator = 0.0;
+
+	// Apply user defined algorithm
 	(this->*m_distanceFunction)();
+}
+
+void btCable::updateMassRatioDamping(int currentIter)
+{
+	// Compute iteration thresholds (first iteration is 0 not 1)
+	const btScalar maxIteration = m_cfg.piterations - 1.0;
+
+	// Detect when mass balance activation state must be frozen to avoid improve convergence
+	// At this point we assume that there is enough previous solver iterations to get a stabilized mass balance activation state
+	const int hysteresisStabilizationIterationThreshold = btClamped(m_stretchHysteresis.threshold * maxIteration, 1.0, maxIteration);
+	m_stretchHysteresis.frozen = currentIter > hysteresisStabilizationIterationThreshold;
+
+	// Detect when mass balance damping can be gradually cancel out
+	// This is used to mimic the increasing trust in the solver the further the solver is to the end of the substep
+	const int dampingAttenuationIterationThreshold = btClamped(m_stretchDamping.threshold * maxIteration, 1.0, maxIteration);
+	if (currentIter > dampingAttenuationIterationThreshold)
+	{
+		// Min-Max normalization to scale damping from 1.0 (at minFrozenThreshold) to 0.0 (at m_cfg.piterations)
+		m_stretchDamping.attenuation = 1.0 - ((btScalar)currentIter - dampingAttenuationIterationThreshold) / (maxIteration - dampingAttenuationIterationThreshold);
+	}
+	else
+	{
+		// Damping remains untouched if threshold not yet reached
+		m_stretchDamping.attenuation = 1.0;
+	}
 }
 
 void btCable::distanceConstraintBullet()
 {
 	BT_PROFILE("PSolve_Links");
 
-	btScalar lengthAccumulator = 0.0;
-	btScalar restLengthAccumulator = 0.0;
 	const btScalar stiffness = m_materials[0]->m_kLST;
 
 	// Sum the distances between anchors and nodes
@@ -1268,7 +1422,7 @@ void btCable::distanceConstraintBullet()
 		Anchor& a = m_anchors[i];
 		btVector3 wn = a.m_node->m_x;
 		btVector3 wa = a.m_body->getWorldTransform() * a.m_local;
-		lengthAccumulator += wn.distance(wa);
+		m_lengthAccumulator += wn.distance(wa);
 	}
 
 	for (int i = 0, ni = m_links.size(); i < ni; ++i)
@@ -1291,12 +1445,14 @@ void btCable::distanceConstraintBullet()
 				b.m_x += del * (k * b.m_im);
 			}
 
-			lengthAccumulator += len;
-			restLengthAccumulator += l.m_rl;
+			m_lengthAccumulator += len;
+			m_restLengthAccumulator += l.m_rl;
+			m_linkStretchRatio = max(m_linkStretchRatio, (len - l.m_rl) / l.m_rl);
 		}
 	}
-	// Calculate the strain of the cable
-	m_tenseAccumulator = max(0.0, (lengthAccumulator - restLengthAccumulator) / restLengthAccumulator);
+
+	//m_linkStretchRatio = min(m_linkStretchRatio, m_stretchBehavior.max);  // Should not clamped it this early
+	m_cableStretchRatio = (m_lengthAccumulator - m_restLengthAccumulator) / m_restLengthAccumulator;
 }
 
 void btCable::distanceConstraintXPBD()
@@ -1406,11 +1562,13 @@ void btCable::distanceConstraintXPBD()
 		a->m_x += dxA;
 		b->m_x += dxB;
 
-		lengthAccumulator += L;
-		restLengthAccumulator += l->m_rl;
+		m_linkStretchRatio = max(m_linkStretchRatio, C / l->m_rl);
+		m_lengthAccumulator += L;
+		m_restLengthAccumulator += l->m_rl;
 	}
-	// Calculate the strain of the cable
-	m_tenseAccumulator = max(0.0, (lengthAccumulator - restLengthAccumulator) / restLengthAccumulator);
+
+	//m_linkStretchRatio = min(m_linkStretchRatio, m_stretchBehavior.max);  // Should not clamped it this early
+	m_cableStretchRatio = (m_lengthAccumulator - m_restLengthAccumulator) / m_restLengthAccumulator;
 }
 
 void btCable::LRAConstraint()
@@ -2171,6 +2329,39 @@ void btCable::setDistanceMode(int mode)
 int btCable::getDistanceMode()
 {
 	return (int)m_distanceMode;
+}
+
+void btCable::setStretchRatioMinThreshold(btScalar value)
+{
+	m_stretchBehavior.min = max(0.0, value);
+
+	// Keep hysteresis up to date
+	setStretchRatioHysteresis(m_stretchHysteresis.amount);
+}
+
+void btCable::setStretchRatioMaxThreshold(btScalar value)
+{
+	m_stretchBehavior.max = max(0.0, value);
+
+	// Keep hysteresis up to date
+	setStretchRatioHysteresis(m_stretchHysteresis.amount);
+}
+
+void btCable::setStretchRatioHysteresis(btScalar value)
+{
+	m_stretchHysteresis.amount = value;
+
+	// Compute hysteresis bounds only once
+	m_stretchHysteresis.upperBound = min(m_stretchBehavior.max, m_stretchBehavior.min + m_stretchHysteresis.amount);
+	m_stretchHysteresis.lowerBound = max(0.0, m_stretchBehavior.min - m_stretchHysteresis.amount);
+}
+
+void btCable::setStretchRatioDamping(btScalar value)
+{
+	m_stretchDamping.amountInv = max(0.0, 1.0 - value);
+
+	// Force reset to avoid inertia of old value
+	m_stretchRatioDamped = m_stretchRatio;
 }
 
 #pragma endregion

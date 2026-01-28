@@ -54,6 +54,22 @@ class btCable : public btSoftBody
 		LerpB2MB, // Modified position in anchor constraint lerping between the original method and the MassBalance one
 		OnPoint // Modified position in anchor constraint with teleportation on the anchor position
 	};
+	
+	enum class StretchRatioMode
+	{
+		Cable = 0,  // Tension ratio is computed based on the whole cable length
+		Link,        // Tension ration is computed based on the more stretched link
+		None        // Assume mass ratio is always needed at max
+	};
+
+	enum class StretchRatioCurve
+	{
+		Linear = 0,     
+		Quadratic,      
+		QuadraticInverse,
+		Quartic,
+		QuarticInverse
+	};
 
 	//
 	~btCable()
@@ -261,11 +277,62 @@ private:
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
 
-	btScalar m_tenseAccumulator = 0.0;
-	btScalar m_minAccumulator = 0.2;
-	btScalar m_maxAccumulator = 1.0;
-	
+	//
+	// Mass balance control
+	//
+
+	// How mass balance is influenced by cable stretch
+	struct StretchRatioBehavior
+	{
+		StretchRatioMode mode{StretchRatioMode::Link};
+		StretchRatioCurve curve{StretchRatioCurve::Linear};
+		btScalar min{0.0};
+		btScalar max{1.0};
+	};
+	StretchRatioBehavior m_stretchBehavior{};
+	btScalar m_lengthAccumulator = 0.0;
+	btScalar m_restLengthAccumulator = 0.0;
+	btScalar m_stretchRatio = 0.0;
+	btScalar m_stretchRatioDamped = 0.0;
+	btScalar m_cableStretchRatio = 0.0;
+	btScalar m_linkStretchRatio = 0.0;
 	AnchorMode m_anchorMode{AnchorMode::Bullet};
+
+	// Schmitt hysteresis to avoid on/off activation
+	struct StretchRatioHysteresis
+	{
+		// Window used to avoid on/off effect arount the mass balance activation
+		btScalar amount{0.0};
+
+		// Precomputer bounds based on amount and mass balance activation minimal value
+		btScalar lowerBound{0.0};
+		btScalar upperBound{0.0};
+
+		// Percentage of iterations at which the state can no longer change
+		btScalar threshold{1.0};
+		bool enabled{0.0};
+		bool frozen{0.0};
+	};
+	StretchRatioHysteresis m_stretchHysteresis{};
+
+	// EMA filtering to filter out noise
+	// https://en.wikipedia.org/wiki/Exponential_smoothing
+	struct StretchRatioDamping
+	{
+		// Damping stored as it counterpart (1-damping) for efficiency
+		btScalar amountInv{1.0};  // The smaller the more damping [0, 1]
+
+		// Percentage of iterations at which the damping attenuation is applied
+		btScalar threshold{0.0};  // The larger the later [0, 1]
+
+		// Used to scale damping after reaching threshold
+		btScalar attenuation{1.0};  // The smaller the more attenuation [0, 1]
+	};
+	StretchRatioDamping m_stretchDamping{};
+	btScalar m_cableStretchRatioDamped = 0.0;
+	btScalar m_linkStretchRatioDamped = 0.0;
+	btScalar m_massBalanceRatio = 0.0;
+
 
 
 	MonotonicSpline1D* spline;
@@ -311,6 +378,8 @@ private:
 	void distanceConstraintBullet();
 	void distanceConstraintXPBD();
 
+	btScalar computeMassBalanceRatio();
+
 	void distanceConstraintLock(int limMin, int limMax);
 	void LRAConstraint();
 	void LRAHierachique();
@@ -321,6 +390,8 @@ private:
 	static void setNodeBoundingBox(btVector3 mx, btVector3 mq, btScalar margin, btVector3* minLink, btVector3* maxLink);
 	void anchorConstraint();
 	void anchorConstraintPlacement();
+
+	void updateMassRatioDamping(int currentIter);
 
 	void contactConstraint();
 	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
@@ -370,15 +441,13 @@ public:
 
 	CollisionMode m_collisionMode;
 	DistanceMode m_distanceMode;
-	DistanceFunction m_distanceFunction; // avoid a lot of "if/switch" statements
+	DistanceFunction m_distanceFunction;  // avoid a lot of "if/switch" statements
 	bool m_useAnchorConstraintPlacement;
 
 	btScalar WantedDistance = 0;
 	btScalar WantedSpeed = 0;
 	btScalar forceResponseCoef;
 	btVector3 m_gravity;
-
-	void setMassRatioActivationThreshold(btScalar offset);
 
 	void updateLength(btScalar dt);
 
@@ -504,7 +573,7 @@ public:
 	void* getCableNodesPos();
 
 	int getCableState();
-	
+
 	int getCollisionMode();
 
 	void appendNode(const btVector3& x, btScalar m) override;
@@ -543,13 +612,35 @@ public:
 	int getDistanceMode();
 
 	void setUseAnchorConstraintPlacement(bool status);
-	
-	btScalar getTensionAccumulator() { return m_tenseAccumulator; }
-	btScalar getTensionMinAccumulator() { return m_minAccumulator; }
-	btScalar getTensionMaxAccumulator() { return m_maxAccumulator; }
 
-	void setTensionMinAccumulator(btScalar value) { m_minAccumulator = value; }
-	void setTensionMaxAccumulator(btScalar value) { m_maxAccumulator = value; }
+	btScalar getStretchRatio() { return m_stretchRatio; }
+	btScalar getStretchRatioDamped() { return m_stretchRatioDamped; }
+	btScalar getMassBalanceRatio() { return m_massBalanceRatio; }
+	bool getIsMassBalanceEnabled() { return m_stretchHysteresis.enabled; }
+
+	void setStretchRatioMinThreshold(btScalar value);
+	btScalar getStretchRatioMaxThreshold() { return m_stretchBehavior.max; }
+
+	void setStretchRatioMaxThreshold(btScalar value);
+	btScalar getStretchRatioMinThreshold() { return m_stretchBehavior.min; }
+
+	void setStretchRatioHysteresis(btScalar value);
+	btScalar getStretchRatioHysteresis() { return m_stretchHysteresis.amount; }
+
+	void setStretchRatioDamping(btScalar value);
+	btScalar getStretchRatioDamping() { return 1.0 - m_stretchDamping.amountInv; }
+
+	void setStretchRatioMode(int modeId) { m_stretchBehavior.mode = static_cast<StretchRatioMode>(modeId); }
+	int getStretchRatioMode() { return static_cast<int>(m_stretchBehavior.mode); }
+
+	void setStretchRatioCurve(int curveId) { m_stretchBehavior.curve = static_cast<StretchRatioCurve>(curveId); }
+	int getStretchRatioCurve() { return static_cast<int>(m_stretchBehavior.curve); }
+
+	void setStretchRatioHysteresisThreshold(btScalar threshold) { m_stretchHysteresis.threshold = threshold; }
+	btScalar getStretchRatioHysteresisThreshold() { return m_stretchHysteresis.threshold; }
+
+	void setStretchRatioDampingThreshold(btScalar threshold) { m_stretchDamping.threshold = threshold; }
+	btScalar getStretchRatioDampingThreshold() { return m_stretchDamping.threshold; }
 
 	void setAnchorMode(int mode) { m_anchorMode = (AnchorMode) mode; }
 	int getAnchorMode() { return (int) m_anchorMode; }

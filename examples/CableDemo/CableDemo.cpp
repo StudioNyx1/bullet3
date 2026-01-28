@@ -86,7 +86,14 @@ struct StabilityData
 	bool Cable_LRA{false};
 	bool Cable_AnchorPlacement{true};
 	btScalar Cable_DistanceMode{0};
-	btScalar Cable_massRatioActivationThreshold{0.0};
+	btScalar Cable_StretchRatioMinThreshold{0.0};
+	btScalar Cable_StretchRatioMaxThreshold{1.0};
+	btScalar Cable_StretchRatioMode{1.0};
+	btScalar Cable_StretchRatioCurve{0.0};
+	btScalar Cable_StretchRatioHysteresis{0.0};
+	btScalar Cable_StretchRatioDamping{0.0};
+	btScalar Cable_StretchStabilizationThreshold{1.0};
+	btScalar Cable_StretchDampingAttenuationThreshold{1.0};
 
 	// Used to reset to test init values
 	bool AutoResetTensionTest{false};
@@ -96,17 +103,16 @@ StabilityData StabilityTensionData{};
 StabilityData StabilityA18Data{};
 GlobalData globals{};
 
-
 struct CableStepController
 {
-	bool   enabled = false;
-	bool   sessionActive = false;
+	bool enabled = false;
+	bool sessionActive = false;
 };
 
 class CableDemo : public CommonRigidBodyBase
 {
 public:
-	btCable* m_cable = nullptr; // set this to the cable you want to inspect
+	btCable* m_cable = nullptr;  // set this to the cable you want to inspect
 	CableStepController m_cableStep;
 
 	StabilityData* m_stabilityData{nullptr};
@@ -152,7 +158,8 @@ public:
 		}
 	}
 
-	void renderSingleFrame() {
+	void renderSingleFrame()
+	{
 		// draws
 		for (int i = 0; i < m_dynamicsWorld->getNumCollisionObjects(); ++i)
 		{
@@ -165,7 +172,7 @@ public:
 			// m_dynamicsWorld->getDebugDrawer()->drawSphere(co->getWorldTransform().getOrigin(), 0.05, btVector3(1, 0, 1));
 		}
 	}
-	
+
 	// In your main simulation tick, pause normal stepping when in cable-step mode.
 	void tick(btScalar dt, int subStep, btScalar fixedTimeStep)
 	{
@@ -192,7 +199,7 @@ public:
 		//{
 		//	// Warm-up step to avoid cold start overhead
 		//	m_dynamicsWorld->stepSimulation(dt, subStep, fixedTimeStep);
-		//	
+		//
 		//	// Simulate many steps to smooth out timing noise
 		//	const int iterations = 10;
 
@@ -220,7 +227,7 @@ public:
 	// Benchmark
 	int tickCount = 1;
 	btScalar cumulatedDelta = 0;
-	
+
 	btScalar posX;
 	btScalar posY;
 	btScalar margin;
@@ -495,9 +502,9 @@ public:
 			m_printAnchorData = !m_printAnchorData;
 		}
 
-		if (key == 'y' && state) // toggle stepping mode
+		if (key == 'y' && state)  // toggle stepping mode
 			toggleCableIterStepMode();
-		else if (key == 'u' && state) // do one iteration
+		else if (key == 'u' && state)  // do one iteration
 			stepCableOneIteration();
 
 		return false;
@@ -764,18 +771,19 @@ public:
 				const btScalar distanceReal = cable->getLength();
 				const btScalar distanceRest = cable->getRestLength();
 
-				cout << "Anchor[" << i << "]-Node[" << node->index << "]:" << "\n\t"
-					<< "Mass (Body):" << 1.0 / body->getInvMass() << "\n\t"
-					<< "Last Tension: " << anchor.m_lastTension.length() << "\n\t"
-					<< "Total Tension: " << anchor.m_totalTension.length() / substepSolver << "\n\t"
-					<< "Distance Anchor-Node: " << node->m_x.distance(body->getWorldTransform() * anchor.m_local) << "\n\t"
+				cout << "Anchor[" << i << "]-Node[" << node->index << "]:"
+					 << "\n\t"
+					 << "Mass (Body):" << 1.0 / body->getInvMass() << "\n\t"
+					 << "Last Tension: " << anchor.m_lastTension.length() << "\n\t"
+					 << "Total Tension: " << anchor.m_totalTension.length() / substepSolver << "\n\t"
+					 << "Distance Anchor-Node: " << node->m_x.distance(body->getWorldTransform() * anchor.m_local) << "\n\t"
 					 << "Distance Cable (Rest): " << distanceRest << "\n\t"
 					 << "Distance Cable (Real): " << distanceReal << "\n\t"
 					 << "Delta Distance Cable (Real - Rest): " << distanceReal - distanceRest << "\n\t"
-					<< "Mass Cable: " << cable->getTotalMass() << "\n\t"
-					<< "Mass Node: " << 1.0 / node->m_im << "\n\t"
-					<< "Substeps count: " << substepSolver << "\n\t"
-					<< endl;
+					 << "Mass Cable: " << cable->getTotalMass() << "\n\t"
+					 << "Mass Node: " << 1.0 / node->m_im << "\n\t"
+					 << "Substeps count: " << substepSolver << "\n\t"
+					 << endl;
 			}
 		}
 	}
@@ -819,7 +827,7 @@ public:
 						result.m_flags = btTriangleRaycastCallback::kF_FilterBackfaces;
 						result.m_flags |= btTriangleRaycastCallback::kF_UseGjkConvexCastRaytest;
 						m_dynamicsWorld->rayTestSingleWithMargin(btTransform(btQuaternion(), fromPos), btTransform(btQuaternion(), toPos),
-							rb, rb->getCollisionShape(), rb->getWorldTransform(), result, margin);
+																 rb, rb->getCollisionShape(), rb->getWorldTransform(), result, margin);
 						if (result.hasHit())
 						{
 							m_dynamicsWorld->getDebugDrawer()->drawSphere(result.m_hitPointWorld, margin, btVector3(0, 0, 1));
@@ -835,7 +843,7 @@ public:
 				{
 					btVector3 normal;
 				};
-				
+
 				btVector3 position = btVector3(posX, 0, 0);
 
 				for (int i = 0; i < 6; ++i)
@@ -854,15 +862,15 @@ public:
 					btCable::MyContactResultCallback firstResult(0.0, &tmp, rb);
 					getSoftDynamicsWorld()->contactPairTest(&tmp, rb, firstResult);
 					if (firstResult.m_connected == 0) continue;
-					
-					// Update data to redo the contactPairTest 		
+
+					// Update data to redo the contactPairTest
 					int idxDeque = 0;
 					vector<std::tuple<btVector3, ContactNotInfo>> contactInfo;
 
 					ContactNotInfo contact;
 					contact.normal = firstResult.contactNorm;
 					contactInfo.emplace_back(firstResult.contactPoint + contact.normal * (margin + FLT_EPSILON), contact);
-					
+
 					nodeShape = btSphereShape(margin);
 					tmp.setCollisionShape(&nodeShape);
 
@@ -871,14 +879,15 @@ public:
 					{
 						auto contactData = contactInfo[idxDeque];
 						btVector3 outPosition = std::get<btVector3>(contactData);
-						
+
 						// Set the position to node collision object
 						tmp.setWorldTransform(btTransform(btQuaternion::getIdentity(), outPosition));
 
 						btCable::MyContactResultCallback loopResult(0.0, &tmp, rb);
 						getSoftDynamicsWorld()->contactPairTest(&tmp, rb, loopResult);
 
-						if (!loopResult.m_connected) idxDeque++;
+						if (!loopResult.m_connected)
+							idxDeque++;
 						else
 						{
 							ContactNotInfo contact;
@@ -888,7 +897,7 @@ public:
 							contactInfo.erase(contactInfo.begin() + idxDeque);
 						}
 
-						if (idxDeque >= contactInfo.size()) break;		
+						if (idxDeque >= contactInfo.size()) break;
 					}
 
 					// Sort and find the position closest to the current node
@@ -899,8 +908,8 @@ public:
 					{
 						btVector3 outPosition = std::get<btVector3>(contactInfo[idxOut]);
 						btScalar distance = outPosition.distance(position);
-						
-						if(distance < bestDistancePosition)
+
+						if (distance < bestDistancePosition)
 						{
 							bestOutPosition = outPosition;
 							bestDistancePosition = distance;
@@ -988,7 +997,7 @@ public:
 
 			int subStep = substepSolver;
 			tick(deltaTime, subStep, deltaTime / subStep);
-			
+
 			if (m_printFPS && delta_ticks > 0)
 			{
 				m_fps = CLOCKS_PER_SEC / delta_ticks;
@@ -1989,7 +1998,7 @@ static void Init_TestCableCollisionMt(CableDemo* pdemo)
 	cable->setUseCollision(true);
 	cable->setUseLRA(false);
 	cable->getCollisionShape()->setMargin(0.005);
-	cable->setCollisionParameters(1,2);
+	cable->setCollisionParameters(1, 2);
 	cable->setCollisionMargin(0.005);
 	pdemo->SetCameraPosition(btVector3(0, 10, 0));
 
@@ -2087,8 +2096,6 @@ static void Init_TestBenchmarkSubsteps(CableDemo* pdemo)
 							float r = 0.5f * (idx - 6 + 1);
 							btCapsuleShape* capsuleShape = new btCapsuleShape(capsuleRadius * r, capsuleHalf * r);
 							pdemo->createRigidBody(capsuleMass * r, trans, capsuleShape)->setSleepingThresholds(0, 0);
-
-
 						}
 						break;
 					}
@@ -2194,8 +2201,7 @@ static void Init_TestBenchmarkSubsteps(CableDemo* pdemo)
 	cable5->getCollisionShape()->setMargin(0.005);
 	cable5->setCollisionParameters(1, 2);
 	cable5->setCollisionMargin(0.005);
-}	
-
+}
 
 static void initLock(CableDemo* pdemo)
 {
@@ -3149,28 +3155,28 @@ static void Init_TestClaw(CableDemo* pdemo)
 
 	btGImpactMeshShape* b2;
 	{
-		static const btVector3 kCubeVertsB[8] = 
-		{
-			{-kHalfExtentsB.x(), -kHalfExtentsB.y(), -kHalfExtentsB.z()},  // 0
-			{kHalfExtentsB.x(), -kHalfExtentsB.y(), -kHalfExtentsB.z()},   // 1
-			{kHalfExtentsB.x(), kHalfExtentsB.y(), -kHalfExtentsB.z()},    // 2
-			{-kHalfExtentsB.x(), kHalfExtentsB.y(), -kHalfExtentsB.z()},   // 3
-			{-kHalfExtentsB.x(), -kHalfExtentsB.y(), kHalfExtentsB.z()},   // 4
-			{kHalfExtentsB.x(), -kHalfExtentsB.y(), kHalfExtentsB.z()},    // 5
-			{kHalfExtentsB.x(), kHalfExtentsB.y(), kHalfExtentsB.z()},     // 6
-			{-kHalfExtentsB.x(), kHalfExtentsB.y(), kHalfExtentsB.z()}     // 7
-		};
+		static const btVector3 kCubeVertsB[8] =
+			{
+				{-kHalfExtentsB.x(), -kHalfExtentsB.y(), -kHalfExtentsB.z()},  // 0
+				{kHalfExtentsB.x(), -kHalfExtentsB.y(), -kHalfExtentsB.z()},   // 1
+				{kHalfExtentsB.x(), kHalfExtentsB.y(), -kHalfExtentsB.z()},    // 2
+				{-kHalfExtentsB.x(), kHalfExtentsB.y(), -kHalfExtentsB.z()},   // 3
+				{-kHalfExtentsB.x(), -kHalfExtentsB.y(), kHalfExtentsB.z()},   // 4
+				{kHalfExtentsB.x(), -kHalfExtentsB.y(), kHalfExtentsB.z()},    // 5
+				{kHalfExtentsB.x(), kHalfExtentsB.y(), kHalfExtentsB.z()},     // 6
+				{-kHalfExtentsB.x(), kHalfExtentsB.y(), kHalfExtentsB.z()}     // 7
+			};
 
 		// 12 triangles (two per face)
-		static const unsigned int kCubeIdxB[36] = 
-		{
-			0, 2, 1, 2, 0, 3,  // −Z
-			4, 5, 6, 6, 7, 4,  // +Z
-			0, 5, 4, 5, 0, 1,  // −Y
-			3, 6, 2, 6, 3, 7,  // +Y
-			1, 6, 5, 6, 1, 2,  // +X
-			0, 7, 3, 7, 0, 4   // −X
-		};
+		static const unsigned int kCubeIdxB[36] =
+			{
+				0, 2, 1, 2, 0, 3,  // −Z
+				4, 5, 6, 6, 7, 4,  // +Z
+				0, 5, 4, 5, 0, 1,  // −Y
+				3, 6, 2, 6, 3, 7,  // +Y
+				1, 6, 5, 6, 1, 2,  // +X
+				0, 7, 3, 7, 0, 4   // −X
+			};
 
 		// 2. Fill a btIndexedMesh
 		btIndexedMesh mesh;
@@ -3390,27 +3396,27 @@ static void Init_MCMVCable(CableDemo* pdemo)
 		{
 			static const btVector3 kHalfExtents(2.5, 2, 0.5);
 
-			static const btVector3 kCubeVerts[8] = 
-			{
-				{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 0
-				{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 1
-				{kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},    // 2
-				{-kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},   // 3
-				{-kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},   // 4
-				{kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},    // 5
-				{kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()},     // 6
-				{-kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}     // 7
-			};
+			static const btVector3 kCubeVerts[8] =
+				{
+					{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 0
+					{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 1
+					{kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},    // 2
+					{-kHalfExtents.x(), kHalfExtents.y(), -kHalfExtents.z()},   // 3
+					{-kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},   // 4
+					{kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},    // 5
+					{kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()},     // 6
+					{-kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}     // 7
+				};
 
-			static const unsigned int kCubeIdx[36] = 
-			{
-				0, 2, 1, 2, 0, 3,  // −Z
-				4, 5, 6, 6, 7, 4,  // +Z
-				0, 5, 4, 5, 0, 1,  // −Y
-				3, 6, 2, 6, 3, 7,  // +Y
-				1, 6, 5, 6, 1, 2,  // +X
-				0, 7, 3, 7, 0, 4   // −X
-			};
+			static const unsigned int kCubeIdx[36] =
+				{
+					0, 2, 1, 2, 0, 3,  // −Z
+					4, 5, 6, 6, 7, 4,  // +Z
+					0, 5, 4, 5, 0, 1,  // −Y
+					3, 6, 2, 6, 3, 7,  // +Y
+					1, 6, 5, 6, 1, 2,  // +X
+					0, 7, 3, 7, 0, 4   // −X
+				};
 
 			btIndexedMesh mesh;
 			{
@@ -3448,23 +3454,22 @@ static void Init_MCMVCable(CableDemo* pdemo)
 		{
 			static const btVector3 kHalfExtents(2.5, 0.25, 0.25);
 
-			static const btVector3 kCubeVerts[6] = 
-			{
-				{-kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},   // 0
-				{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 1
-				{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 2
-				{kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},    // 3
-				{-kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()},    // 4
-				{kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}      // 5
-			};
+			static const btVector3 kCubeVerts[6] =
+				{
+					{-kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},   // 0
+					{-kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},  // 1
+					{kHalfExtents.x(), -kHalfExtents.y(), -kHalfExtents.z()},   // 2
+					{kHalfExtents.x(), -kHalfExtents.y(), kHalfExtents.z()},    // 3
+					{-kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()},    // 4
+					{kHalfExtents.x(), kHalfExtents.y(), kHalfExtents.z()}      // 5
+				};
 
-			static const unsigned int kCubeIdx[24] = 
-			{
-				0, 1, 2, 0, 2, 3,
-				0, 4, 1, 3, 2, 5,
-				1, 4, 5, 1, 5, 2,
-				3, 5, 4, 3, 4, 0
-			};
+			static const unsigned int kCubeIdx[24] =
+				{
+					0, 1, 2, 0, 2, 3,
+					0, 4, 1, 3, 2, 5,
+					1, 4, 5, 1, 5, 2,
+					3, 5, 4, 3, 4, 0};
 
 			btIndexedMesh mesh;
 			mesh.m_numTriangles = 8;
@@ -3535,7 +3540,7 @@ static void Init_MCMVCable(CableDemo* pdemo)
 	mcmvCable->setCollisionMargin(margin);
 	mcmvCable->getCollisionShape()->setMargin(margin);
 	mcmvCable->setCollisionParameters(5, 5);
-	
+
 	pdemo->m_cable = mcmvCable;
 
 	// Register GIMPACT algorithm
@@ -3585,7 +3590,7 @@ static void Init_RayCast(CableDemo* pdemo)
 
 		btCompoundShape* shape = new btCompoundShape(false);
 		shape->setMargin(0.0);
-		shape->addChildShape(btTransform(btQuaternion(), btVector3(   0, 0.510, 0)), shape1);
+		shape->addChildShape(btTransform(btQuaternion(), btVector3(0, 0.510, 0)), shape1);
 		// shape->addChildShape(btTransform(btQuaternion(), btVector3(-0.5, 0.005, 0)), shape2);
 
 		btRigidBody* rb = pdemo->createRigidBody(10, trShape, shape2);
@@ -4298,9 +4303,9 @@ static void Init_Stability(CableDemo* pdemo)
 	// Shapes
 	btCollisionShape* updownBoxShape = new btBoxShape(btVector3(0.4, 0.1, 0.1));
 	btCollisionShape* lefrightBoxShape = new btBoxShape(btVector3(0.1, 0.4, 0.1));
-	btTransform upBoxTransform(btMatrix3x3::getIdentity(), btVector3(0,0.3,0));
-	btTransform downBoxTransform(btMatrix3x3::getIdentity(), btVector3(0,-0.3,0));
-	btTransform leftBoxTransform(btMatrix3x3::getIdentity(), btVector3(-0.3,0,0));
+	btTransform upBoxTransform(btMatrix3x3::getIdentity(), btVector3(0, 0.3, 0));
+	btTransform downBoxTransform(btMatrix3x3::getIdentity(), btVector3(0, -0.3, 0));
+	btTransform leftBoxTransform(btMatrix3x3::getIdentity(), btVector3(-0.3, 0, 0));
 	btTransform rightBoxTransform(btMatrix3x3::getIdentity(), btVector3(0.3, 0, 0));
 
 	btCompoundShape* ringShape = new btCompoundShape(false);
@@ -4319,15 +4324,15 @@ static void Init_Stability(CableDemo* pdemo)
 	// Transform
 	btTransform transformAttachPoint(btMatrix3x3::getIdentity(), btVector3(0, 7.7, 0));
 	btTransform transformRingLest(btMatrix3x3::getIdentity(), btVector3(0, 5, 0));
-	btTransform transformRingA18(btQuaternion(btVector3(0,1,0), SIMD_HALF_PI), btVector3(0, 4.7, 0));
+	btTransform transformRingA18(btQuaternion(btVector3(0, 1, 0), SIMD_HALF_PI), btVector3(0, 4.7, 0));
 	btTransform transformA18(btMatrix3x3::getIdentity(), btVector3(0, 2.35, 0));
 
 	// Attach Point
-	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1,0.1,0.1)));
-	attachPoint->setCollisionFlags(2); // attachPoint->getCollisionFlags();
+	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1, 0.1, 0.1)));
+	attachPoint->setCollisionFlags(2);  // attachPoint->getCollisionFlags();
 	attachPoint->setSleepingThresholds(0, 0);
-	attachPoint->setMassProps(0, btVector3(0,0,0));
-	
+	attachPoint->setMassProps(0, btVector3(0, 0, 0));
+
 	// Objet A (Lest)
 	btRigidBody* ringLest = pdemo->createRigidBody(massRingLest, transformRingLest, ringShape);
 	ringLest->setSleepingThresholds(0, 0);
@@ -4336,11 +4341,11 @@ static void Init_Stability(CableDemo* pdemo)
 	// Object B (A18's claws)
 	btRigidBody* ringA18 = pdemo->createRigidBody(massRingA18, transformRingA18, ringShape);
 	ringA18->setSleepingThresholds(0, 0);
-	
+
 	// Objet C (A18)
 	btRigidBody* a18 = pdemo->createRigidBody(massA18, transformA18, a18Shape);
 	a18->setSleepingThresholds(0, 0);
-	 
+
 	// Object B's set up
 	ringA18->m_redirectionTarget = a18;
 	ringA18->m_localTransform = btTransform(btQuaternion(btVector3(0, 1, 0), 3.14 / 2.0), btVector3(0, 2.35, 0));
@@ -4351,7 +4356,7 @@ static void Init_Stability(CableDemo* pdemo)
 
 	// Cable's Waypoints
 	btAlignedObjectArray<btVector3> waypointPos = btAlignedObjectArray<btVector3>();
-	waypointPos.push_back(transformRingLest.getOrigin() + btVector3(0,0.3,0));
+	waypointPos.push_back(transformRingLest.getOrigin() + btVector3(0, 0.3, 0));
 	waypointPos.push_back(transformAttachPoint.getOrigin());
 
 	// Cable's Parameters
@@ -4407,7 +4412,14 @@ static void Init_StabilityTension(CableDemo* pdemo)
 		data.Cable_growSpeed = 0.5;
 		data.Cable_LRA = false;
 		data.Cable_AnchorPlacement = true;
-		data.Cable_massRatioActivationThreshold = 0.0;
+		data.Cable_StretchRatioMinThreshold = 0.0;
+		data.Cable_StretchRatioMaxThreshold = 1.0;
+		data.Cable_StretchRatioMode = 1.0;
+		data.Cable_StretchRatioCurve = 0.0;
+		data.Cable_StretchRatioHysteresis = 0.0;
+		data.Cable_StretchRatioDamping = 0.0;
+		data.Cable_StretchStabilizationThreshold = 1.0;
+		data.Cable_StretchDampingAttenuationThreshold = 1.0;
 	}
 
 	// Shapes
@@ -4444,10 +4456,8 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	attachPoint->setMassProps(0, btVector3(0, 0, 0));
 
 	// Ground
-	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion(btVector3(1,0,0), 0.0),
-		                                         btVector3(0, LestHeight - data.Ground_offset - 0.4 - 0.2, 0)), 
-		                                         new btBoxShape(btVector3(10, 0.2, 10))
-	);
+	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion(btVector3(1, 0, 0), 0.0), btVector3(0, LestHeight - data.Ground_offset - 0.4 - 0.2, 0)),
+												 new btBoxShape(btVector3(10, 0.2, 10)));
 
 	// Cable
 	// Waypoints
@@ -4466,7 +4476,9 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	cable->m_materials[0]->m_kLST = 1.0;
 	cable->setDistanceMode(data.Cable_DistanceMode);
 	cable->setUseAnchorConstraintPlacement(data.Cable_AnchorPlacement);
-	cable->setMassRatioActivationThreshold(data.Cable_massRatioActivationThreshold);
+	cable->setStretchRatioMinThreshold(data.Cable_StretchRatioMinThreshold);
+	cable->setStretchRatioMaxThreshold(data.Cable_StretchRatioMaxThreshold);
+	cable->setStretchRatioMode(data.Cable_DistanceMode);
 	pdemo->m_cable = cable;
 
 	// User controls
@@ -4594,19 +4606,115 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, stepAMassRatio);
 
-	SliderParams sliderMassRationActivationThreshold("Mass ratio min (Cable)", &data.Cable_massRatioActivationThreshold);
-	btScalar stepMassRationActivationThreshold = 0.02;
-	sliderMassRationActivationThreshold.m_userPointer = pdemo;
-	sliderMassRationActivationThreshold.m_minVal = 0;
-	sliderMassRationActivationThreshold.m_maxVal = 1.0 - stepMassRationActivationThreshold;
-	sliderMassRationActivationThreshold.m_clampToIntegers = true;
-	sliderMassRationActivationThreshold.m_clampToNotches = true;
-	sliderMassRationActivationThreshold.m_callback = [](float value, void* userPtr)
+	SliderParams sliderStretchRatioMode("Stretch Mode (Cable)", &data.Cable_StretchRatioMode);
+	sliderStretchRatioMode.m_userPointer = pdemo;
+	sliderStretchRatioMode.m_minVal = 0;
+	sliderStretchRatioMode.m_maxVal = 2.0;
+	sliderStretchRatioMode.m_clampToIntegers = true;
+	sliderStretchRatioMode.m_clampToNotches = true;
+	sliderStretchRatioMode.m_callback = [](float value, void* userPtr)
 	{
 		CableDemo* pdemo = (CableDemo*)userPtr;
-		pdemo->m_cable->setMassRatioActivationThreshold(value);
+		pdemo->m_cable->setStretchRatioMode(static_cast<int>(value));
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassRationActivationThreshold, stepMassRationActivationThreshold);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioMode);
+
+	SliderParams sliderStretchRatioCurve("Stretch Curve (Cable)", &data.Cable_StretchRatioCurve);
+	sliderStretchRatioCurve.m_userPointer = pdemo;
+	sliderStretchRatioCurve.m_minVal = 0;
+	sliderStretchRatioCurve.m_maxVal = 3.0;
+	sliderStretchRatioCurve.m_clampToIntegers = true;
+	sliderStretchRatioCurve.m_clampToNotches = true;
+	sliderStretchRatioCurve.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioCurve(static_cast<int>(value));
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioCurve);
+
+	SliderParams sliderStretchRatioMinThreshold("Stretch Min (Cable)", &data.Cable_StretchRatioMinThreshold);
+	btScalar stepStretchRatioMinThreshold = 0.02;
+	sliderStretchRatioMinThreshold.m_userPointer = pdemo;
+	sliderStretchRatioMinThreshold.m_minVal = 0;
+	sliderStretchRatioMinThreshold.m_maxVal = 1.0 - stepStretchRatioMinThreshold;
+	sliderStretchRatioMinThreshold.m_clampToIntegers = false;
+	sliderStretchRatioMinThreshold.m_clampToNotches = true;
+	sliderStretchRatioMinThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioMinThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioMinThreshold, stepStretchRatioMinThreshold);
+
+	SliderParams sliderStretchRatioMaxThreshold("Stretch Max (Cable)", &data.Cable_StretchRatioMaxThreshold);
+	btScalar stepStretchRatioMaxThreshold = 0.02;
+	sliderStretchRatioMaxThreshold.m_userPointer = pdemo;
+	sliderStretchRatioMaxThreshold.m_minVal = 0;
+	sliderStretchRatioMaxThreshold.m_maxVal = 1.0 - stepStretchRatioMaxThreshold;
+	sliderStretchRatioMaxThreshold.m_clampToIntegers = false;
+	sliderStretchRatioMaxThreshold.m_clampToNotches = true;
+	sliderStretchRatioMaxThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioMaxThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioMaxThreshold, stepStretchRatioMaxThreshold);
+
+	SliderParams sliderStretchRatioHysteresis("Hysteresis (Cable)", &data.Cable_StretchRatioHysteresis);
+	btScalar stepStretchRatioHysteresis = 0.0005;
+	sliderStretchRatioHysteresis.m_userPointer = pdemo;
+	sliderStretchRatioHysteresis.m_minVal = 0;
+	sliderStretchRatioHysteresis.m_maxVal = 0.5;
+	sliderStretchRatioHysteresis.m_clampToIntegers = false;
+	sliderStretchRatioHysteresis.m_clampToNotches = true;
+	sliderStretchRatioHysteresis.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioHysteresis(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioHysteresis, stepStretchRatioHysteresis);
+
+	SliderParams sliderStretchStabilizationThreshold("Hysteresis threshold (Cable)", &data.Cable_StretchStabilizationThreshold);
+	btScalar stepStretchStabilizationThreshold = 0.1;
+	sliderStretchStabilizationThreshold.m_userPointer = pdemo;
+	sliderStretchStabilizationThreshold.m_minVal = 0;
+	sliderStretchStabilizationThreshold.m_maxVal = 1.0 - stepStretchStabilizationThreshold * 0.5;
+	sliderStretchStabilizationThreshold.m_clampToIntegers = false;
+	sliderStretchStabilizationThreshold.m_clampToNotches = true;
+	sliderStretchStabilizationThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioDampingThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchStabilizationThreshold, stepStretchStabilizationThreshold);
+
+	SliderParams sliderStretchRatioDamping("Damping (Cable)", &data.Cable_StretchRatioDamping);
+	btScalar stepStretchRatioDamping = 0.1;
+	sliderStretchRatioDamping.m_userPointer = pdemo;
+	sliderStretchRatioDamping.m_minVal = 0;
+	sliderStretchRatioDamping.m_maxVal = 1.0 - stepStretchRatioDamping;
+	sliderStretchRatioDamping.m_clampToIntegers = false;
+	sliderStretchRatioDamping.m_clampToNotches = true;
+	sliderStretchRatioDamping.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioDamping(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioDamping, stepStretchRatioDamping);
+
+	SliderParams sliderDampingAttenuationThreshold("Damping threshold (Cable)", &data.Cable_StretchDampingAttenuationThreshold);
+	btScalar stepDampingAttenuationThreshold = 0.1;
+	sliderDampingAttenuationThreshold.m_userPointer = pdemo;
+	sliderDampingAttenuationThreshold.m_minVal = 0;
+	sliderDampingAttenuationThreshold.m_maxVal = 1.0 - stepDampingAttenuationThreshold * 0.5;
+	sliderDampingAttenuationThreshold.m_clampToIntegers = false;
+	sliderDampingAttenuationThreshold.m_clampToNotches = true;
+	sliderDampingAttenuationThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioDampingThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderDampingAttenuationThreshold, stepDampingAttenuationThreshold);
 
 	SliderParams sliderCableLinearMass("Linear Mass (Cable)", &data.Cable_linearMass);
 	btScalar stepCableLinearMass = 1.0;
@@ -4697,7 +4805,14 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		data.Cable_growSpeed = 1.0;
 		data.Cable_LRA = false;
 		data.Cable_AnchorPlacement = false;
-		data.Cable_massRatioActivationThreshold = 0.0;
+		data.Cable_StretchRatioMinThreshold = 0.0;
+		data.Cable_StretchRatioMaxThreshold = 1.0;
+		data.Cable_StretchRatioMode = 1.0;
+		data.Cable_StretchRatioCurve = 0.0;
+		data.Cable_StretchRatioHysteresis = 0.0;
+		data.Cable_StretchRatioDamping = 0.0;
+		data.Cable_StretchStabilizationThreshold = 1.0;
+		data.Cable_StretchDampingAttenuationThreshold = 1.0;
 	}
 
 	// Shapes
@@ -4743,13 +4858,12 @@ static void Init_StabilityA18(CableDemo* pdemo)
 
 	// Objet D (Cable attach point)
 	btRigidBody* attachPoint = pdemo->createRigidBody(btScalar(1), transformAttachPoint, new btBoxShape(btVector3(0.1, 0.1, 0.1)));
-	attachPoint->setCollisionFlags(2);  
+	attachPoint->setCollisionFlags(2);
 	attachPoint->setSleepingThresholds(0, 0);
 	attachPoint->setMassProps(0, btVector3(0, 0, 0));
 
 	// Ground
-	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion::getIdentity(), 
-		                                         btVector3(0, LestHeight - data.Ground_offset - 4 - 0.6 - 0.2, 0)),
+	btRigidBody* ground = pdemo->createRigidBody(0, btTransform(btQuaternion::getIdentity(), btVector3(0, LestHeight - data.Ground_offset - 4 - 0.6 - 0.2, 0)),
 												 new btBoxShape(btVector3(10, 0.2, 10)));
 
 	// Cable
@@ -4768,8 +4882,9 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	cable->m_anchors[1].m_bodyMassRatio = data.D_massRatio;
 	cable->m_materials[0]->m_kLST = 1.0;
 	cable->setDistanceMode(data.Cable_DistanceMode);
-	cable->setUseAnchorConstraintPlacement(data.Cable_AnchorPlacement);
-	cable->setMassRatioActivationThreshold(data.Cable_massRatioActivationThreshold);
+	cable->setStretchRatioMinThreshold(data.Cable_StretchRatioMinThreshold);
+	cable->setStretchRatioMaxThreshold(data.Cable_StretchRatioMaxThreshold);
+	cable->setStretchRatioMode(data.Cable_DistanceMode);
 	pdemo->m_cable = cable;
 
 	// User controls
@@ -4787,7 +4902,10 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	dataSelector.m_initialState = data.AutoResetTensionTest < 0.5;
 	dataSelector.m_callback = [](int buttonId, bool buttonState, void* userPtr)
 	{
-		if (buttonId != 0) { return; }
+		if (buttonId != 0)
+		{
+			return;
+		}
 
 		CableDemo* pdemo = (CableDemo*)userPtr;
 		pdemo->m_stabilityData->AutoResetTensionTest = buttonState ? 0 : 1;
@@ -4912,19 +5030,115 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAMassRatio, stepAMassRatio);
 
-	SliderParams sliderMassRationActivationThreshold("Mass ratio min (Cable)", &data.Cable_massRatioActivationThreshold);
-	btScalar stepMassRationActivationThreshold = 0.01;
-	sliderMassRationActivationThreshold.m_userPointer = pdemo;
-	sliderMassRationActivationThreshold.m_minVal = 0.0;
-	sliderMassRationActivationThreshold.m_maxVal = 1.0 - stepMassRationActivationThreshold;
-	sliderMassRationActivationThreshold.m_clampToIntegers = true;
-	sliderMassRationActivationThreshold.m_clampToNotches = true;
-	sliderMassRationActivationThreshold.m_callback = [](float value, void* userPtr)
+	SliderParams sliderStretchRatioMode("Stretch Mode (Cable)", &data.Cable_StretchRatioMode);
+	sliderStretchRatioMode.m_userPointer = pdemo;
+	sliderStretchRatioMode.m_minVal = 0;
+	sliderStretchRatioMode.m_maxVal = 2.0;
+	sliderStretchRatioMode.m_clampToIntegers = true;
+	sliderStretchRatioMode.m_clampToNotches = true;
+	sliderStretchRatioMode.m_callback = [](float value, void* userPtr)
 	{
 		CableDemo* pdemo = (CableDemo*)userPtr;
-		pdemo->m_cable->setMassRatioActivationThreshold(value);
+		pdemo->m_cable->setStretchRatioMode(static_cast<int>(value));
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassRationActivationThreshold, stepMassRationActivationThreshold);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioMode);
+
+	SliderParams sliderStretchRatioCurve("Stretch Curve (Cable)", &data.Cable_StretchRatioCurve);
+	sliderStretchRatioCurve.m_userPointer = pdemo;
+	sliderStretchRatioCurve.m_minVal = 0;
+	sliderStretchRatioCurve.m_maxVal = 3.0;
+	sliderStretchRatioCurve.m_clampToIntegers = true;
+	sliderStretchRatioCurve.m_clampToNotches = true;
+	sliderStretchRatioCurve.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioCurve(static_cast<int>(value));
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioCurve);
+
+	SliderParams sliderStretchRatioMinThreshold("Stretch Min (Cable)", &data.Cable_StretchRatioMinThreshold);
+	btScalar stepStretchRatioMinThreshold = 0.02;
+	sliderStretchRatioMinThreshold.m_userPointer = pdemo;
+	sliderStretchRatioMinThreshold.m_minVal = 0;
+	sliderStretchRatioMinThreshold.m_maxVal = 1.0 - stepStretchRatioMinThreshold;
+	sliderStretchRatioMinThreshold.m_clampToIntegers = false;
+	sliderStretchRatioMinThreshold.m_clampToNotches = true;
+	sliderStretchRatioMinThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioMinThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioMinThreshold, stepStretchRatioMinThreshold);
+
+	SliderParams sliderStretchRatioMaxThreshold("Stretch Max (Cable)", &data.Cable_StretchRatioMaxThreshold);
+	btScalar stepStretchRatioMaxThreshold = 0.02;
+	sliderStretchRatioMaxThreshold.m_userPointer = pdemo;
+	sliderStretchRatioMaxThreshold.m_minVal = 0;
+	sliderStretchRatioMaxThreshold.m_maxVal = 1.0 - stepStretchRatioMaxThreshold;
+	sliderStretchRatioMaxThreshold.m_clampToIntegers = false;
+	sliderStretchRatioMaxThreshold.m_clampToNotches = true;
+	sliderStretchRatioMaxThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioMaxThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioMaxThreshold, stepStretchRatioMaxThreshold);
+
+	SliderParams sliderStretchRatioHysteresis("Hysteresis (Cable)", &data.Cable_StretchRatioHysteresis);
+	btScalar stepStretchRatioHysteresis = 0.01;
+	sliderStretchRatioHysteresis.m_userPointer = pdemo;
+	sliderStretchRatioHysteresis.m_minVal = 0;
+	sliderStretchRatioHysteresis.m_maxVal = 0.5;
+	sliderStretchRatioHysteresis.m_clampToIntegers = false;
+	sliderStretchRatioHysteresis.m_clampToNotches = true;
+	sliderStretchRatioHysteresis.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioHysteresis(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioHysteresis, stepStretchRatioHysteresis);
+
+	SliderParams sliderStretchStabilizationThreshold("Hysteresis threshold (Cable)", &data.Cable_StretchStabilizationThreshold);
+	btScalar stepStretchStabilizationThreshold = 0.1;
+	sliderStretchStabilizationThreshold.m_userPointer = pdemo;
+	sliderStretchStabilizationThreshold.m_minVal = 0;
+	sliderStretchStabilizationThreshold.m_maxVal = 1.0 - stepStretchStabilizationThreshold * 0.5;
+	sliderStretchStabilizationThreshold.m_clampToIntegers = false;
+	sliderStretchStabilizationThreshold.m_clampToNotches = true;
+	sliderStretchStabilizationThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioHysteresisThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchStabilizationThreshold, stepStretchStabilizationThreshold);
+
+	SliderParams sliderStretchRatioDamping("Damping (Cable)", &data.Cable_StretchRatioDamping);
+	btScalar stepStretchRatioDamping = 0.1;
+	sliderStretchRatioDamping.m_userPointer = pdemo;
+	sliderStretchRatioDamping.m_minVal = 0;
+	sliderStretchRatioDamping.m_maxVal = 1.0 - stepStretchRatioDamping;
+	sliderStretchRatioDamping.m_clampToIntegers = false;
+	sliderStretchRatioDamping.m_clampToNotches = true;
+	sliderStretchRatioDamping.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioDamping(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioDamping, stepStretchRatioDamping);
+
+	SliderParams sliderDampingAttenuationThreshold("Damping threshold (Cable)", &data.Cable_StretchDampingAttenuationThreshold);
+	btScalar stepDampingAttenuationThreshold = 0.1;
+	sliderDampingAttenuationThreshold.m_userPointer = pdemo;
+	sliderDampingAttenuationThreshold.m_minVal = 0;
+	sliderDampingAttenuationThreshold.m_maxVal = 1.0 - stepDampingAttenuationThreshold * 0.5;
+	sliderDampingAttenuationThreshold.m_clampToIntegers = false;
+	sliderDampingAttenuationThreshold.m_clampToNotches = true;
+	sliderDampingAttenuationThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioDampingThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderDampingAttenuationThreshold, stepDampingAttenuationThreshold);
 
 	SliderParams sliderCableLinearMass("Linear Mass (Cable)", &data.Cable_linearMass);
 	btScalar stepCableLinearMass = 0.25;
