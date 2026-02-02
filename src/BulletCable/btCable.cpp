@@ -1802,15 +1802,28 @@ btScalar btCable::getRestLength()
 {
 	btScalar length = 0;
 	for (int i = 0; i < m_links.size(); ++i)
+	{
 		length += m_links[i].m_rl;
+	}
+
 	return length;
 }
 
 btScalar btCable::getLength()
 {
 	btScalar length = 0;
+
+	for (int i = 0; i < m_anchors.size(); ++i)
+	{
+		Anchor a = m_anchors[i];
+		length += a.m_node->m_x.distance(a.m_body->getWorldTransform() * a.m_local);
+	}
+
 	for (int i = 0; i < m_links.size(); ++i)
+	{
 		length += m_links[i].m_n[0]->m_x.distance(m_links[i].m_n[1]->m_x);
+	}
+
 	return length;
 }
 
