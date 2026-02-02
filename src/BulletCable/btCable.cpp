@@ -1250,9 +1250,20 @@ void btCable::distanceConstraint(int currentIter)
 void btCable::distanceConstraintBullet()
 {
 	BT_PROFILE("PSolve_Links");
-	const btScalar stiffness = m_materials[0]->m_kLST;
+
 	btScalar lengthAccumulator = 0.0;
 	btScalar restLengthAccumulator = 0.0;
+	const btScalar stiffness = m_materials[0]->m_kLST;
+
+	// Sum the distances between anchors and nodes
+	for (int i = 0, ni = m_anchors.size(); i < ni; ++i)
+	{
+		Anchor& a = m_anchors[i];
+		btVector3 wn = a.m_node->m_x;
+		btVector3 wa = a.m_body->getWorldTransform() * a.m_local;
+		lengthAccumulator += wn.distance(wa);
+	}
+
 	for (int i = 0, ni = m_links.size(); i < ni; ++i)
 	{
 		Link& l = m_links[i];
@@ -1273,18 +1284,29 @@ void btCable::distanceConstraintBullet()
 				b.m_x += del * (k * b.m_im);
 			}
 
-			m_linkStretchRatio = max(m_linkStretchRatio, (len - l.m_rl) / l.m_rl);
-			m_lengthAccumulator += len;
-			m_restLengthAccumulator += l.m_rl;
+			lengthAccumulator += len;
+			restLengthAccumulator += l.m_rl;
 		}
 	}
 	// Calculate the strain of the cable
-	m_tenseAccumulator = (lengthAccumulator - restLengthAccumulator) / restLengthAccumulator;
+	m_tenseAccumulator = max(0.0, (lengthAccumulator - restLengthAccumulator) / restLengthAccumulator);
 }
 
 void btCable::distanceConstraintXPBD()
 {
 	BT_PROFILE("PSolve_Links");
+
+	btScalar lengthAccumulator = 0.0;
+	btScalar restLengthAccumulator = 0.0;
+
+	// Sum the distances between anchors and nodes
+	for (int i = 0, ni = m_anchors.size(); i < ni; ++i)
+	{
+		Anchor& a = m_anchors[i];
+		btVector3 wn = a.m_node->m_x;
+		btVector3 wa = a.m_body->getWorldTransform() * a.m_local;
+		lengthAccumulator += wn.distance(wa);
+	}
 
 	Link* l;
 	Node* a;
@@ -1377,10 +1399,11 @@ void btCable::distanceConstraintXPBD()
 		a->m_x += dxA;
 		b->m_x += dxB;
 
-		m_tenseAccumulator = max(m_tenseAccumulator, (L - l->m_rl) / l->m_rl);
+		lengthAccumulator += L;
+		restLengthAccumulator += l->m_rl;
 	}
-
-	m_tenseAccumulator = min(m_tenseAccumulator, m_maxAccumulator);
+	// Calculate the strain of the cable
+	m_tenseAccumulator = max(0.0, (lengthAccumulator - restLengthAccumulator) / restLengthAccumulator);
 }
 
 void btCable::LRAConstraint()
