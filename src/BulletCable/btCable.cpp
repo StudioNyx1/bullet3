@@ -1263,15 +1263,19 @@ void btCable::distanceConstraintBullet()
 			Node& b = *l.m_n[1];
 			const btVector3 del = b.m_x - a.m_x;
 			const btScalar len2 = del.length2();
+			const btScalar len = sqrt(len2);
 			const btScalar rl2 = l.m_c1;
+
 			if (rl2 + len2 > SIMD_EPSILON)
 			{
 				const btScalar k = ((rl2 - len2) / (sumInvMass * (rl2 + len2))) * stiffness;
 				a.m_x -= del * (k * a.m_im);
 				b.m_x += del * (k * b.m_im);
 			}
-			lengthAccumulator += len2;
-			restLengthAccumulator += rl2;
+
+			m_linkStretchRatio = max(m_linkStretchRatio, (len - l.m_rl) / l.m_rl);
+			m_lengthAccumulator += len;
+			m_restLengthAccumulator += l.m_rl;
 		}
 	}
 	// Calculate the strain of the cable
