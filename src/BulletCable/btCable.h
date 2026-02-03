@@ -47,6 +47,14 @@ class btCable : public btSoftBody
 		XPBD // Modified distance constraint from XPBD
 	};
 
+	enum class AnchorMode
+	{
+		Bullet = 0, // Original position in anchor constraint from Bullet
+		MassBalance, // Modified position in anchor constraint from Bullet with the Impulse Matrix MassBalance
+		LerpB2MB, // Modified position in anchor constraint lerping between the original method and the MassBalance one
+		OnPoint // Modified position in anchor constraint with teleportation on the anchor position
+	};
+
 	//
 	~btCable()
 	{
@@ -256,6 +264,9 @@ private:
 	btScalar m_tenseAccumulator = 0.0;
 	btScalar m_minAccumulator = 0.2;
 	btScalar m_maxAccumulator = 1.0;
+	
+	AnchorMode m_anchorMode{AnchorMode::Bullet};
+
 
 	MonotonicSpline1D* spline;
 
@@ -539,6 +550,9 @@ public:
 
 	void setTensionMinAccumulator(btScalar value) { m_minAccumulator = value; }
 	void setTensionMaxAccumulator(btScalar value) { m_maxAccumulator = value; }
+
+	void setAnchorMode(int mode) { m_anchorMode = (AnchorMode) mode; }
+	int getAnchorMode() { return (int) m_anchorMode; }
 
 #pragma endregion
 };

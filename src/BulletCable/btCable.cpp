@@ -1185,7 +1185,26 @@ void btCable::anchorConstraint()
 		anchor.m_totalTension += impulse / dt;
 
 		// Update anchor's data
-		node.m_x += impulseMassBalance * anchor.m_c2_massBalance; // lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
+		switch (m_anchorMode)
+		{
+			case AnchorMode::Bullet:
+				node.m_x += impulseBullet * anchor.m_c2;
+				break;
+			case AnchorMode::MassBalance:
+				node.m_x += impulseMassBalance * anchor.m_c2_massBalance;
+				break;
+			case AnchorMode::LerpB2MB:
+				node.m_x += lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
+				break;
+			case AnchorMode::OnPoint:
+				node.m_x = wa;
+				break;
+	
+			// Unreachable value
+			default:
+				assert(false);
+				break;
+		}
 		anchor.m_dist = wa.distance(node.m_x);
 		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
 	}
@@ -1236,7 +1255,26 @@ void btCable::anchorConstraintPlacement()
 		anchor.m_totalTension += impulse / dt;
 
 		// Update anchor's data
-		node.m_x += impulseMassBalance * anchor.m_c2_massBalance; // lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
+		switch (m_anchorMode)
+		{
+			case AnchorMode::Bullet:
+				node.m_x += impulseBullet * anchor.m_c2;
+				break;
+			case AnchorMode::MassBalance:
+				node.m_x += impulseMassBalance * anchor.m_c2_massBalance;
+				break;
+			case AnchorMode::LerpB2MB:
+				node.m_x += lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, ratio);
+				break;
+			case AnchorMode::OnPoint:
+				node.m_x = wa;
+				break;
+
+				// Unreachable value
+			default:
+				assert(false);
+				break;
+		}
 		anchor.m_dist = wa.distance(node.m_x);
 		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
 	}
