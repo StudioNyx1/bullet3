@@ -67,7 +67,7 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	_nodeContactObject = btCollisionObject();
 	_nodeContactTransform = btTransform::getIdentity();
 	_nodeContactObject.setCollisionShape(&_nodeContactSphere);
-	setDistanceMode((int) DistanceMode::Bullet);
+	setDistanceMode((int) DistanceMode::PBD);
 	m_collisionMode = CollisionMode::Base;
 }
 
@@ -1189,16 +1189,16 @@ void btCable::anchorConstraint()
 		// Update anchor's data
 		switch (m_anchorMode)
 		{
-			case AnchorMode::Bullet:
+			case AnchorMode::Original:
 				node.m_x += impulseBullet * anchor.m_c2;
 				break;
 			case AnchorMode::MassBalance:
 				node.m_x += impulseMassBalance * anchor.m_c2_massBalance;
 				break;
-			case AnchorMode::LerpB2MB:
+			case AnchorMode::Interpolation:
 				node.m_x += lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, m_massBalanceRatio);
 				break;
-			case AnchorMode::OnPoint:
+			case AnchorMode::Teleportation:
 				node.m_x = wa;
 				break;
 	
@@ -1410,7 +1410,7 @@ void btCable::updateMassRatioDamping(int currentIter)
 	}
 }
 
-void btCable::distanceConstraintBullet()
+void btCable::distanceConstraintPBD()
 {
 	BT_PROFILE("PSolve_Links");
 
@@ -2317,8 +2317,8 @@ void btCable::setDistanceMode(int mode)
 	m_distanceMode = (DistanceMode)mode;
 	switch(m_distanceMode)
 	{
-		case DistanceMode::Bullet:
-			m_distanceFunction = &btCable::distanceConstraintBullet;
+		case DistanceMode::PBD:
+			m_distanceFunction = &btCable::distanceConstraintPBD;
 			break;
 		case DistanceMode::XPBD:
 			m_distanceFunction = &btCable::distanceConstraintXPBD;
