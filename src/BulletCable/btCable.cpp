@@ -734,6 +734,9 @@ void btCable::Shrinks(float dt)
 				}
 			}
 
+			// Get the rl of the second removed link
+			btScalar beforeLastLinkRL = m_links[lastIndexLink - 1].m_rl;
+
 			// Remove the last link and the last-1 link
 			m_links.removeAtIndex(lastIndexLink);
 			lastIndexLink--;
@@ -758,7 +761,8 @@ void btCable::Shrinks(float dt)
 				anchor->m_node = &m_nodes.at(lastIndexNode);
 			}
 
-			newLinkRL += currentCableRL;
+			// Add the before last link rest length 
+			newLinkRL += beforeLastLinkRL;
 		}
 	}
 
