@@ -348,16 +348,15 @@ void btCable::updateNodeData()
 	{
 		// Update velocities for the cable
 		Node& n = m_nodes[i];
-		n.m_vn = n.m_v;
 		n.m_v = (n.m_x - n.m_q) * subFrameDT * damping;
 
 		// Only update data for last substep
 		if (m_world->GetIndexSubIteration() == m_world->GetSubIteration() - 1)
 		{
-			btVector3 nodeVelocity = (n.m_x - n.m_xn) * frameDT * damping;
-
 			// Update velocities for the hydro's forces
-			n.m_movingAverage[n.m_indexMovingAverage] = nodeVelocity;
+			n.m_vn = (n.m_x - n.m_xn) * frameDT * damping;
+			n.m_xn = n.m_x;
+			n.m_movingAverage[n.m_indexMovingAverage] = n.m_vn;
 
 			btVector3 average = btVector3(0, 0, 0);
 			int currentIndex = (n.m_indexMovingAverage + 1) % n.m_maxSizeMovingAverage;  // start after current value, first has weight of 0.0
@@ -393,13 +392,12 @@ void btCable::updateNodeData()
 			}
 			else
 			{
-				m_nodeData[i].velocity_x = nodeVelocity.getX();
-				m_nodeData[i].velocity_y = nodeVelocity.getY();
-				m_nodeData[i].velocity_z = nodeVelocity.getZ();
+				m_nodeData[i].velocity_x = n.m_vn.getX();
+				m_nodeData[i].velocity_y = n.m_vn.getY();
+				m_nodeData[i].velocity_z = n.m_vn.getZ();
 			}
 
-			n.m_xn = n.m_x;  // Update previous pos with current
-							 //n.m_f = btVector3(0, 0, 0);  // reset node total forces
+			//n.m_f = btVector3(0, 0, 0);  // reset node total forces
 		}
 
 		// Calculate Volume
