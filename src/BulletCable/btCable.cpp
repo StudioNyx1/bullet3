@@ -1340,7 +1340,7 @@ btScalar btCable::computeMassBalanceRatio()
 		if (m_stretchBehavior.max > m_stretchBehavior.min)
 		{
 			// Make sure user defined mass massBalanceRatio cannot overshoot
-			btScalar x = btClamped((m_stretchRatio - m_stretchBehavior.min) / (m_stretchBehavior.max - m_stretchBehavior.min), 0.0, 1.0);
+			btScalar x = btClamped((m_stretchRatioDamped - m_stretchBehavior.min) / (m_stretchBehavior.max - m_stretchBehavior.min), 0.0, 1.0);
 
 			// Select how mass balance ratio evolves toward the max value
 			switch (m_stretchBehavior.curve)
