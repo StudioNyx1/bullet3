@@ -4595,20 +4595,6 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassImpactA, 1);
 
-	SliderParams sliderAnchorMode("AnchorMode", &data.Cable_AnchorMode);
-	btScalar stepAnchorMode = 1;
-	sliderAnchorMode.m_userPointer = pdemo;
-	sliderAnchorMode.m_minVal = 0;
-	sliderAnchorMode.m_maxVal = 3 - stepAnchorMode;
-	sliderAnchorMode.m_clampToIntegers = true;
-	sliderAnchorMode.m_clampToNotches = true;
-	sliderAnchorMode.m_callback = [](float value, void* userPtr)
-	{
-		CableDemo* demo = (CableDemo*)userPtr;
-		demo->m_cable->setAnchorMode((int) value);
-	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAnchorMode, stepAnchorMode);
-
 	SliderParams sliderAMassRatio("MassRatio (A)", &data.A_massRatio);
 	btScalar stepAMassRatio = 0.02;
 	sliderAMassRatio.m_userPointer = pdemo;
@@ -5033,20 +5019,6 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		lest->activeMassAtImpact(value > 0.0 ? true : false);
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderMassImpactA, stepMassImpactA);
-
-	SliderParams sliderAnchorMode("AnchorMode", &data.Cable_AnchorMode);
-	btScalar stepAnchorMode = 1;
-	sliderAnchorMode.m_userPointer = pdemo;
-	sliderAnchorMode.m_minVal = 0;
-	sliderAnchorMode.m_maxVal = 3 - stepAnchorMode;
-	sliderAnchorMode.m_clampToIntegers = true;
-	sliderAnchorMode.m_clampToNotches = true;
-	sliderAnchorMode.m_callback = [](float value, void* userPtr)
-	{
-		CableDemo* demo = (CableDemo*)userPtr;
-		demo->m_cable->setAnchorMode((int)value);
-	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderAnchorMode, stepAnchorMode);
 
 	SliderParams sliderAMassRatio("MassRatio (A)", &data.A_massRatio);
 	btScalar stepAMassRatio = 0.01;

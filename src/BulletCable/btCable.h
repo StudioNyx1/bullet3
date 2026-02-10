@@ -46,14 +46,6 @@ class btCable : public btSoftBody
 		PBD = 0, // Original distance constraint (Original)
 		XPBD // Modified distance constraint
 	};
-
-	enum class AnchorMode
-	{
-		Original = 0, // Original position in anchor constraint from Bullet
-		MassBalance, // Modified position in anchor constraint from Bullet with the Impulse Matrix MassBalance
-		Interpolation, // Modified position in anchor constraint lerping between the original method and the MassBalance one
-		Teleportation // Modified position in anchor constraint with teleportation on the anchor position
-	};
 	
 	enum class StretchRatioMode
 	{
@@ -296,7 +288,6 @@ private:
 	btScalar m_stretchRatioDamped = 0.0;
 	btScalar m_cableStretchRatio = 0.0;
 	btScalar m_linkStretchRatio = 0.0;
-	AnchorMode m_anchorMode{AnchorMode::Original};
 
 	// Schmitt hysteresis to avoid on/off activation
 	struct StretchRatioHysteresis
@@ -641,9 +632,6 @@ public:
 
 	void setStretchRatioDampingThreshold(btScalar threshold) { m_stretchDamping.threshold = threshold; }
 	btScalar getStretchRatioDampingThreshold() { return m_stretchDamping.threshold; }
-
-	void setAnchorMode(int mode) { m_anchorMode = (AnchorMode) mode; }
-	int getAnchorMode() { return (int) m_anchorMode; }
 
 #pragma endregion
 };

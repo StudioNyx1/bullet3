@@ -1188,26 +1188,7 @@ void btCable::anchorConstraint()
 		anchor.m_totalTension += impulse / dt;
 
 		// Update anchor's data
-		switch (m_anchorMode)
-		{
-			case AnchorMode::Original:
-				node.m_x += impulseBullet * anchor.m_c2;
-				break;
-			case AnchorMode::MassBalance:
-				node.m_x += impulseMassBalance * anchor.m_c2_massBalance;
-				break;
-			case AnchorMode::Interpolation:
-				node.m_x += lerp(impulseBullet * anchor.m_c2, impulseMassBalance * anchor.m_c2_massBalance, m_massBalanceRatio);
-				break;
-			case AnchorMode::Teleportation:
-				node.m_x = wa;
-				break;
-	
-			// Unreachable value
-			default:
-				assert(false);
-				break;
-		}
+		node.m_x += impulseMassBalance * anchor.m_c2_massBalance;
 		anchor.m_dist = wa.distance(node.m_x);
 		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
 	}
