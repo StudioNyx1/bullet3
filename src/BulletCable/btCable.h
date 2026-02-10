@@ -277,7 +277,9 @@ private:
 	struct StretchRatioBehavior
 	{
 		StretchRatioMode mode{StretchRatioMode::Link};
-		StretchRatioCurve curve{StretchRatioCurve::Linear};
+		StretchRatioCurve curveLowSpeed{StretchRatioCurve::Quartic};
+		StretchRatioCurve curveHighSpeed{StretchRatioCurve::QuarticInverse};
+		btScalar speedThreshold{4.0};
 		btScalar min{0.0};
 		btScalar max{1.0};
 	};
@@ -369,7 +371,7 @@ private:
 	void distanceConstraintPBD();
 	void distanceConstraintXPBD();
 
-	btScalar computeMassBalanceRatio();
+	btScalar computeMassBalanceRatio(Anchor& anchor);
 
 	void distanceConstraintLock(int limMin, int limMax);
 	void LRAConstraint();
@@ -624,8 +626,14 @@ public:
 	void setStretchRatioMode(int modeId) { m_stretchBehavior.mode = static_cast<StretchRatioMode>(modeId); }
 	int getStretchRatioMode() { return static_cast<int>(m_stretchBehavior.mode); }
 
-	void setStretchRatioCurve(int curveId) { m_stretchBehavior.curve = static_cast<StretchRatioCurve>(curveId); }
-	int getStretchRatioCurve() { return static_cast<int>(m_stretchBehavior.curve); }
+	void setStretchRatioLowSpeedCurve(int curveId) { m_stretchBehavior.curveLowSpeed = static_cast<StretchRatioCurve>(curveId); }
+	int getStretchRatioLowSpeedCurve() { return static_cast<int>(m_stretchBehavior.curveLowSpeed); }
+
+	void setStretchRatioHighSpeedCurve(int curveId) { m_stretchBehavior.curveHighSpeed = static_cast<StretchRatioCurve>(curveId); }
+	int getStretchRatioHighSpeedCurve() { return static_cast<int>(m_stretchBehavior.curveHighSpeed); }
+
+	void setStretchRatioSpeedThreshold(btScalar threshold) { m_stretchBehavior.speedThreshold = threshold; }
+	btScalar getStretchRatioSpeedThreshold() { return m_stretchBehavior.speedThreshold; }
 
 	void setStretchRatioHysteresisThreshold(btScalar threshold) { m_stretchHysteresis.threshold = threshold; }
 	btScalar getStretchRatioHysteresisThreshold() { return m_stretchHysteresis.threshold; }

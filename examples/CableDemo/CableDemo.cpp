@@ -89,7 +89,9 @@ struct StabilityData
 	btScalar Cable_StretchRatioMinThreshold{0.0};
 	btScalar Cable_StretchRatioMaxThreshold{1.0};
 	btScalar Cable_StretchRatioMode{1.0};
-	btScalar Cable_StretchRatioCurve{0.0};
+	btScalar Cable_StretchRatioCurveLow{0.0};
+	btScalar Cable_StretchRatioSpeedThreshold{0.0};
+	btScalar Cable_StretchRatioCurveHigh{0.0};
 	btScalar Cable_StretchRatioHysteresis{0.0};
 	btScalar Cable_StretchRatioDamping{0.0};
 	btScalar Cable_StretchStabilizationThreshold{1.0};
@@ -4417,7 +4419,9 @@ static void Init_StabilityTension(CableDemo* pdemo)
 		data.Cable_StretchRatioMinThreshold = 0.0;
 		data.Cable_StretchRatioMaxThreshold = 1.0;
 		data.Cable_StretchRatioMode = 1.0;
-		data.Cable_StretchRatioCurve = 0.0;
+		data.Cable_StretchRatioCurveLow = 0.0;
+		data.Cable_StretchRatioSpeedThreshold = 0.0;
+		data.Cable_StretchRatioCurveHigh = 0.0;
 		data.Cable_StretchRatioHysteresis = 0.0;
 		data.Cable_StretchRatioDamping = 0.0;
 		data.Cable_StretchStabilizationThreshold = 1.0;
@@ -4622,18 +4626,45 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioMode);
 
-	SliderParams sliderStretchRatioCurve("Stretch Curve (Cable)", &data.Cable_StretchRatioCurve);
-	sliderStretchRatioCurve.m_userPointer = pdemo;
-	sliderStretchRatioCurve.m_minVal = 0;
-	sliderStretchRatioCurve.m_maxVal = 3.0;
-	sliderStretchRatioCurve.m_clampToIntegers = true;
-	sliderStretchRatioCurve.m_clampToNotches = true;
-	sliderStretchRatioCurve.m_callback = [](float value, void* userPtr)
+	SliderParams sliderStretchRatioCurveLow("Stretch Curve Low (Cable)", &data.Cable_StretchRatioCurveLow);
+	sliderStretchRatioCurveLow.m_userPointer = pdemo;
+	sliderStretchRatioCurveLow.m_minVal = 0;
+	sliderStretchRatioCurveLow.m_maxVal = 4.0;
+	sliderStretchRatioCurveLow.m_clampToIntegers = true;
+	sliderStretchRatioCurveLow.m_clampToNotches = false;
+	sliderStretchRatioCurveLow.m_callback = [](float value, void* userPtr)
 	{
 		CableDemo* pdemo = (CableDemo*)userPtr;
-		pdemo->m_cable->setStretchRatioCurve(static_cast<int>(value));
+		pdemo->m_cable->setStretchRatioLowSpeedCurve(static_cast<int>(value));
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioCurve);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioCurveLow);
+
+	SliderParams sliderStretchRatioSpeedThreshold("Stretch Curve Threshold (Cable)", &data.Cable_StretchRatioSpeedThreshold);
+	btScalar stepStretchRatioSpeedThreshold = 0.1;
+	sliderStretchRatioSpeedThreshold.m_userPointer = pdemo;
+	sliderStretchRatioSpeedThreshold.m_minVal = 0;
+	sliderStretchRatioSpeedThreshold.m_maxVal = 30.0 - stepStretchRatioSpeedThreshold;
+	sliderStretchRatioSpeedThreshold.m_clampToIntegers = false;
+	sliderStretchRatioSpeedThreshold.m_clampToNotches = true;
+	sliderStretchRatioSpeedThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioSpeedThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioSpeedThreshold, stepStretchRatioSpeedThreshold);
+
+	SliderParams sliderStretchRatioCurveHigh("Stretch Curve High (Cable)", &data.Cable_StretchRatioCurveHigh);
+	sliderStretchRatioCurveHigh.m_userPointer = pdemo;
+	sliderStretchRatioCurveHigh.m_minVal = 0;
+	sliderStretchRatioCurveHigh.m_maxVal = 4.0;
+	sliderStretchRatioCurveHigh.m_clampToIntegers = true;
+	sliderStretchRatioCurveHigh.m_clampToNotches = false;
+	sliderStretchRatioCurveHigh.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioHighSpeedCurve(static_cast<int>(value));
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioCurveHigh);
 
 	SliderParams sliderStretchRatioMinThreshold("Stretch Min (Cable)", &data.Cable_StretchRatioMinThreshold);
 	btScalar stepStretchRatioMinThreshold = 0.02;
@@ -4811,7 +4842,9 @@ static void Init_StabilityA18(CableDemo* pdemo)
 		data.Cable_StretchRatioMinThreshold = 0.0;
 		data.Cable_StretchRatioMaxThreshold = 1.0;
 		data.Cable_StretchRatioMode = 1.0;
-		data.Cable_StretchRatioCurve = 0.0;
+		data.Cable_StretchRatioCurveLow = 0.0;
+		data.Cable_StretchRatioSpeedThreshold = 0.0;
+		data.Cable_StretchRatioCurveHigh = 0.0;
 		data.Cable_StretchRatioHysteresis = 0.0;
 		data.Cable_StretchRatioDamping = 0.0;
 		data.Cable_StretchStabilizationThreshold = 1.0;
@@ -5047,18 +5080,45 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	};
 	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioMode);
 
-	SliderParams sliderStretchRatioCurve("Stretch Curve (Cable)", &data.Cable_StretchRatioCurve);
-	sliderStretchRatioCurve.m_userPointer = pdemo;
-	sliderStretchRatioCurve.m_minVal = 0;
-	sliderStretchRatioCurve.m_maxVal = 3.0;
-	sliderStretchRatioCurve.m_clampToIntegers = true;
-	sliderStretchRatioCurve.m_clampToNotches = true;
-	sliderStretchRatioCurve.m_callback = [](float value, void* userPtr)
+	SliderParams sliderStretchRatioCurveLow("Stretch Curve Low (Cable)", &data.Cable_StretchRatioCurveLow);
+	sliderStretchRatioCurveLow.m_userPointer = pdemo;
+	sliderStretchRatioCurveLow.m_minVal = 0;
+	sliderStretchRatioCurveLow.m_maxVal = 4.0;
+	sliderStretchRatioCurveLow.m_clampToIntegers = true;
+	sliderStretchRatioCurveLow.m_clampToNotches = true;
+	sliderStretchRatioCurveLow.m_callback = [](float value, void* userPtr)
 	{
 		CableDemo* pdemo = (CableDemo*)userPtr;
-		pdemo->m_cable->setStretchRatioCurve(static_cast<int>(value));
+		pdemo->m_cable->setStretchRatioLowSpeedCurve(static_cast<int>(value));
 	};
-	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioCurve);
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioCurveLow);
+
+	SliderParams sliderStretchRatioSpeedThreshold("Stretch Curve Threshold (Cable)", &data.Cable_StretchRatioSpeedThreshold);
+	btScalar stepStretchRatioSpeedThreshold = 0.1;
+	sliderStretchRatioSpeedThreshold.m_userPointer = pdemo;
+	sliderStretchRatioSpeedThreshold.m_minVal = 0;
+	sliderStretchRatioSpeedThreshold.m_maxVal = 30.0 - stepStretchRatioSpeedThreshold;
+	sliderStretchRatioSpeedThreshold.m_clampToIntegers = false;
+	sliderStretchRatioSpeedThreshold.m_clampToNotches = true;
+	sliderStretchRatioSpeedThreshold.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioSpeedThreshold(value);
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioSpeedThreshold, stepStretchRatioSpeedThreshold);
+
+	SliderParams sliderStretchRatioCurveHigh("Stretch Curve High (Cable)", &data.Cable_StretchRatioCurveHigh);
+	sliderStretchRatioCurveHigh.m_userPointer = pdemo;
+	sliderStretchRatioCurveHigh.m_minVal = 0;
+	sliderStretchRatioCurveHigh.m_maxVal = 4.0;
+	sliderStretchRatioCurveHigh.m_clampToIntegers = true;
+	sliderStretchRatioCurveHigh.m_clampToNotches = false;
+	sliderStretchRatioCurveHigh.m_callback = [](float value, void* userPtr)
+	{
+		CableDemo* pdemo = (CableDemo*)userPtr;
+		pdemo->m_cable->setStretchRatioHighSpeedCurve(static_cast<int>(value));
+	};
+	pdemo->getGUIHelper()->getParameterInterface()->registerSliderFloatParameter(sliderStretchRatioCurveHigh);
 
 	SliderParams sliderStretchRatioMinThreshold("Stretch Min (Cable)", &data.Cable_StretchRatioMinThreshold);
 	btScalar stepStretchRatioMinThreshold = 0.02;
@@ -5080,7 +5140,7 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	sliderStretchRatioMaxThreshold.m_minVal = 0;
 	sliderStretchRatioMaxThreshold.m_maxVal = 1.0 - stepStretchRatioMaxThreshold;
 	sliderStretchRatioMaxThreshold.m_clampToIntegers = false;
-	sliderStretchRatioMaxThreshold.m_clampToNotches = true;
+	sliderStretchRatioMaxThreshold.m_clampToNotches = false;
 	sliderStretchRatioMaxThreshold.m_callback = [](float value, void* userPtr)
 	{
 		CableDemo* pdemo = (CableDemo*)userPtr;

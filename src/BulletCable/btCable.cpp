@@ -223,6 +223,10 @@ void btCable::PrepareSolver()
 		a.m_anchorPlacement = massBody < FLT_EPSILON ? 
 			true : a.m_bodyMassRatio > 0.0 ?
 			false : (massNode / massBody < 5.0 / 100.0);
+
+		// Store associated node last frame speed (used to interpolate between mass ratio curves)
+		btScalar d = n->m_vn.length2();
+		a.m_vn_magnitude = (d > SIMD_EPSILON*SIMD_EPSILON) ? btSqrt(d) : 0.0;
 	}
 
 	// Prepare contacts
@@ -254,8 +258,6 @@ void btCable::solveSingleCableIteration(int currentIter)
 	bool runContactConstraint = (currentIter + 1) % m_substepDelayCollisionSolver == 0 || lastStep;
 
 	updateNodeDeltaPos(currentIter);
-
-	m_massBalanceRatio = computeMassBalanceRatio();
 
 	anchorConstraint();
 
@@ -1170,6 +1172,7 @@ void btCable::anchorConstraint()
 		btVector3 impulseMassBalance = anchor.m_c0_massBalance * vr;
 
 		// Account for mass balance
+		m_massBalanceRatio = computeMassBalanceRatio(anchor);
 		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, m_massBalanceRatio);
 
 		// Clamp the calculated impulse
@@ -1265,8 +1268,40 @@ static btScalar EMAFilterTimeIndependent(btScalar previousDampedSignal, btScalar
 	return dampedSignal;
 }
 
+/**
+ * @brief Computes a normalized weight in the range [0, 1] used to
+ * interpolate between two curves based on a non-negative parameter @p t
+ *
+ * Behavior:
+ *  - t = 0        → weight = 0.0   (100% lower / first curve)
+ *  - t = x        → weight = 0.5   (equal contribution)
+ *  - t = 2x       → weight = 1.0   (100% upper / second curve)
+ *  - t > 2x       → weight = 1.0   (clamped)
+ *
+ * @param t  Non-negative parameter driving the blend.
+ * @param x  Threshold at which both curves contribute equally (50/50).
+ *           Must be strictly positive.
+ *
+ * @return Blend weight for the upper (second) curve.
+ */
+static btScalar UpperWeight(btScalar t, btScalar x)
+{
+	btAssert(t >= 0);  // assumes t >= 0
+	btAssert(x >= 0);  // assumes x >= 0
 
-btScalar btCable::computeMassBalanceRatio()
+	const btScalar weigth2 = btClamped(t / (2.0 * x), 0.0, 1.0);
+
+	return weigth2;
+}
+
+static btScalar Blend(btScalar c1, btScalar c2, btScalar w2)
+{
+	const btScalar blended = (1.0f - w2) * c1 + w2 * c2;
+
+	return blended;
+}
+
+btScalar btCable::computeMassBalanceRatio(Anchor& anchor)
 {
 	// Only enable mass balance feature if there is a stretch on the whole cable
 	// Required to avoid cases where a link is contracted and another is stretched
@@ -1311,7 +1346,7 @@ btScalar btCable::computeMassBalanceRatio()
 	//m_stretchHysteresis.enabled = m_cableStretchRatioDamped > m_stretchBehavior.min;
 	// @TEST(jeremy) Bypass hysteresis behavior
 
-	// 3) Select stretch ratio using user defined curve
+	// 3) Select stretch ratio using user defined curveLowSpeed
 	if (m_stretchHysteresis.enabled)
 	{
 		// Select max ratio as default if min is larger than max
@@ -1320,29 +1355,57 @@ btScalar btCable::computeMassBalanceRatio()
 		{
 			// Make sure user defined mass massBalanceRatio cannot overshoot
 			btScalar x = btClamped((m_stretchRatioDamped - m_stretchBehavior.min) / (m_stretchBehavior.max - m_stretchBehavior.min), 0.0, 1.0);
+			btScalar c1 = 0.0;
+			btScalar c2 = 0.0;
 
 			// Select how mass balance ratio evolves toward the max value
-			switch (m_stretchBehavior.curve)
+			switch (m_stretchBehavior.curveLowSpeed)
 			{
 				case btCable::StretchRatioCurve::Linear:
-					massBalanceRatio = x;
+					c1 = x;
 					break;
 				case btCable::StretchRatioCurve::Quadratic:
-					massBalanceRatio = btPow(x, 2.0);
+					c1 = btPow(x, 2.0);
 					break;
 				case btCable::StretchRatioCurve::QuadraticInverse:
-					massBalanceRatio = 1.0 - btPow(1.0 - x, 2.0);
+					c1 = 1.0 - btPow(1.0 - x, 2.0);
 					break;
 				case btCable::StretchRatioCurve::Quartic:
-					massBalanceRatio = btPow(x, 4.0);
+					c1 = btPow(x, 4.0);
 					break;
 				case btCable::StretchRatioCurve::QuarticInverse:
-					massBalanceRatio = 1.0 - btPow(1.0 - x, 4.0);
+					c1 = 1.0 - btPow(1.0 - x, 4.0);
 					break;
 				default:
-					massBalanceRatio = 0.0;
+					c1 = 0.0;
 					break;
 			}
+
+			switch (m_stretchBehavior.curveHighSpeed)
+			{
+				case btCable::StretchRatioCurve::Linear:
+					c2 = x;
+					break;
+				case btCable::StretchRatioCurve::Quadratic:
+					c2 = btPow(x, 2.0);
+					break;
+				case btCable::StretchRatioCurve::QuadraticInverse:
+					c2 = 1.0 - btPow(1.0 - x, 2.0);
+					break;
+				case btCable::StretchRatioCurve::Quartic:
+					c2 = btPow(x, 4.0);
+					break;
+				case btCable::StretchRatioCurve::QuarticInverse:
+					c2 = 1.0 - btPow(1.0 - x, 4.0);
+					break;
+				default:
+					c2 = 0.0;
+					break;
+			}
+
+			// Favor high speed curve when speed threshold is 0
+			const btScalar w2 = m_stretchBehavior.speedThreshold > 0 ? UpperWeight(anchor.m_vn_magnitude, m_stretchBehavior.speedThreshold) : 1.0;
+			massBalanceRatio = Blend(c1, c2, w2);
 		}
 	}
 

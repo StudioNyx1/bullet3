@@ -506,6 +506,7 @@ public:
 		btScalar m_dist;			    // Last distance known between anchor posiiton and node position
 		btScalar m_bodyMassRatio;       // Body added mass to node
 		bool m_anchorPlacement;			// Apply (or not) the AnchorConstraintPlacement's method
+		btScalar m_vn_magnitude;        // Last frame velocity magnitude
 	};
 	/* Note			*/
 	struct Note : Element
