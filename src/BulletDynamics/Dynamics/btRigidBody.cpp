@@ -157,13 +157,15 @@ void btRigidBody::updateBulletChildrenRecursive(btScalar timeStep, unsigned int 
 	// Mark this body as updated for this frame
 	m_lastUpdateFrame = currentFrame;
 	
+	btDefaultMotionState* motionState = (btDefaultMotionState*)getMotionState();
+	btTransform parentTransform = motionState->getGraphicsWorldTransform();
+
 	for (auto kinematic : m_Children)
 	{
 		if (!kinematic->isStaticOrKinematicObject()) continue;
 
 		// World transform kinematic = WorldTransform Parent * LocalTransform Kinematic	
-		// Note: 'getWorldTransform()' here refers to 'this' (the parent), which is already updated.
-		btTransform res = getWorldTransform() * kinematic->m_localTransform;
+		btTransform res = parentTransform * kinematic->m_localTransform;
 		
 		kinematic->setInterpolationWorldTransform(kinematic->getWorldTransform());
 		kinematic->setWorldTransform(res);
@@ -208,13 +210,14 @@ void btRigidBody::updateBulletChildrenInterpolatedRecursive(btScalar timeStep, u
 	// Mark this body as updated for this frame
 	m_lastInterpolatedUpdateFrame = currentFrame;
 	
+	btDefaultMotionState* motionState = (btDefaultMotionState*)getMotionState();
+	btTransform parentTransform = motionState->getGraphicsWorldTransform();
 	for (auto kinematic : m_Children)
 	{
 		if (!kinematic->isStaticOrKinematicObject()) continue;
 
 		// World transform kinematic = WorldTransform Parent * LocalTransform Kinematic	
-		// Note: 'getWorldTransform()' here refers to 'this' (the parent), which is already updated.
-		btTransform res = getWorldTransform() * kinematic->m_localTransform;
+		btTransform res = parentTransform * kinematic->m_localTransform;
 		
 		kinematic->setInterpolationWorldTransform(kinematic->getWorldTransform());
 		kinematic->setWorldTransform(res);
