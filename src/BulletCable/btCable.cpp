@@ -2421,6 +2421,14 @@ void btCable::setStretchRatioDamping(btScalar value)
 
 	// Force reset to avoid inertia of old value
 	m_stretchRatioDamped = m_stretchRatio;
+	m_cableStretchRatioDamped = m_cableStretchRatio;
+	m_linkStretchRatioDamped = m_linkStretchRatio;
+	// Mode anchor store stretching in anchors
+	for (int i = 0, ni = this->m_anchors.size(); i < ni; ++i)
+	{
+		Anchor& anchor = m_anchors[i];
+		anchor.m_stretchRatioDamped = anchor.m_stretchRatio;
+	}
 }
 
 #pragma endregion
