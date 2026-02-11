@@ -1270,19 +1270,10 @@ static bool SchmittHysteresis(bool state, btScalar x, btScalar lower, btScalar u
 }
 
 
-static btScalar EMAFilter(btScalar previousDampedSignal, btScalar signal, btScalar lambda)
+static btScalar EMAFilter(btScalar previousDampedSignal, btScalar signal, btScalar damping)
 {
 	// EMA (https://en.wikipedia.org/wiki/Exponential_smoothing)
-	btScalar dampedSignal = (1.0 - lambda) * previousDampedSignal + lambda * signal;
-
-	return dampedSignal;
-}
-
-static btScalar EMAFilterTimeIndependent(btScalar previousDampedSignal, btScalar signal, btScalar tau, btScalar dt)
-{
-	// EMA (https://en.wikipedia.org/wiki/Exponential_smoothing)
-	float smoothingRate = 1.0 - btExp(-dt / tau);
-	btScalar dampedSignal = previousDampedSignal + smoothingRate * (signal - previousDampedSignal);
+	btScalar dampedSignal = damping * previousDampedSignal + (1-damping) * signal;
 
 	return dampedSignal;
 }
@@ -1332,19 +1323,19 @@ btScalar btCable::computeMassBalanceRatio(Anchor& anchor)
 	{
 		case btCable::StretchRatioMode::Cable:
 			// Use max stretch at cable level
-			m_cableStretchRatioDamped = EMAFilter(m_cableStretchRatioDamped, m_cableStretchRatio, m_stretchDamping.amountInv * m_stretchDamping.attenuation);
+			m_cableStretchRatioDamped = EMAFilter(m_cableStretchRatioDamped, m_cableStretchRatio, m_stretchDamping.amount * m_stretchDamping.attenuation);
 			m_stretchRatio = m_cableStretchRatio;
 			m_stretchRatioDamped = m_cableStretchRatioDamped;
 			break;
 		case btCable::StretchRatioMode::Link:
 			// Use max stretch at link level but smooth it first
-			m_linkStretchRatioDamped = EMAFilter(m_linkStretchRatioDamped, m_linkStretchRatio, m_stretchDamping.amountInv * m_stretchDamping.attenuation);
+			m_linkStretchRatioDamped = EMAFilter(m_linkStretchRatioDamped, m_linkStretchRatio, m_stretchDamping.amount * m_stretchDamping.attenuation);
 			m_stretchRatio = m_linkStretchRatio;
 			m_stretchRatioDamped = m_linkStretchRatioDamped;
 			break;
 		case btCable::StretchRatioMode::Anchor:
 			// Use max stretch at anchor level
-			anchor.m_stretchRatioDamped = EMAFilter(anchor.m_stretchRatioDamped, anchor.m_stretchRatio, m_stretchDamping.amountInv * m_stretchDamping.attenuation);
+			anchor.m_stretchRatioDamped = EMAFilter(anchor.m_stretchRatioDamped, anchor.m_stretchRatio, m_stretchDamping.amount * m_stretchDamping.attenuation);
 			m_stretchRatio = anchor.m_stretchRatio;
 			m_stretchRatioDamped = anchor.m_stretchRatioDamped;
 			break;
@@ -2426,7 +2417,7 @@ void btCable::setStretchRatioHysteresis(btScalar value)
 
 void btCable::setStretchRatioDamping(btScalar value)
 {
-	m_stretchDamping.amountInv = max(0.0, 1.0 - value);
+	m_stretchDamping.amount = btClamped(value, 0.0, 1.0);
 
 	// Force reset to avoid inertia of old value
 	m_stretchRatioDamped = m_stretchRatio;

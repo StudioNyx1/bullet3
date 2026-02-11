@@ -314,7 +314,7 @@ private:
 	struct StretchRatioDamping
 	{
 		// Damping stored as it counterpart (1-damping) for efficiency
-		btScalar amountInv{1.0};  // The smaller the more damping [0, 1]
+		btScalar amount{1.0};  // The bigger the more damping [0, 1]
 
 		// Percentage of iterations at which the damping attenuation is applied
 		btScalar threshold{0.0};  // The larger the later [0, 1]
@@ -622,7 +622,7 @@ public:
 	btScalar getStretchRatioHysteresis() { return m_stretchHysteresis.amount; }
 
 	void setStretchRatioDamping(btScalar value);
-	btScalar getStretchRatioDamping() { return 1.0 - m_stretchDamping.amountInv; }
+	btScalar getStretchRatioDamping() { return m_stretchDamping.amount; }
 
 	void setStretchRatioMode(int modeId) { m_stretchBehavior.mode = static_cast<StretchRatioMode>(modeId); }
 	int getStretchRatioMode() { return static_cast<int>(m_stretchBehavior.mode); }
