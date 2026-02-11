@@ -49,10 +49,10 @@ class btCable : public btSoftBody
 	
 	enum class StretchRatioMode
 	{
-		Cable = 0,  // Tension ratio is computed based on the whole cable length (same accross anchors)
-		Link,       // Tension ration is computed based on the more stretched link (same accross anchors)
-		Anchor,     // Tension ration is computed only at the anchor level (unique to each anchor)
-		None        // Assume mass ratio is always needed at max
+		None = 0, // Assume mass ratio is always needed at max
+	    Cable,    // Tension ratio is computed based on the whole cable length (same accross anchors)
+		Link,     // Tension ration is computed based on the more stretched link (same accross anchors)
+		Anchor    // Tension ration is computed only at the anchor level (unique to each anchor)
 	};
 
 	enum class StretchRatioCurve
@@ -277,9 +277,9 @@ private:
 	// How mass balance is influenced by cable stretch
 	struct StretchRatioBehavior
 	{
-		StretchRatioMode mode{StretchRatioMode::Link};
-		StretchRatioCurve curveLowSpeed{StretchRatioCurve::Quartic};
-		StretchRatioCurve curveHighSpeed{StretchRatioCurve::QuarticInverse};
+		StretchRatioMode mode{StretchRatioMode::None};
+		StretchRatioCurve curveLowSpeed{StretchRatioCurve::Linear};
+		StretchRatioCurve curveHighSpeed{StretchRatioCurve::Linear};
 		btScalar speedThreshold{4.0};
 		btScalar min{0.0};
 		btScalar max{1.0};
