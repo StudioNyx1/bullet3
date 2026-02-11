@@ -507,6 +507,11 @@ public:
 		btScalar m_bodyMassRatio;       // Body added mass to node
 		bool m_anchorPlacement;			// Apply (or not) the AnchorConstraintPlacement's method
 		btScalar m_vn_magnitude;        // Last frame velocity magnitude
+
+		// Cable stretching detection (Anchor mode)
+		Link* m_nodeLink;               // Link associated with the node (Works only if anchor at the end/start)
+		btScalar m_stretchRatio;        // Link associated stretching
+		btScalar m_stretchRatioDamped;  // Link associated stretching damped
 	};
 	/* Note			*/
 	struct Note : Element

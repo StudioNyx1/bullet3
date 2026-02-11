@@ -227,6 +227,20 @@ void btCable::PrepareSolver()
 		// Store associated node last frame speed (used to interpolate between mass ratio curves)
 		btScalar d = n->m_vn.length2();
 		a.m_vn_magnitude = (d > SIMD_EPSILON*SIMD_EPSILON) ? btSqrt(d) : 0.0;
+
+		// TODO(jeremy) This must be updated to handle in middle anchor
+		// Keep track of associated node to compute stretch at node
+		a.m_nodeLink = nullptr;
+		for (i = 0, ni = m_links.size(); i < ni; ++i)
+		{
+			Link& l = m_links[i];
+
+			if (l.m_n[0] == n || l.m_n[1] == n)
+			{
+				a.m_nodeLink = &l;
+				break;
+			}
+		}
 	}
 
 	// Prepare contacts
@@ -1192,6 +1206,11 @@ void btCable::anchorConstraint()
 		node.m_x += impulseMassBalance * anchor.m_c2_massBalance;
 		anchor.m_dist = wa.distance(node.m_x);
 		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
+
+		// Anchor position is not yet effective because only body velocity is changed
+		// So use updated node position instead 
+		btScalar d = anchor.m_nodeLink->m_n[1]->m_x.distance(anchor.m_nodeLink->m_n[0]->m_x);
+		anchor.m_stretchRatio = max(0.0, (d > SIMD_EPSILON) ? (d - anchor.m_nodeLink->m_rl) / anchor.m_nodeLink->m_rl : 0.0);
 	}
 }
 
@@ -1322,6 +1341,12 @@ btScalar btCable::computeMassBalanceRatio(Anchor& anchor)
 			m_linkStretchRatioDamped = EMAFilter(m_linkStretchRatioDamped, m_linkStretchRatio, m_stretchDamping.amountInv * m_stretchDamping.attenuation);
 			m_stretchRatio = m_linkStretchRatio;
 			m_stretchRatioDamped = m_linkStretchRatioDamped;
+			break;
+		case btCable::StretchRatioMode::Anchor:
+			// Use max stretch at anchor level
+			anchor.m_stretchRatioDamped = EMAFilter(anchor.m_stretchRatioDamped, anchor.m_stretchRatio, m_stretchDamping.amountInv * m_stretchDamping.attenuation);
+			m_stretchRatio = anchor.m_stretchRatio;
+			m_stretchRatioDamped = anchor.m_stretchRatioDamped;
 			break;
 		default:
 			// Use max mass massBalanceRatio all the time

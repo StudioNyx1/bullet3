@@ -4616,9 +4616,9 @@ static void Init_StabilityTension(CableDemo* pdemo)
 	SliderParams sliderStretchRatioMode("Stretch Mode (Cable)", &data.Cable_StretchRatioMode);
 	sliderStretchRatioMode.m_userPointer = pdemo;
 	sliderStretchRatioMode.m_minVal = 0;
-	sliderStretchRatioMode.m_maxVal = 2.0;
+	sliderStretchRatioMode.m_maxVal = 3;
 	sliderStretchRatioMode.m_clampToIntegers = true;
-	sliderStretchRatioMode.m_clampToNotches = true;
+	sliderStretchRatioMode.m_clampToNotches = false;
 	sliderStretchRatioMode.m_callback = [](float value, void* userPtr)
 	{
 		CableDemo* pdemo = (CableDemo*)userPtr;
@@ -5070,9 +5070,9 @@ static void Init_StabilityA18(CableDemo* pdemo)
 	SliderParams sliderStretchRatioMode("Stretch Mode (Cable)", &data.Cable_StretchRatioMode);
 	sliderStretchRatioMode.m_userPointer = pdemo;
 	sliderStretchRatioMode.m_minVal = 0;
-	sliderStretchRatioMode.m_maxVal = 2.0;
+	sliderStretchRatioMode.m_maxVal = 3;
 	sliderStretchRatioMode.m_clampToIntegers = true;
-	sliderStretchRatioMode.m_clampToNotches = true;
+	sliderStretchRatioMode.m_clampToNotches = false;
 	sliderStretchRatioMode.m_callback = [](float value, void* userPtr)
 	{
 		CableDemo* pdemo = (CableDemo*)userPtr;

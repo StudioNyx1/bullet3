@@ -49,8 +49,9 @@ class btCable : public btSoftBody
 	
 	enum class StretchRatioMode
 	{
-		Cable = 0,  // Tension ratio is computed based on the whole cable length
-		Link,        // Tension ration is computed based on the more stretched link
+		Cable = 0,  // Tension ratio is computed based on the whole cable length (same accross anchors)
+		Link,       // Tension ration is computed based on the more stretched link (same accross anchors)
+		Anchor,     // Tension ration is computed only at the anchor level (unique to each anchor)
 		None        // Assume mass ratio is always needed at max
 	};
 
