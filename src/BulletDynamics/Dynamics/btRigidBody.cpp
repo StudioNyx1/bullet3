@@ -278,6 +278,14 @@ void btRigidBody::saveKinematicVelocity(btScalar timeStep)
 		// If this body has no parent, we need to recalculate velocity because it may have moved
 		needUpdate = true;
 	}
+	else if (m_parent->isStaticOrKinematicObject())
+	{
+		// If the parent is static/kinematic, it won't be handled by updateBulletChildren(),
+		// so we must still recompute the kinematic velocity each step in case it has moved.
+		// Careful though, this makes the velocity calculation even if the parent hasn't moved
+		// (TODO:) We'd need to change how the velocity is calculated so the parent calls the velocity update for its children 
+		needUpdate = true;
+	}
 	else
 	{
 		// If this body is considered has child of dynamic body and moved by his parent
