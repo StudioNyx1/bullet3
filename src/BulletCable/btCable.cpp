@@ -1561,7 +1561,6 @@ void btCable::distanceConstraintPBD()
 		}
 	}
 
-	//m_linkStretchRatio = min(m_linkStretchRatio, m_stretchBehavior.max);  // Should not clamped it this early
 	m_cableStretchRatio = (m_lengthAccumulator - m_restLengthAccumulator) / m_restLengthAccumulator;
 }
 
@@ -1677,7 +1676,6 @@ void btCable::distanceConstraintXPBD()
 		m_restLengthAccumulator += l->m_rl;
 	}
 
-	//m_linkStretchRatio = min(m_linkStretchRatio, m_stretchBehavior.max);  // Should not clamped it this early
 	m_cableStretchRatio = (m_lengthAccumulator - m_restLengthAccumulator) / m_restLengthAccumulator;
 }
 
