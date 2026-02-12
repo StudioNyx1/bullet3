@@ -509,9 +509,9 @@ public:
 		btScalar m_vn_magnitude;        // Last frame velocity magnitude
 
 		// Cable stretching detection (Anchor mode)
-		Link* m_nodeLink;               // Link associated with the node (Works only if anchor at the end/start)
-		btScalar m_stretchRatio;        // Link associated stretching
-		btScalar m_stretchRatioDamped;  // Link associated stretching damped
+		Link* m_nodeLinks[2];           // Links
+		btScalar m_stretchRatio;        // Links associated stretching
+		btScalar m_stretchRatioDamped;  // Links associated stretching damped
 	};
 	/* Note			*/
 	struct Note : Element

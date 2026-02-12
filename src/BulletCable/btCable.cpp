@@ -138,6 +138,55 @@ void btCable::endIterativeSolve()
 	updateNodeData();
 }
 
+
+void FindLinksAtAnchor(btSoftBody::Anchor& anchor, btSoftBody::tLinkArray& links)
+{
+	anchor.m_nodeLinks[0] = nullptr;
+	anchor.m_nodeLinks[1] = nullptr;
+	btSoftBody::Node* node = anchor.m_node;
+	btSoftBody::Link* link = nullptr;
+
+	// Quick checks at the start to avoid looping over all links
+	link = &links[0];
+	if (link->m_n[0] == node || link->m_n[1] == node)
+	{
+		anchor.m_nodeLinks[0] = link;
+
+		return;
+	}
+
+	// Quick checks at the end to avoid looping over all links
+	int links_count = links.size();
+	link = &links[links_count - 1];
+	if (link->m_n[0] == node || link->m_n[1] == node)
+	{
+		anchor.m_nodeLinks[0] = link;
+
+		return;
+	}
+
+	// Loop over the remaining links
+	for (int i = 1, nl = links_count - 1; i < nl; ++i)
+	{
+		link = &links[i];
+		if (link->m_n[0] == node || link->m_n[1] == node)
+		{
+			anchor.m_nodeLinks[0] = link;
+
+			// Handle special case where multiple links exist for the anchor associated node
+			link = &links[links_count + 1];
+			if (link->m_n[0] == node || link->m_n[1] == node)
+			{
+				anchor.m_nodeLinks[1] = link;
+			}
+
+			return;
+		}
+	}
+
+	return;
+}
+
 void btCable::PrepareSolver()
 {
 	int i, ni;
@@ -186,7 +235,7 @@ void btCable::PrepareSolver()
 	{
 		Anchor& a = this->m_anchors[i];
 		Node* n = a.m_node;
-		btRigidBody* b = a.m_body; 
+		btRigidBody* b = a.m_body;
 
 		// Relative anchor position
 		const btVector3 ra = b->getWorldTransform().getBasis() * a.m_local;
@@ -210,7 +259,7 @@ void btCable::PrepareSolver()
 		a.m_c2 = m_sst.sdt * invMassNode;
 		a.m_c2_massBalance = m_sst.sdt * invTweakedMass;
 		a.m_body->activate();
-		a.m_lastTension = btVector3(0, 0, 0);	
+		a.m_lastTension = btVector3(0, 0, 0);
 		if (m_world->GetIndexSubIteration() == 0)
 		{
 			a.m_totalTension = btVector3(0, 0, 0);
@@ -220,26 +269,17 @@ void btCable::PrepareSolver()
 		//	- the attached body is a kinematic one
 		//  - the node's mass is lower than 5% of the body's mass
 		//  - the bodyMassRatio is not activated
-		a.m_anchorPlacement = massBody < FLT_EPSILON ? 
-			true : a.m_bodyMassRatio > 0.0 ?
-			false : (massNode / massBody < 5.0 / 100.0);
+		a.m_anchorPlacement = massBody < FLT_EPSILON ? true : a.m_bodyMassRatio > 0.0 ? false
+																					  : (massNode / massBody < 5.0 / 100.0);
 
 		// Store associated node last frame speed (used to interpolate between mass ratio curves)
 		btScalar d = n->m_vn.length2();
-		a.m_vn_magnitude = (d > SIMD_EPSILON*SIMD_EPSILON) ? btSqrt(d) : 0.0;
+		a.m_vn_magnitude = (d > SIMD_EPSILON * SIMD_EPSILON) ? btSqrt(d) : 0.0;
 
-		// TODO(jeremy) This must be updated to handle in middle anchor
 		// Keep track of associated node to compute stretch at node
-		a.m_nodeLink = nullptr;
-		for (i = 0, ni = m_links.size(); i < ni; ++i)
+		if (m_stretchBehavior.mode == StretchRatioMode::Anchor)
 		{
-			Link& l = m_links[i];
-
-			if (l.m_n[0] == n || l.m_n[1] == n)
-			{
-				a.m_nodeLink = &l;
-				break;
-			}
+			FindLinksAtAnchor(a, m_links);
 		}
 	}
 
@@ -262,6 +302,7 @@ void btCable::PrepareSolver()
 	// Run broadPhase to get candidates
 	runBroadPhase();
 }
+
 
 void btCable::solveSingleCableIteration(int currentIter)
 {
@@ -1207,10 +1248,20 @@ void btCable::anchorConstraint()
 		anchor.m_dist = wa.distance(node.m_x);
 		anchor.m_body->applyImpulse(-impulse, anchor.m_c1);
 
-		// Anchor position is not yet effective because only body velocity is changed
-		// So use updated node position instead 
-		btScalar d = anchor.m_nodeLink->m_n[1]->m_x.distance(anchor.m_nodeLink->m_n[0]->m_x);
-		anchor.m_stretchRatio = max(0.0, (d > SIMD_EPSILON) ? (d - anchor.m_nodeLink->m_rl) / anchor.m_nodeLink->m_rl : 0.0);
+		if (m_stretchBehavior.mode == StretchRatioMode::Anchor)
+		{
+			// Anchor position is not yet effective because only body velocity is changed
+			// However anchor associated node position is up to date
+			anchor.m_stretchRatio = 0.0;
+			for each (Link* link in anchor.m_nodeLinks)
+			{
+				if (link != nullptr)
+				{
+					btScalar d = link->m_n[1]->m_x.distance(link->m_n[0]->m_x);
+					anchor.m_stretchRatio = max(anchor.m_stretchRatio, (d - link->m_rl) / link->m_rl);
+				}
+			}
+		}
 	}
 }
 

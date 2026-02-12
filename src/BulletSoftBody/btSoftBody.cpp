@@ -557,7 +557,8 @@ void btSoftBody::appendAnchor(int node, btRigidBody* body, const btVector3& loca
 	a.m_dist = 0.0;
 	a.m_bodyMassRatio = 0.0;
 	a.m_vn_magnitude = 0.0;
-	a.m_nodeLink = nullptr;
+	a.m_nodeLinks[0] = nullptr;
+	a.m_nodeLinks[1] = nullptr;
 	a.m_stretchRatio = 0.0;
 	a.m_stretchRatioDamped = 0.0;
 	m_anchors.push_back(a);
