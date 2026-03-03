@@ -137,7 +137,6 @@ public:
 		btVector3 hitPoint;
 		btVector3 normal;
 		btScalar timeOfImpact;
-		btScalar margin;
 		btScalar distance;
 		BroadPhasePair* pair;
 		btTransform worldTransform;
@@ -389,7 +388,6 @@ private:
 
 	void contactConstraint();
 	btVector3 calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition);
-	btScalar computeCollisionMargin(const btCollisionShape* shape) const;
 	void resetManifoldLifeTime();
 
 	void updateNodeDeltaPos(int iteration);

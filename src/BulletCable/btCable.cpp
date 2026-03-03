@@ -1034,7 +1034,6 @@ void btCable::runNarrowPhase()
 
 		btVector3 currentPos = node->m_x;
 		btVector3 prevPos = node->m_q;
-		btScalar margin = computeCollisionMargin(rb->getCollisionShape());
 
 		// Get transform of the rigid body
 		btTransform rbTransform = rb->getWorldTransform();
@@ -1144,7 +1143,6 @@ void btCable::runNarrowPhase()
 		pair.hitPoint = hitContact;
 		pair.timeOfImpact = toi;
 		pair.distance = penetration;
-		pair.margin = margin;
 		pair.worldTransform = rbTransformAtTime;
 		pair.normal = normalContact;
 
@@ -1966,11 +1964,6 @@ void btCable::contactConstraint()
 	}
 }
 
-btScalar btCable::computeCollisionMargin(const btCollisionShape* shape) const
-{
-	return m_collisionMargin + shape->getMargin();
-}
-
 btVector3 btCable::calculateBodyImpulse(btRigidBody* obj, Node* n, btVector3 normal, btVector3 hitPosition)
 {
 	// a = node
@@ -2264,7 +2257,6 @@ void btCable::appendNode(const btVector3& x, btScalar m)
 		indicesToPointers();
 	}
 
-	const btScalar margin = getCollisionShape()->getMargin();
 	m_nodes.push_back(Node());
 	Node& n = m_nodes[m_nodes.size() - 1];
 	ZeroInitialize(n);
