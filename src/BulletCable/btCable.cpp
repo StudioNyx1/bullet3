@@ -1043,29 +1043,34 @@ void btCable::runNarrowPhase()
 		btVector3 normalContact;
 		btVector3 hitContact;
 		bool foundCollision = false;
-		btScalar toi = 1.0f;  // Time of impact
 		btScalar penetration = 0.0f;
 
-		// btVector3 rayStart = prevPos;
-		// btVector3 rayEnd;
+		// Discarding sweep result (see objectQuerySingle) penetration ratio to improve collisions response stability
+		const btScalar toi = 1.0f;  // Time of impact
+
 		btTransform rbTransformAtTime;
 
-		//Single sweep in relative motion
-		// Relative-motion single sweep against rb fixed at rbPrevTransform
+		// Single sweep in relative motion
+		// objectQuerySingle performs a convex sweep against a target object evaluated at ONE transform.
+		// It does not support two moving trajectories (moving target transform), which would require
+		// solving a much harder continuous collision problem.
+		//
+		// Trick: freeze the rigid body at its previous transform (t0), and sweep the node using
+		// the node's motion relative to the rigid body's motion at the nodeStart point.
+		//
+		// pLocal = rb-local coordinates of the body point that coincides with nodeStart at t0.
+		// rbPointEnd = where that same body point moves to at t1.
+		// relEnd = nodeEnd expressed in the frame where the rigid body is frozen at t0.
 		btVector3 nodeStart = prevPos;
 		btVector3 nodeEnd = currentPos;
-
-		// Compute the motion of the rigid body's material point that coincides with nodeStart at t0
 		btVector3 pLocal = rbPrevTransform.inverse() * nodeStart;
 		btVector3 rbPointEnd = rbTransform * pLocal;
 		btVector3 deltaNode = nodeEnd - nodeStart;
 		btVector3 deltaRbPt = rbPointEnd - nodeStart;
 		btVector3 relEnd = nodeStart + (deltaNode - deltaRbPt);
 
-		// Skip if motion is negligible
-		btVector3 sweepDelta = relEnd - nodeStart;
-
-		if (sweepDelta.length2() < FLT_EPSILON)
+		// This distance must be the smallest possible to detect object that barely moves but large enough to avoid numerical issues
+		if (relEnd.distance2(nodeStart) < DBL_EPSILON * DBL_EPSILON)
 		{
 			continue;
 		}
