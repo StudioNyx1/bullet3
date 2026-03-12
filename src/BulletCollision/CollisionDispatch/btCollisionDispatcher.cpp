@@ -367,7 +367,7 @@ void btCollisionDispatcher::ClearManifoldsCache()
 
 void btCollisionDispatcher::ClearParticlesManifolds()
 {
-	for (int i = 0; i < m_collidedManifoldsCache.size(); i++)
+	for (int i = 0; i < m_particlesManifolds.size(); i++)
 	{
 		delete m_particlesManifolds[i];
 	}

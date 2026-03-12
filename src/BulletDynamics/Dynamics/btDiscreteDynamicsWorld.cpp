@@ -633,23 +633,13 @@ void btDiscreteDynamicsWorld::collisionWorldStep() {
 		btPersistentManifold* manifold = m_dispatcher1->getManifoldByIndexInternal(i);
 		if(manifold->m_hasCollided)
 		{
-			// The 2nd bit of the m_collisionFilterMask needs to be 1
-			std::string byte0 = std::bitset<8>(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterMask).to_string();
-			std::string byte1 = std::bitset<8>(manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterMask).to_string();
-			int bitTerrain = byte0.size() - 2;
-			if (byte0[bitTerrain] == '1' || byte1[bitTerrain] == '1')
+			if(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterGroup == 4 || manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterGroup == 4)
 			{
-				btPersistentManifold* newManifold = new btPersistentManifold;
-				*newManifold = *manifold;
-				newManifold->CopyContactsFromManifold(manifold);
-				m_dispatcher1->addParticlesManifold(newManifold);
+				m_dispatcher1->addParticlesManifold(manifold);
 			}
 			else
 			{
-				btPersistentManifold* newManifold = new btPersistentManifold;
-				*newManifold = *manifold;
-				newManifold->CopyContactsFromManifold(manifold);			
-				m_dispatcher1->addManifoldToCache(newManifold);
+				m_dispatcher1->addManifoldToCache(manifold);
 			}
 		}
 	}
