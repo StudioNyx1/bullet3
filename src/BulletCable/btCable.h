@@ -120,7 +120,8 @@ public:
 		float velocity_x;
 		float velocity_y;
 		float velocity_z;
-		float volume;
+		float volume {0};
+		float mass {1};
 	};
 	static const std::size_t NodeDataSize = sizeof(NodeData);
 

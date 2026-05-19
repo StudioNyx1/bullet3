@@ -152,7 +152,9 @@ void btSoftRigidDynamicsWorld::prepareSingleStepSimulation()
 			// First update `endIndex` before performing the copy
 			nodesIndex += nodesCount;
 			cable->setEndIndex(nodesIndex - 1);
-			memcpy(m_cablesData + i, cable->getCableData(), cable->CableDataSize);
+			//memcpy(m_cablesData + i, cable->getCableData(), cable->CableDataSize); // remplacer i par physicCableIndex
+			memcpy(m_cablesData + physicCableIndex, cable->getCableData(), cable->CableDataSize); 
+
 
 			physicCableIndex += 1;
 		}

@@ -45,6 +45,8 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 		m_nodeData[i].velocity_x = m_nodes[i].m_v.getX();
 		m_nodeData[i].velocity_y = m_nodes[i].m_v.getY();
 		m_nodeData[i].velocity_z = m_nodes[i].m_v.getZ();
+
+		m_nodeData[i].mass = 1.0 / m_nodes[i].m_im;
 	}
 
 	// Using getCollisionShape we set the cable radius
@@ -400,95 +402,73 @@ void btCable::updateNodeData()
 {
 	const btScalar frameDT = 1.0 / m_sst.fdt;
 	const btScalar subFrameDT = 1.0 / m_sst.sdt;
-	const btScalar damping = 1.0 - m_cfg.kDP;
-	for (int i = 0; i < m_nodes.size(); ++i)
-	{
-		// Update velocities for the cable
-		Node& n = m_nodes[i];
-		n.m_v = (n.m_x - n.m_q) * subFrameDT * damping;
 
-		// Only update data for last substep
+	// Update velocities for the cable nodes
+	for (int i = 0; i < m_nodes.size(); ++i)
+	{		
+		Node& n = m_nodes[i];
+		n.m_v = (n.m_x - n.m_q) * subFrameDT;
+		n.m_q = n.m_x;
+
+		// Only update node data for external use in at last substep
 		if (m_world->GetIndexSubIteration() == m_world->GetSubIteration() - 1)
 		{
-			// Update velocities for the hydro's forces
-			n.m_vn = (n.m_x - n.m_xn) * frameDT * damping;
+			// Update node velocity
+			n.m_vn = (n.m_x - n.m_xn) * frameDT;
+
+			// store latest position
 			n.m_xn = n.m_x;
-			n.m_movingAverage[n.m_indexMovingAverage] = n.m_vn;
 
-			btVector3 average = btVector3(0, 0, 0);
-			int currentIndex = (n.m_indexMovingAverage + 1) % n.m_maxSizeMovingAverage;  // start after current value, first has weight of 0.0
-
-			float weight = 0.0f;
-			float weightPortion = 1.0f / n.m_maxSizeMovingAverage;
-			float totalWeight = 0.0f;
-			for (int j = 0; j < n.m_maxSizeMovingAverage; j++)
-			{
-				average += n.m_movingAverage[currentIndex] * weight;
-
-				totalWeight += weight;
-
-				weight += weightPortion;
-				currentIndex = (currentIndex + 1) % n.m_maxSizeMovingAverage;
-			}
-
-			average = average / totalWeight;
-
-			n.m_indexMovingAverage = (n.m_indexMovingAverage + 1) % n.m_maxSizeMovingAverage;
-
-			// Update NodePos
+			// Update NodePos array
 			m_nodePos[i].x = n.m_x.getX();
 			m_nodePos[i].y = n.m_x.getY();
 			m_nodePos[i].z = n.m_x.getZ();
 
-			// Update NodeData
+			// Update Node velocity in NodeData array
+			m_nodeData[i].velocity_x = n.m_vn.getX();
+			m_nodeData[i].velocity_y = n.m_vn.getY();
+			m_nodeData[i].velocity_z = n.m_vn.getZ();
+
+
+			// Calculate Volume
 			if (useHydroAero)
 			{
-				m_nodeData[i].velocity_x = average.getX();
-				m_nodeData[i].velocity_y = average.getY();
-				m_nodeData[i].velocity_z = average.getZ();
+				float sizeElement = 0;
+				if (i == 0)
+				{
+					sizeElement = (n.m_x - m_nodes[i + 1].m_x).length();
+				}
+				else if (i == m_nodes.size() - 1)
+				{
+					sizeElement = (n.m_x - m_nodes[i - 1].m_x).length();
+				}
+				else
+				{
+					sizeElement = (n.m_x - m_nodes[i - 1].m_x).length();
+					sizeElement += (n.m_x - m_nodes[i + 1].m_x).length();
+				}
+
+				// Using a cylinder volume calculation with 2 links and divide by 2
+				m_nodeData[i].volume = SIMD_PI * m_cableData->radius * m_cableData->radius * sizeElement * 0.5;
+
+				// update mass
+				m_nodeData[i].mass = 1.0 / n.m_im;
 			}
-			else
-			{
-				m_nodeData[i].velocity_x = n.m_vn.getX();
-				m_nodeData[i].velocity_y = n.m_vn.getY();
-				m_nodeData[i].velocity_z = n.m_vn.getZ();
-			}
-
-			//n.m_f = btVector3(0, 0, 0);  // reset node total forces
 		}
-
-		// Calculate Volume
-		float sizeElement = 0;
-		if (i == 0)
-		{
-			sizeElement = (n.m_x - m_nodes[i + 1].m_x).length();
-		}
-		else if (i == m_nodes.size() - 1)
-		{
-			sizeElement = (n.m_x - m_nodes[i - 1].m_x).length();
-		}
-		else
-		{
-			sizeElement = (n.m_x - m_nodes[i - 1].m_x).length();
-			sizeElement += (n.m_x - m_nodes[i + 1].m_x).length();
-		}
-
-		// Using a cylinder volume calculation with 2 links and divide by 2
-		m_nodeData[i].volume = SIMD_PI * m_cableData->radius * m_cableData->radius * sizeElement * 0.5;
+		
 	}
 }
 
 void btCable::ResetForceAndVelocity()
 {
 	int nodeCount = m_nodes.size();
-	btVector3 v0 = btVector3(0, 0, 0);
+	btVector3 zero = btVector3(0, 0, 0);
 	for (int i = 0; i < nodeCount; i++)
 	{
-		m_nodes[i].m_v = v0;
-		m_nodes[i].m_vn = v0;
-		m_nodes[i].m_f = v0;
-
-		ResetVelocityArray(i);
+		m_nodes[i].m_acc = zero;
+		m_nodes[i].m_v = zero;
+		m_nodes[i].m_vn = zero;
+		m_nodes[i].m_f = zero;
 	}
 }
 
@@ -517,22 +497,36 @@ void btCable::predictMotion(btScalar dt)
 	/* Prepare                */
 	m_sst.sdt = dt * m_cfg.timescale;
 	m_sst.fdt = dt * m_cfg.timescale * m_world->GetSubIteration();
-	m_sst.isdt = 1 / m_sst.sdt;
-	m_sst.velmrg = m_sst.sdt * 3;
+	m_sst.isdt = 1.0 / m_sst.sdt;
+	m_sst.velmrg = m_sst.sdt * 3.0;
 	m_sst.radmrg = getCollisionShape()->getMargin();
-	m_sst.updmrg = m_sst.radmrg * (btScalar)0.25;
+	m_sst.updmrg = m_sst.radmrg * 0.25;
 
 	// SoftRigidBody
-	NodeForces* nodeForces = ((btSoftRigidDynamicsWorld*)m_world)->m_nodeForces;
-	btVector3 nodeForceToApply = btVector3();
-	for (i = 0, ni = m_nodes.size(); i < ni; ++i)
+	if (isActive())
 	{
-		Node& n = m_nodes[i];
-		n.m_q = n.m_x;
+		NodeForces* nodeForces = ((btSoftRigidDynamicsWorld*)m_world)->m_nodeForces;		
+		const btScalar damping = 1.0 - m_cfg.kDP;
 
-		float addedMass = 0.0f;
-		if (isActive())
+		btVector3 zero = btVector3(0, 0, 0);
+
+
+		for (i = 0, ni = m_nodes.size(); i < ni; ++i)
 		{
+			Node& n = m_nodes[i];
+
+			// Skip attached nodes
+			if (n.m_battach != 0)
+			{				
+				// Apply damping to velocity
+				n.m_v *= damping;
+				n.m_x += n.m_v * m_sst.sdt;
+				n.m_f = zero;
+				continue;
+			}
+			
+			float addedMass = 0.0f;
+
 			// Add gravity force
 			if (useGravity)
 			{
@@ -558,17 +552,36 @@ void btCable::predictMotion(btScalar dt)
 				// Integrate addedMass for each substep
 				addedMass = currentNodeForces.ma;
 			}
+
+			// Semi Implicit Euler
+			const btScalar mass = (1.0f / n.m_im) + addedMass;
+			
+			/*
+			btVector3 acceleration = n.m_f / mass;
+			n.m_v += acceleration * m_sst.sdt;
+			// Apply damping to velocity			
+			n.m_v *= damping;
+			n.m_x += n.m_v * m_sst.sdt;
+			*/
+
+			// Velocity Verlet
+			n.m_v *= damping;
+
+			n.m_x += n.m_v * m_sst.sdt + 0.5 * n.m_acc * m_sst.sdt * m_sst.sdt;
+			
+			btVector3 newAcceleration = n.m_f / mass;	
+
+			n.m_v += 0.5 * (newAcceleration + n.m_acc) * m_sst.sdt;
+
+			n.m_acc = newAcceleration;
+
+			n.m_f = zero;
 		}
 
-		const btScalar mass = 1.0f / n.m_im + addedMass;
-		btVector3 acceleration = n.m_f / mass;
-		n.m_v += acceleration * m_sst.sdt;
-		n.m_x += n.m_v * m_sst.sdt;
-		n.m_f = btVector3(0, 0, 0);
+		/* Bounds */
+		updateBounds();	
 	}
 
-	/* Bounds                */
-	updateBounds();
 
 	/* Clear contacts        */
 	m_rcontacts.resize(0);
@@ -853,6 +866,8 @@ void btCable::synchNodesInfos()
 		m_nodeData[i].velocity_x = m_nodes[i].m_v.getX();
 		m_nodeData[i].velocity_y = m_nodes[i].m_v.getY();
 		m_nodeData[i].velocity_z = m_nodes[i].m_v.getZ();
+
+		m_nodeData[i].mass = 1.0 / m_nodes[i].m_im;
 	}
 }
 
@@ -1826,6 +1841,7 @@ void btCable::distanceHierachy(int indexMain, int indexCheck)
 
 void btCable::bendingConstraint()
 {
+	/*
 	int size = m_nodes.size();
 	float stiffness = this->bendingStiffness;
 	float iterationFactor = stiffness * stiffness;
@@ -1897,6 +1913,70 @@ void btCable::bendingConstraint()
 			after->m_x += (after->m_im * impulse) * J3;
 		}
 	}
+	*/
+	const btScalar stiffnessBase = this->bendingStiffness;
+	const btScalar angleMax = this->maxAngle;
+	const btScalar angleMaxInv = (angleMax > SIMD_EPSILON) ? (1.0 / angleMax) : 0.0;
+
+	for (int i = 1; i < this->m_links.size(); ++i)
+	{
+		Node* before = m_links[i - 1].m_n[0];
+		Node* current = m_links[i].m_n[0];
+		Node* after = m_links[i].m_n[1];
+
+		if (!before->computeNodeConstraint &&
+			!current->computeNodeConstraint &&
+			!after->computeNodeConstraint)
+			continue;
+
+		before->computeNodeConstraint = true;
+		current->computeNodeConstraint = true;
+		after->computeNodeConstraint = true;
+
+		btVector3 delta1 = current->m_x - before->m_x;
+		btVector3 delta2 = after->m_x - current->m_x;
+
+		btScalar len1 = delta1.length();
+		btScalar len2 = delta2.length();
+		if (len1 < SIMD_EPSILON || len2 < SIMD_EPSILON) continue;
+
+		// Angle entre les deux segments
+		btScalar dot = delta1.dot(delta2) / (len1 * len2);
+		dot = btClamped(dot, (btScalar)-1.0, (btScalar)1.0);
+		btScalar phi = acos(dot);
+
+		// Stiffness locale (reset à chaque itération)
+		btScalar stiffness = (angleMax > SIMD_EPSILON && phi < angleMax)
+								 ? (phi * angleMaxInv * stiffnessBase)
+								 : stiffnessBase;
+
+		// Point médian et direction de correction
+		btVector3 mid = (before->m_x + after->m_x) * 0.5;
+		btVector3 d = mid - current->m_x;
+		btScalar dLen = d.length();
+		if (dLen < SIMD_EPSILON) continue;
+
+		btVector3 dNorm = d / dLen;
+
+		// Jacobiens simplifiés (alpha1 = alpha2 = 0.5 par symétrie du mid-point)
+		// J_before = 0.5 * dNorm, J_current = -dNorm, J_after = 0.5 * dNorm
+		const btScalar alpha = 0.5;
+		btScalar sum = before->m_im * (alpha * alpha) + current->m_im + after->m_im * (alpha * alpha);
+
+		if (sum <= DBL_EPSILON) continue;
+
+		// Impulsion : C = dLen, lambda = -stiffness * C / sum
+		btScalar impulse = -stiffness * dLen / sum;
+
+		// Clamp de sécurité pour éviter les explosions
+		//const btScalar maxDisp = 0.1;  // à adapter à votre échelle
+		//impulse = btClamped(impulse, -maxDisp, maxDisp);
+
+		before->m_x += (before->m_im * impulse * alpha) * dNorm;
+		current->m_x += (current->m_im * impulse * -1.0) * dNorm;
+		after->m_x += (after->m_im * impulse * alpha) * dNorm;
+	}
+
 }
 
 #pragma region Contact Constraint
@@ -2278,7 +2358,6 @@ void btCable::removeNodeAt(const int index)
 {
 	if (index < m_nodes.size())
 	{
-		delete[] m_nodes[index].m_movingAverage;
 		m_nodes[index].index = -1;
 		m_nodes[m_nodes.size() - 1].index = index;
 

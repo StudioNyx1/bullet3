@@ -243,19 +243,6 @@ void btSoftBody::InitializeNode(Node* node, const btVector3 x, btScalar m)
 	node->m_q = node->m_x;
 	node->m_im = m ? m++ : 1;
 	node->m_im = node->m_im > 0 ? 1 / node->m_im : 0;
-
-	node->m_maxSizeMovingAverage = 24;
-	node->m_movingAverage = new btVector3[node->m_maxSizeMovingAverage];
-	node->m_indexMovingAverage = 0;
-}
-
-void btSoftBody::ResetVelocityArray(int nodeIndex)
-{
-	m_nodes[nodeIndex].m_indexMovingAverage = 0;
-	for (int j = 0; j < m_nodes[nodeIndex].m_maxSizeMovingAverage; j++)
-	{
-		m_nodes[nodeIndex].m_movingAverage[j] = btVector3(0,0,0);
-	}
 }
 
 //
@@ -272,12 +259,6 @@ btSoftBody::~btSoftBody()
 		btAlignedFree(m_joints[i]);
 	if (m_fdbvnt)
 		delete m_fdbvnt;
-
-	int nodeCount = m_nodes.size();
-	for (int i = 0 ; i < nodeCount; ++i)
-	{
-		delete [] m_nodes[i].m_movingAverage;
-	}
 }
 
 //
@@ -938,11 +919,13 @@ void btSoftBody::addVelocity(const btVector3& velocity)
 /* Set velocity for the entire body										*/
 void btSoftBody::setVelocity(const btVector3& velocity)
 {
+	btVector3 zero = btVector3(0, 0, 0);
 	for (int i = 0, ni = m_nodes.size(); i < ni; ++i)
 	{
 		Node& n = m_nodes[i];
 		if (n.m_im > 0)
 		{
+			n.m_acc = zero;
 			n.m_v = velocity;
 			n.m_vn = velocity;
 		}
@@ -1088,8 +1071,13 @@ void btSoftBody::setLinearVelocity(const btVector3& linVel)
 {
 	btVector3 old_vel = getLinearVelocity();
 	btVector3 diff = linVel - old_vel;
+	btVector3 zero = btVector3(0, 0, 0);
 	for (int i = 0; i < m_nodes.size(); ++i)
+	{
+		m_nodes[i].m_acc = zero;
 		m_nodes[i].m_v += diff;
+	}
+		
 }
 
 //
@@ -1097,8 +1085,10 @@ void btSoftBody::setAngularVelocity(const btVector3& angVel)
 {
 	btVector3 old_vel = getLinearVelocity();
 	btVector3 com = getCenterOfMass();
+	btVector3 zero = btVector3(0, 0, 0);
 	for (int i = 0; i < m_nodes.size(); ++i)
 	{
+		m_nodes[i].m_acc = zero;
 		m_nodes[i].m_v = angVel.cross(m_nodes[i].m_x - com) + old_vel;
 	}
 }
@@ -1146,15 +1136,17 @@ void btSoftBody::transform(const btTransform& trs)
 	ATTRIBUTE_ALIGNED16(btDbvtVolume)
 	vol;
 
+	btVector3 zero = btVector3(0, 0, 0);
 	for (int i = 0, ni = m_nodes.size(); i < ni; ++i)
 	{
 		Node& n = m_nodes[i];
 		n.m_x = trs * n.m_x;
 		n.m_xn = n.m_x;
 		n.m_q = n.m_x;
-		n.m_v = btVector3(0, 0, 0);
-		n.m_vn = btVector3(0, 0, 0);
-		n.m_splitv = btVector3(0, 0, 0);
+		n.m_acc = zero;
+		n.m_v = zero;
+		n.m_vn = zero;
+		n.m_splitv = zero;
 		n.m_n = trs.getBasis() * n.m_n;		
 	}
 	updateBounds();
@@ -1164,16 +1156,17 @@ void btSoftBody::transform(const btTransform& trs)
 //
 void btSoftBody::translate(const btVector3& trs)
 {
+	btVector3 zero = btVector3(0, 0, 0);
 	for (int i = 0, ni = m_nodes.size(); i < ni; ++i)
 	{
 		Node& n = m_nodes[i];
 		n.m_x += trs;
 		n.m_xn = n.m_x;
 		n.m_q = n.m_x;
-		n.m_v = btVector3(0, 0, 0);
-		n.m_vn = btVector3(0, 0, 0);
-		ResetVelocityArray(i);
-		n.m_splitv = btVector3(0, 0, 0);
+		n.m_acc = zero;
+		n.m_v = zero;
+		n.m_vn = zero;
+		n.m_splitv = zero;
 	}
 
 	/*

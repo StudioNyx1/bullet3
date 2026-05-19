@@ -320,6 +320,7 @@ public:
 		btVector3 m_vn;      // Previous step velocity
 		btVector3 m_f;       // Force accumulator
 		btVector3 m_n;       // Normal
+		btVector3 m_acc;     // Acceleration
 		btScalar m_im;       // 1/mass
 		btScalar m_area;     // Area
 		btDbvtNode* m_leaf;  // Leaf data
@@ -334,10 +335,6 @@ public:
 		bool collideInAllIteration;
 		bool computeNodeConstraint;
 		int cptIteration;
-
-		int m_maxSizeMovingAverage;
-		btVector3* m_movingAverage;
-		int m_indexMovingAverage;
 	};
 
 	/* SumForces of a node*/
@@ -1495,7 +1492,6 @@ public:
 
 	protected:
 		void InitializeNode(Node* node, const btVector3 x, btScalar m);
-		void ResetVelocityArray(int nodeIndex);
 
 };
 
