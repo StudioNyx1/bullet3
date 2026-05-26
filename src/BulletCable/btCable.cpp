@@ -169,26 +169,27 @@ void FindLinksAtAnchor(btSoftBody::Anchor& anchor, btSoftBody::tLinkArray& links
 		return;
 	}
 
-	// Loop over the remaining links
-	for (int i = 1, nl = links_count - 1; i < nl; ++i)
+	// Loop over the remaining links, second to second to last
+	for (int i = 1; i < links_count - 1; ++i)
 	{
 		link = &links[i];
 		if (link->m_n[0] == node || link->m_n[1] == node)
 		{
-			anchor.m_nodeLinks[0] = link;
-
-			// Handle special case where multiple links exist for the anchor associated node
-			link = &links[links_count + 1];
-			if (link->m_n[0] == node || link->m_n[1] == node)
+			if (anchor.m_nodeLinks[0] == nullptr)
 			{
-				anchor.m_nodeLinks[1] = link;
+				anchor.m_nodeLinks[0] = link;
+				continue;
 			}
 
-			return;
+			if (anchor.m_nodeLinks[1] == nullptr)
+			{
+				anchor.m_nodeLinks[1] = link;
+
+				// stop the iteration since both links are found
+				return;
+			}
 		}
 	}
-
-	return;
 }
 
 void btCable::PrepareSolver()
