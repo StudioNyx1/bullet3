@@ -429,6 +429,9 @@ private:
 	btCollisionObject _nodeContactObject;
 	btTransform _nodeContactTransform;
 
+	// Parallel solve parameters
+	int m_cachedNumThreads;
+
 public:
 	btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int node_count, int section_count, const btVector3* x, const btScalar* m);
 

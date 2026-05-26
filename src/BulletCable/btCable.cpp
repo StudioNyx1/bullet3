@@ -16,6 +16,8 @@ btCable::btCable(btSoftBodyWorldInfo* worldInfo, btCollisionWorld* world, int no
 	m_solverSubStep = worldInfo->numIteration;
 	m_cpt = 0;
 
+	m_cachedNumThreads = omp_get_max_threads();
+
 	// Initialize Data
 	m_cableData = new CableData();
 	m_nodePos = new NodePos[worldInfo->maxNodeNumberPerCable]();
@@ -402,16 +404,19 @@ void btCable::updateNodeData()
 {
 	const btScalar frameDT = 1.0 / m_sst.fdt;
 	const btScalar subFrameDT = 1.0 / m_sst.sdt;
+	const int subIterationIdx = m_world->GetIndexSubIteration();
+	const int subIterationsMaxIdx = m_world->GetSubIteration() - 1;
+	const bool isLastIteration = subIterationIdx == subIterationsMaxIdx;
 
 	// Update velocities for the cable nodes
-	for (int i = 0; i < m_nodes.size(); ++i)
+	/* for (int i = 0; i < m_nodes.size(); ++i)
 	{		
 		Node& n = m_nodes[i];
 		n.m_v = (n.m_x - n.m_q) * subFrameDT;
 		n.m_q = n.m_x;
 
 		// Only update node data for external use in at last substep
-		if (m_world->GetIndexSubIteration() == m_world->GetSubIteration() - 1)
+		if (subIterationIdx == subIterationsMaxIdx)
 		{
 			// Update node velocity
 			n.m_vn = (n.m_x - n.m_xn) * frameDT;
@@ -455,7 +460,88 @@ void btCable::updateNodeData()
 				m_nodeData[i].mass = 1.0 / n.m_im;
 			}
 		}
-		
+	}*/
+
+	if (useHydroAero)
+	{
+		for (int i = 0; i < m_nodes.size(); ++i)
+		{
+			Node& n = m_nodes[i];
+			n.m_v = (n.m_x - n.m_q) * subFrameDT;
+			n.m_q = n.m_x;
+
+			// Only update node data for external use in at last substep
+			if (isLastIteration)
+			{
+				// Update node velocity
+				n.m_vn = (n.m_x - n.m_xn) * frameDT;
+
+				// store latest position
+				n.m_xn = n.m_x;
+
+				// Update NodePos array
+				m_nodePos[i].x = n.m_x.getX();
+				m_nodePos[i].y = n.m_x.getY();
+				m_nodePos[i].z = n.m_x.getZ();
+
+				// Update Node velocity in NodeData array
+				m_nodeData[i].velocity_x = n.m_vn.getX();
+				m_nodeData[i].velocity_y = n.m_vn.getY();
+				m_nodeData[i].velocity_z = n.m_vn.getZ();
+
+				// Calculate Volume
+				float sizeElement = 0;
+				if (i == 0)
+				{
+					sizeElement = (n.m_x - m_nodes[i + 1].m_x).length();
+				}
+				else if (i == m_nodes.size() - 1)
+				{
+					sizeElement = (n.m_x - m_nodes[i - 1].m_x).length();
+				}
+				else
+				{
+					sizeElement = (n.m_x - m_nodes[i - 1].m_x).length();
+					sizeElement += (n.m_x - m_nodes[i + 1].m_x).length();
+				}
+
+				// Using a cylinder volume calculation with 2 links and divide by 2
+				m_nodeData[i].volume = SIMD_PI * m_cableData->radius * m_cableData->radius * sizeElement * 0.5;
+
+				// update mass
+				m_nodeData[i].mass = 1.0 / n.m_im;
+			}
+		}
+
+	}
+	else
+	{
+		for (int i = 0; i < m_nodes.size(); ++i)
+		{
+			Node& n = m_nodes[i];
+			n.m_v = (n.m_x - n.m_q) * subFrameDT;
+			n.m_q = n.m_x;
+
+			// Only update node data for external use in at last substep
+			if (isLastIteration)
+			{
+				// Update node velocity
+				n.m_vn = (n.m_x - n.m_xn) * frameDT;
+
+				// store latest position
+				n.m_xn = n.m_x;
+
+				// Update NodePos array
+				m_nodePos[i].x = n.m_x.getX();
+				m_nodePos[i].y = n.m_x.getY();
+				m_nodePos[i].z = n.m_x.getZ();
+
+				// Update Node velocity in NodeData array
+				m_nodeData[i].velocity_x = n.m_vn.getX();
+				m_nodeData[i].velocity_y = n.m_vn.getY();
+				m_nodeData[i].velocity_z = n.m_vn.getZ();
+			}
+		}
 	}
 }
 
@@ -982,7 +1068,7 @@ void btCable::runBroadPhase()
 
 	// one bucket per thread
 	btAlignedObjectArray<btAlignedObjectArray<BroadPhasePair>> threadBuckets;
-	threadBuckets.resize(omp_get_max_threads());
+	threadBuckets.resize(m_cachedNumThreads);
 
 #pragma omp parallel for schedule(static, 1)
 	for (int i = 0; i < nodeCount; ++i)
