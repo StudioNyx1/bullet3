@@ -219,9 +219,6 @@ void btCable::PrepareSolver()
 		node.computeNodeConstraint = true;
 		node.m_splitv = btVector3(0, 0, 0);
 		node.m_nbCollidingObjectPotential = 0;
-
-		// XPDB
-		node.m_q_sub = node.m_x;  // Reset each substep for damping
 	}
 
 	// Prepare links
@@ -1326,7 +1323,7 @@ void btCable::anchorConstraint()
 
 		const btVector3 wa = body.getWorldTransform() * anchor.m_local;
 		const btVector3 va = anchor.m_body->getVelocityInLocalPoint(anchor.m_c1) * dt;
-		const btVector3 vb = node.m_x - node.m_q_sub;
+		const btVector3 vb = node.m_x - node.m_q;
 		const btVector3 vr = (va - vb) + (wa - node.m_x) * kAHR;
 		btVector3 impulseBullet = anchor.m_c0 * vr;
 		btVector3 impulseMassBalance = anchor.m_c0_massBalance * vr;
