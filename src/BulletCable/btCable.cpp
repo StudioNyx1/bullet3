@@ -637,28 +637,23 @@ void btCable::predictMotion(btScalar dt)
 				addedMass = currentNodeForces.ma;
 			}
 
-			// Semi Implicit Euler
 			const btScalar mass = (1.0f / n.m_im) + addedMass;
 			
-			/*
-			btVector3 acceleration = n.m_f / mass;
-			n.m_v += acceleration * m_sst.sdt;
-			// Apply damping to velocity			
-			n.m_v *= damping;
-			n.m_x += n.m_v * m_sst.sdt;
-			*/
-
-			// Velocity Verlet
-			n.m_v *= damping;
-
-			n.m_x += n.m_v * m_sst.sdt + 0.5 * n.m_acc * m_sst.sdt * m_sst.sdt;
 			
+			//// Semi Implicit Euler
+			//btVector3 newAcceleration = n.m_f / mass;
+			//n.m_v += newAcceleration * m_sst.sdt;
+			//n.m_v *= damping;
+			//n.m_x += n.m_v * m_sst.sdt;
+			//n.m_acc = newAcceleration;
+			//n.m_f = zero;
+			
+			// Velocity Verlet (https://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet)
+			n.m_v *= damping;
+			n.m_x += n.m_v * m_sst.sdt + 0.5 * n.m_acc * m_sst.sdt * m_sst.sdt;
 			btVector3 newAcceleration = n.m_f / mass;	
-
 			n.m_v += 0.5 * (newAcceleration + n.m_acc) * m_sst.sdt;
-
 			n.m_acc = newAcceleration;
-
 			n.m_f = zero;
 		}
 
