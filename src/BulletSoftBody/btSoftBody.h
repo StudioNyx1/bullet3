@@ -504,6 +504,8 @@ public:
 		btScalar m_bodyMassRatio;       // Body added mass to node
 		bool m_anchorPlacement;			// Apply (or not) the AnchorConstraintPlacement's method
 		btScalar m_vn_magnitude;        // Last frame velocity magnitude
+		btScalar m_massBalanceRatio;    // Last transition value for the impulse
+		btScalar m_massBalanceEnabled;  // True if mass balance ratio is in use
 
 		// Cable stretching detection (Anchor mode)
 		Link* m_nodeLinks[2];           // Links

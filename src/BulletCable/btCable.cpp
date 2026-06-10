@@ -1332,8 +1332,8 @@ void btCable::anchorConstraint()
 		btVector3 impulseMassBalance = anchor.m_c0_massBalance * vr;
 
 		// Account for mass balance
-		m_massBalanceRatio = computeMassBalanceRatio(anchor);
-		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, m_massBalanceRatio);
+		anchor.m_massBalanceRatio = computeMassBalanceRatio(anchor);
+		btVector3 impulse = lerp(impulseBullet, impulseMassBalance, anchor.m_massBalanceRatio);
 
 		// Clamp the calculated impulse
 		btScalar currentTension = anchor.m_lastTension.length();
@@ -1480,25 +1480,23 @@ btScalar btCable::computeMassBalanceRatio(Anchor& anchor)
 		case btCable::StretchRatioMode::Cable:
 			// Use max stretch at cable level
 			m_cableStretchRatioDamped = EMAFilter(m_cableStretchRatioDamped, m_cableStretchRatio, m_stretchDamping.amount * m_stretchDamping.attenuation);
-			m_stretchRatio = m_cableStretchRatio;
-			m_stretchRatioDamped = m_cableStretchRatioDamped;
+			anchor.m_stretchRatio = m_cableStretchRatio;
+			anchor.m_stretchRatioDamped = m_cableStretchRatioDamped;
 			break;
 		case btCable::StretchRatioMode::Link:
 			// Use max stretch at link level but smooth it first
 			m_linkStretchRatioDamped = EMAFilter(m_linkStretchRatioDamped, m_linkStretchRatio, m_stretchDamping.amount * m_stretchDamping.attenuation);
-			m_stretchRatio = m_linkStretchRatio;
-			m_stretchRatioDamped = m_linkStretchRatioDamped;
+			anchor.m_stretchRatio = m_linkStretchRatio;
+			anchor.m_stretchRatioDamped = m_linkStretchRatioDamped;
 			break;
 		case btCable::StretchRatioMode::Anchor:
 			// Use max stretch at anchor level
 			anchor.m_stretchRatioDamped = EMAFilter(anchor.m_stretchRatioDamped, anchor.m_stretchRatio, m_stretchDamping.amount * m_stretchDamping.attenuation);
-			m_stretchRatio = anchor.m_stretchRatio;
-			m_stretchRatioDamped = anchor.m_stretchRatioDamped;
 			break;
 		default:
 			// Use max mass massBalanceRatio all the time
-			m_stretchRatio = 1.0;
-			m_stretchRatioDamped = m_stretchRatio;
+			anchor.m_stretchRatio = 1.0;
+			anchor.m_stretchRatioDamped = anchor.m_stretchRatio;
 			break;
 	}
 	
@@ -1511,7 +1509,7 @@ btScalar btCable::computeMassBalanceRatio(Anchor& anchor)
 	else
 	{		
 		// Let activation state evolves freely to let solver stabilized to a an hysteresis side
-		m_stretchHysteresis.enabled = SchmittHysteresis(m_stretchHysteresis.enabled, m_stretchRatioDamped, m_stretchHysteresis.lowerBound, m_stretchHysteresis.upperBound);
+		anchor.m_massBalanceEnabled = SchmittHysteresis(anchor.m_massBalanceEnabled, anchor.m_stretchRatioDamped, m_stretchHysteresis.lowerBound, m_stretchHysteresis.upperBound);
 	}
 
 	// @TEST(jeremy) Bypass hysteresis behavior
@@ -1519,14 +1517,14 @@ btScalar btCable::computeMassBalanceRatio(Anchor& anchor)
 	// @TEST(jeremy) Bypass hysteresis behavior
 
 	// 3) Select stretch ratio using user defined curveLowSpeed
-	if (m_stretchHysteresis.enabled)
+	if (anchor.m_massBalanceEnabled)
 	{
 		// Select max ratio as default if min is larger than max
 		massBalanceRatio = 1.0;
 		if (m_stretchBehavior.max > m_stretchBehavior.min)
 		{
 			// Make sure user defined mass massBalanceRatio cannot overshoot
-			btScalar x = btClamped((m_stretchRatioDamped - m_stretchBehavior.min) / (m_stretchBehavior.max - m_stretchBehavior.min), 0.0, 1.0);
+			btScalar x = btClamped((anchor.m_stretchRatioDamped - m_stretchBehavior.min) / (m_stretchBehavior.max - m_stretchBehavior.min), 0.0, 1.0);
 			btScalar c1 = 0.0;
 			btScalar c2 = 0.0;
 
@@ -2632,7 +2630,6 @@ void btCable::setStretchRatioDamping(btScalar value)
 	m_stretchDamping.amount = btClamped(value, 0.0, 1.0);
 
 	// Force reset to avoid inertia of old value
-	m_stretchRatioDamped = m_stretchRatio;
 	m_cableStretchRatioDamped = m_cableStretchRatio;
 	m_linkStretchRatioDamped = m_linkStretchRatio;
 	// Mode anchor store stretching in anchors

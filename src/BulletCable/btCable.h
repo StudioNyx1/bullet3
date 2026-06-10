@@ -266,6 +266,7 @@ private:
 	bool useCollision = true;
 	btScalar m_linearMass = 1.0;
 	btScalar m_maxTension = -1.0;
+	int m_anchorIndex = 0;
 
 	vector<btScalar> collisionFonctionPointX;
 	vector<btScalar> collisionFonctionPointY;
@@ -287,8 +288,6 @@ private:
 	StretchRatioBehavior m_stretchBehavior{};
 	btScalar m_lengthAccumulator = 0.0;
 	btScalar m_restLengthAccumulator = 0.0;
-	btScalar m_stretchRatio = 0.0;
-	btScalar m_stretchRatioDamped = 0.0;
 	btScalar m_cableStretchRatio = 0.0;
 	btScalar m_linkStretchRatio = 0.0;
 
@@ -304,7 +303,6 @@ private:
 
 		// Percentage of iterations at which the state can no longer change
 		btScalar threshold{1.0};
-		bool enabled{0.0};
 		bool frozen{0.0};
 	};
 	StretchRatioHysteresis m_stretchHysteresis{};
@@ -325,9 +323,6 @@ private:
 	StretchRatioDamping m_stretchDamping{};
 	btScalar m_cableStretchRatioDamped = 0.0;
 	btScalar m_linkStretchRatioDamped = 0.0;
-	btScalar m_massBalanceRatio = 0.0;
-
-
 
 	MonotonicSpline1D* spline;
 
@@ -609,10 +604,43 @@ public:
 
 	void setUseAnchorConstraintPlacement(bool status);
 
-	btScalar getStretchRatio() { return m_stretchRatio; }
-	btScalar getStretchRatioDamped() { return m_stretchRatioDamped; }
-	btScalar getMassBalanceRatio() { return m_massBalanceRatio; }
-	bool getIsMassBalanceEnabled() { return m_stretchHysteresis.enabled; }
+	btScalar getStretchRatio()
+	{ 
+		if (m_anchorIndex >= m_anchors.size()) 
+		{
+			return 0.0;
+		}
+
+		return m_anchors[m_anchorIndex].m_stretchRatio;
+	}
+	btScalar getStretchRatioDamped()
+	{
+		if (m_anchorIndex >= m_anchors.size())
+		{
+			return 0.0;
+		}
+
+		return m_anchors[m_anchorIndex].m_stretchRatioDamped;
+	}
+	btScalar getMassBalanceRatio()
+	{ 
+		if (m_anchorIndex >= m_anchors.size())
+		{
+			return 0.0;
+		}
+
+		return m_anchors[m_anchorIndex].m_massBalanceRatio;
+	}
+
+	bool getIsMassBalanceEnabled()
+	{
+		if (m_anchorIndex >= m_anchors.size())
+		{
+			return 0.0;
+		}
+
+		return m_anchors[m_anchorIndex].m_massBalanceEnabled;
+	}
 
 	void setStretchRatioMinThreshold(btScalar value);
 	btScalar getStretchRatioMaxThreshold() { return m_stretchBehavior.max; }
@@ -643,6 +671,9 @@ public:
 
 	void setStretchRatioDampingThreshold(btScalar threshold) { m_stretchDamping.threshold = threshold; }
 	btScalar getStretchRatioDampingThreshold() { return m_stretchDamping.threshold; }
+
+	void setAnchorIndex(int index) { m_anchorIndex = index; };
+	int getAnchorIndex() { return m_anchorIndex; };
 
 #pragma endregion
 };
