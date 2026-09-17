@@ -272,57 +272,65 @@ void btRigidBody::updateCableCollision(btScalar timeStep)
 
 void btRigidBody::saveKinematicVelocity(btScalar timeStep)
 {
-	bool needUpdate;
-	if (m_parent == nullptr)
-	{
-		// If this body has no parent, we need to recalculate velocity because it may have moved
-		needUpdate = true;
-	}
-	else if (m_parent->isStaticOrKinematicObject())
-	{
-		// If the parent is static/kinematic, it won't be handled by updateBulletChildren(),
-		// so we must still recompute the kinematic velocity each step in case it has moved.
-		// Careful though, this makes the velocity calculation even if the parent hasn't moved
-		// (TODO:) We'd need to change how the velocity is calculated so the parent calls the velocity update for its children 
-		needUpdate = true;
-	}
-	else
-	{
-		// If this body is considered has child of dynamic body and moved by his parent
-		needUpdate = m_hasMovedWithChildrenUpdate;
-	}
+	// Unity-driven kinematics already got a frame-constant velocity in saveKinematicState().
+	// Only kinematics moved by a dynamic parent during this sub-step need a recompute here.
+	if (!m_hasMovedWithChildrenUpdate || timeStep == btScalar(0.))
+		return;
 
-	//todo: clamp to some (user definable) safe minimum timestep, to limit maximum angular/linear velocities
-	if (timeStep != btScalar(0.) && needUpdate)
-	{
-		btVector3 linVel, angVel;
-		btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep, linVel, angVel);
-		m_linearVelocity = linVel;
-		m_angularVelocity = angVel;
-
-		m_hasMovedWithChildrenUpdate = false;
-	}
+	btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep,
+									   m_linearVelocity, m_angularVelocity);
+	m_hasMovedWithChildrenUpdate = false;
 }
 
 void btRigidBody::saveKinematicState(btScalar timeStep)
 {
-	// //todo: clamp to some (user definable) safe minimum timestep, to limit maximum angular/linear velocities
-	// if (timeStep != btScalar(0.))
-	// {
-	//		//if we use motionstate to synchronize world transforms, get the new kinematic/animated world transform
-	//		if (getMotionState())
-	//			getMotionState()->getWorldTransform(m_worldTransform);
-	//		btVector3 linVel, angVel;
-	//		
-	//		btTransformUtil::calculateVelocity(m_interpolationWorldTransform, m_worldTransform, timeStep, m_linearVelocity, m_angularVelocity);
-	//		m_interpolationLinearVelocity = m_linearVelocity;
-	//		m_interpolationAngularVelocity = m_angularVelocity;
-	//		m_interpolationWorldTransform = m_worldTransform;
-	//		//printf("angular = %f %f %f\n",m_angularVelocity.getX(),m_angularVelocity.getY(),m_angularVelocity.getZ());
-	// }
+	if (!isKinematicDriven())
+		return;
 
-	// In Unity, we update the render of the rigibody, so we need to sync the motion state
-	if (getMotionState()) getMotionState()->getWorldTransform(m_worldTransform);
+	// Start : the position the simulation ended at last frame.
+	// syncKinematicState() froze it in m_interpolationWorldTransform after the last sub-step,
+	// so it is still valid even if Unity already overwrote m_worldTransform for this frame.
+	m_kinematicFrameStart = m_interpolationWorldTransform;
+
+	// Target : the position Unity wants this frame
+	m_kinematicFrameTarget = m_worldTransform;
+	if (getMotionState())
+		getMotionState()->getWorldTransform(m_kinematicFrameTarget);
+
+	if (timeStep != btScalar(0.))
+	{
+		btTransformUtil::calculateVelocity(m_kinematicFrameStart, m_kinematicFrameTarget, timeStep,
+										   m_linearVelocity, m_angularVelocity);
+	}
+	m_interpolationLinearVelocity = m_linearVelocity;
+	m_interpolationAngularVelocity = m_angularVelocity;
+	m_hasMovedWithChildrenUpdate = false;
+
+	// Put the body back at the frame start; advanceKinematicSubStep() moves it 1/N per sub-step
+	m_worldTransform = m_kinematicFrameStart;
+}
+
+// Called BEFORE each sub-step : moves the body 1/N of the way towards the frame target
+void btRigidBody::advanceKinematicSubStep(int subStep, int numSubSteps)
+{
+	if (!isKinematicDriven())
+		return;
+
+	if (subStep + 1 >= numSubSteps)
+	{
+		// Last sub-step: snap exactly to the target to avoid accumulating drift
+		m_worldTransform = m_kinematicFrameTarget;
+	}
+	else
+	{
+		btScalar alpha = btScalar(subStep + 1) / btScalar(numSubSteps);
+		m_worldTransform.setOrigin(
+			m_kinematicFrameStart.getOrigin().lerp(m_kinematicFrameTarget.getOrigin(), alpha));
+		m_worldTransform.setRotation(
+			m_kinematicFrameStart.getRotation().slerp(m_kinematicFrameTarget.getRotation(), alpha));
+	}
+	// m_interpolationWorldTransform still holds the previous sub-step position (set by syncKinematicState),
+	// so (world - interpolation) / fixedTimeStep == the frame velocity computed above.
 }
 
 void btRigidBody::syncKinematicState()

@@ -151,6 +151,8 @@ private:
 	void updateBulletChildrenRecursive(btScalar timeStep, unsigned int currentFrame);
 	void updateBulletChildrenInterpolatedRecursive(btScalar timeStep, unsigned int currentFrame);
 	bool m_hasMovedWithChildrenUpdate = false;
+	btTransform m_kinematicFrameStart;   // position at the beginning of the frame
+	btTransform m_kinematicFrameTarget;  // position Unity asked for this frame
 	
 public:
 	///The btRigidBodyConstructionInfo structure provides information to create a rigid body. Setting mass to zero creates a fixed (non-dynamic) rigid body.
@@ -309,7 +311,23 @@ public:
 	/// continuous collision detection needs prediction
 	void predictIntegratedTransform(btScalar step, btTransform& predictedTransform);
 
+	// True when the body has a kinematic parent (No dynamic ancestors)
+	bool isKinematicDriven() const
+	{
+		if (!isStaticOrKinematicObject())
+			return false;
+
+		for (const btRigidBody* p = m_parent; p != nullptr; p = p->m_parent)
+		{
+			if (!p->isStaticOrKinematicObject())
+				return false;  // driven by a dynamic ancestor
+		}
+		return true;  // root is kinematic
+	}
+	
 	void saveKinematicState(btScalar step);
+	
+	void advanceKinematicSubStep(int subStep, int numSubSteps);
 
 	void syncKinematicState();
 

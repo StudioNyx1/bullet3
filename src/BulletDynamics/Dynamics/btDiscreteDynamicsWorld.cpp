@@ -457,12 +457,15 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 		m_dispatcher1->ClearManifoldsCache();
 		m_dispatcher1->ClearParticlesManifolds();
 		
-		// Save Kinematics' position for the current frame
-		saveKinematicState(fixedTimeStep);
+		// Save Kinematics' position for the current frame and compute their velocity over the whole frame (not a single sub-step)
+		saveKinematicState(fixedTimeStep * m_clampedSimulationSteps);
 
 		m_indexSubIteration = 0;
 		for (int i = 0; i < m_clampedSimulationSteps; i++)
 		{
+			// Move Unity-driven kinematics 1/N of the way towards their frame target
+			advanceKinematicSubStep(i, m_clampedSimulationSteps);
+			
 			// Update constraints (rigid & soft)
 			internalSingleStepSimulation(fixedTimeStep);
 
@@ -487,6 +490,16 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 #endif  //BT_NO_PROFILE
 
 	return m_indexSubIteration;
+}
+
+void btDiscreteDynamicsWorld::advanceKinematicSubStep(int subStep, int numSubSteps)
+{
+	for (int i = 0; i < m_nonStaticRigidBodies.size(); i++)
+	{
+		btRigidBody* body = m_nonStaticRigidBodies[i];
+		if (body->isKinematicObject())
+			body->advanceKinematicSubStep(subStep, numSubSteps);
+	}
 }
 
 int btDiscreteDynamicsWorld::stepSimulationOneCable(btScalar timeStep, int maxSubSteps, btScalar fixedTimeStep, btCable* cable)
