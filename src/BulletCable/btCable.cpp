@@ -2001,14 +2001,14 @@ void btCable::bendingConstraint()
 		Node* current = m_links[i].m_n[0];
 		Node* after = m_links[i].m_n[1];
 
-		if (!before->computeNodeConstraint &&
-			!current->computeNodeConstraint &&
-			!after->computeNodeConstraint)
-			continue;
-
-		before->computeNodeConstraint = true;
-		current->computeNodeConstraint = true;
-		after->computeNodeConstraint = true;
+		// if (!before->computeNodeConstraint &&
+		// 	!current->computeNodeConstraint &&
+		// 	!after->computeNodeConstraint)
+		// 	continue;
+		// 
+		// before->computeNodeConstraint = true;
+		// current->computeNodeConstraint = true;
+		// after->computeNodeConstraint = true;
 
 		btVector3 delta1 = current->m_x - before->m_x;
 		btVector3 delta2 = after->m_x - current->m_x;
