@@ -214,6 +214,34 @@ int btPersistentManifold::getCacheEntry(const btManifoldPoint& newPoint) const
 			nearestPoint = i;
 		}
 	}
+
+	if (nearestPoint >= 0)
+		return nearestPoint;
+
+	// No match on body A. Points flagged m_hasCollided are kept alive until the end of the frame
+	// (see refreshContactPoints), so when a contact slides along body A by more than the breaking
+	// threshold within a frame (fast motion + sub-steps), the old point would stay next to the new one
+	// and the same contact would be duplicated once per sub-step.
+	// Match it on body B instead (same spot of B, same normal) so the point is updated, not duplicated.
+	const btScalar minNormalDot = btScalar(0.95);
+	shortestDist = getContactBreakingThreshold() * getContactBreakingThreshold();
+	for (int i = 0; i < size; i++)
+	{
+		const btManifoldPoint& mp = m_pointCache[i];
+		if (!mp.m_hasCollided)
+			continue;
+
+		if (mp.m_normalWorldOnB.dot(newPoint.m_normalWorldOnB) < minNormalDot)
+			continue;
+
+		btVector3 diffB = mp.m_localPointB - newPoint.m_localPointB;
+		const btScalar distToManiPoint = diffB.dot(diffB);
+		if (distToManiPoint < shortestDist)
+		{
+			shortestDist = distToManiPoint;
+			nearestPoint = i;
+		}
+	}
 	return nearestPoint;
 }
 
