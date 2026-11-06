@@ -49,6 +49,8 @@ private:
 	const btCollisionObject* m_body1;
 	std::vector<CustomManifoldPoint> m_points;
 
+	void removeZeroImpulsePoints();
+
 public:
 	CustomManifold(btPersistentManifold* manifold);
 
