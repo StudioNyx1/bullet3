@@ -1797,6 +1797,10 @@ void btSequentialImpulseConstraintSolver::writeBackContacts(int iBegin, int iEnd
 		btManifoldPoint* pt = (btManifoldPoint*)solveManifold.m_originalContactPoint;
 		btAssert(pt);
 		pt->m_appliedImpulse = solveManifold.m_appliedImpulse;
+		// Frame impulse = velocity impulse + split (penetration recovery) impulse.
+		// Deep penetrations (< m_splitImpulsePenetrationThreshold) are only resolved by the push impulse,
+		// so without it a body placed inside another one would report a zero impulse.
+		pt->m_frameImpulse += solveManifold.m_appliedImpulse + solveManifold.m_appliedPushImpulse;
 		//	float f = m_tmpSolverContactFrictionConstraintPool[solveManifold.m_frictionIndex].m_appliedImpulse;
 		//	printf("pt->m_appliedImpulseLateral1 = %f\n", f);
 		pt->m_appliedImpulseLateral1 = m_tmpSolverContactFrictionConstraintPool[solveManifold.m_frictionIndex].m_appliedImpulse;
