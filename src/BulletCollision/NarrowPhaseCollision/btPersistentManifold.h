@@ -183,6 +183,7 @@ public:
 			//get rid of duplicated userPersistentData pointer
 			m_pointCache[lastUsedIndex].m_userPersistentData = 0;
 			m_pointCache[lastUsedIndex].m_appliedImpulse = 0.f;
+			m_pointCache[lastUsedIndex].m_frameImpulse = 0.f;
 			m_pointCache[lastUsedIndex].m_prevRHS = 0.f;
 			m_pointCache[lastUsedIndex].m_contactPointFlags = 0;
 			m_pointCache[lastUsedIndex].m_appliedImpulseLateral1 = 0.f;
@@ -206,6 +207,8 @@ public:
 #ifdef MAINTAIN_PERSISTENCY
 		int lifeTime = m_pointCache[insertIndex].getLifeTime();
 		btScalar appliedImpulse = m_pointCache[insertIndex].m_appliedImpulse;
+		btScalar frameImpulse = m_pointCache[insertIndex].m_frameImpulse;
+		bool hasCollided = m_pointCache[insertIndex].m_hasCollided;
 		btScalar prevRHS = m_pointCache[insertIndex].m_prevRHS;
 		btScalar appliedLateralImpulse1 = m_pointCache[insertIndex].m_appliedImpulseLateral1;
 		btScalar appliedLateralImpulse2 = m_pointCache[insertIndex].m_appliedImpulseLateral2;
@@ -235,6 +238,9 @@ public:
 			m_pointCache[insertIndex] = newPoint;
 			m_pointCache[insertIndex].m_userPersistentData = cache;
 			m_pointCache[insertIndex].m_appliedImpulse = appliedImpulse;
+			m_pointCache[insertIndex].m_frameImpulse = frameImpulse;
+			// Same contact: it already collided this frame, keep it alive until the end of the frame
+			m_pointCache[insertIndex].m_hasCollided = hasCollided;
 			m_pointCache[insertIndex].m_prevRHS = prevRHS;
 			m_pointCache[insertIndex].m_appliedImpulseLateral1 = appliedLateralImpulse1;
 			m_pointCache[insertIndex].m_appliedImpulseLateral2 = appliedLateralImpulse2;

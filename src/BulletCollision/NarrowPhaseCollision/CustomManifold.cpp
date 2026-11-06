@@ -4,7 +4,7 @@ CustomManifoldPoint::CustomManifoldPoint(btManifoldPoint* point)
 {
 	m_positionWorldOnA = point->getPositionWorldOnA();
 	m_positionWorldOnB = point->getPositionWorldOnB();
-	m_impulse = point->getAppliedImpulse();
+	m_impulse = point->m_frameImpulse; // whole frame (sum over sub-steps), not only the last sub-step
 	m_depth = point->getDistance();
 	m_normal = point->getNormalWorldOnB();
 }

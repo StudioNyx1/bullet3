@@ -63,7 +63,9 @@ public:
 		  m_contactCFM(0.f),
 		  m_contactERP(0.f),
 		  m_frictionCFM(0.f),
-		  m_lifeTime(0)
+		  m_lifeTime(0),
+		  m_hasCollided(false),
+		  m_frameImpulse(0.f)
 	{
 	}
 
@@ -95,6 +97,8 @@ public:
 										 m_contactERP(0.f),
 										 m_frictionCFM(0.f),
 										 m_lifeTime(0),
+										 m_hasCollided(false),
+										 m_frameImpulse(0.f),
 										 m_lateralFrictionDir1(0,0,0),
 										 m_lateralFrictionDir2(0,0,0)
 	{
@@ -144,7 +148,11 @@ public:
 
 	int m_lifeTime;  //lifetime of the contactpoint in frames
 	bool m_hasCollided;
-	
+
+	// Sum of (applied + split/push) impulse over the sub-steps of the current frame
+	// (reset at frame start by btDiscreteDynamicsWorld, accumulated by btSequentialImpulseConstraintSolver::writeBackContacts)
+	btScalar m_frameImpulse;
+
 	btVector3 m_lateralFrictionDir1;
 	btVector3 m_lateralFrictionDir2;
 

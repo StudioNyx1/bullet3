@@ -450,6 +450,7 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 			for (int j = 0; j < manifold->getNumContacts(); j++)
 			{
 				manifold->getContactPoint(j).m_hasCollided = false;
+				manifold->getContactPoint(j).m_frameImpulse = 0.f;
 			}
 		}
 
@@ -477,6 +478,9 @@ int btDiscreteDynamicsWorld::stepSimulation(btScalar timeStep, int maxSubSteps, 
 
 			m_indexSubIteration++;
 		}
+
+		// Fill the manifolds cache once, with the state of the last sub-step
+		cacheCollidedManifolds();
 	}
 	else
 	{
@@ -529,6 +533,7 @@ int btDiscreteDynamicsWorld::stepSimulationOneCable(btScalar timeStep, int maxSu
 			for (int j = 0; j < manifold->getNumContacts(); j++)
 			{
 				manifold->getContactPoint(j).m_hasCollided = false;
+				manifold->getContactPoint(j).m_frameImpulse = 0.f;
 			}
 		}
 
@@ -552,6 +557,9 @@ int btDiscreteDynamicsWorld::stepSimulationOneCable(btScalar timeStep, int maxSu
 }
 
 void btDiscreteDynamicsWorld::EndStepSimulationOneCable() {
+	// Fill the manifolds cache with the state of this step
+	cacheCollidedManifolds();
+
 	// Update Rigids' positions
 	synchronizeMotionStates();
 
@@ -611,21 +619,11 @@ void btDiscreteDynamicsWorld::internalSingleStepSimulation(btScalar timeStep)
 
 	updateActivationState(timeStep);
 
-	for (int i = 0; i < m_dispatcher1->getNumManifolds(); i++)
-	{
-		btPersistentManifold* manifold = m_dispatcher1->getManifoldByIndexInternal(i);
-		if(manifold->m_hasCollided)
-		{
-			if(manifold->getBody0()->getBroadphaseHandle()->m_collisionFilterGroup == 4 || manifold->getBody1()->getBroadphaseHandle()->m_collisionFilterGroup == 4) {
-				m_dispatcher1->addParticlesManifold(manifold);
-			}
-			else
-			{
-				m_dispatcher1->addManifoldToCache(manifold);
-			}
-		}
-	}
-	
+	// Note: the manifolds cache is NOT filled here (once per sub-step) but once per frame,
+	// after the last sub-step (see cacheCollidedManifolds), otherwise the persistent
+	// contacts get duplicated for each sub-step.
+	// The impulses of the whole frame are accumulated by the solver, in writeBackContacts (m_frameImpulse).
+
 	if (0 != m_internalTickCallback)
 	{
 		(*m_internalTickCallback)(this, timeStep);
@@ -641,6 +639,42 @@ void btDiscreteDynamicsWorld::collisionWorldStep() {
 	///perform collision detection
 	performDiscreteCollisionDetection();
 
+	cacheCollidedManifolds();
+}
+
+void btDiscreteDynamicsWorld::cacheCollidedManifolds()
+{
+	// Points flagged m_hasCollided are kept in the persistent manifolds for the whole frame
+	// (see btPersistentManifold::refreshContactPoints), so after the last sub-step the
+	// manifolds already hold every contact of the frame: copy them once.
+
+	// Bullet also creates points for bodies that are close but not touching (up to the contact
+	// breaking threshold, ~2 cm). A pair (all its manifolds, e.g. one per compound child pair)
+	// is cached only if it really touches: one point at most maxTouchingDistance apart
+	// (resting contacts have a tiny positive distance) or one point that received an impulse.
+	const btScalar maxTouchingDistance = btScalar(0.001);
+	const btScalar minImpulse = btScalar(1e-6);
+
+	// Touching pairs, stored as consecutive (body0, body1)
+	btAlignedObjectArray<const btCollisionObject*> touchingPairs;
+	for (int i = 0; i < m_dispatcher1->getNumManifolds(); i++)
+	{
+		btPersistentManifold* manifold = m_dispatcher1->getManifoldByIndexInternal(i);
+		if (!manifold->m_hasCollided)
+			continue;
+
+		for (int j = 0; j < manifold->getNumContacts(); j++)
+		{
+			const btManifoldPoint& point = manifold->getContactPoint(j);
+			if (point.getDistance() <= maxTouchingDistance || btFabs(point.m_frameImpulse) > minImpulse)
+			{
+				touchingPairs.push_back(manifold->getBody0());
+				touchingPairs.push_back(manifold->getBody1());
+				break;
+			}
+		}
+	}
+
 	for (int i = 0; i < m_dispatcher1->getNumManifolds(); i++)
 	{
 		btPersistentManifold* manifold = m_dispatcher1->getManifoldByIndexInternal(i);
@@ -652,7 +686,19 @@ void btDiscreteDynamicsWorld::collisionWorldStep() {
 			}
 			else
 			{
-				m_dispatcher1->addManifoldToCache(manifold);
+				const btCollisionObject* body0 = manifold->getBody0();
+				const btCollisionObject* body1 = manifold->getBody1();
+				bool isTouching = false;
+				for (int k = 0; k < touchingPairs.size() && !isTouching; k += 2)
+				{
+					isTouching = (touchingPairs[k] == body0 && touchingPairs[k + 1] == body1)
+						|| (touchingPairs[k] == body1 && touchingPairs[k + 1] == body0);
+				}
+
+				if (isTouching)
+				{
+					m_dispatcher1->addManifoldToCache(manifold);
+				}
 			}
 		}
 	}

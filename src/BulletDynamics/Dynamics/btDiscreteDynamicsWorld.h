@@ -91,6 +91,9 @@ protected:
 
 	virtual void internalSingleStepSimulation(btScalar timeStep);
 
+	// Copy the collided manifolds into the dispatcher's cache (to be called once per frame)
+	void cacheCollidedManifolds();
+
 	void releasePredictiveContacts();
 	void createPredictiveContactsInternal(btRigidBody * *bodies, int numBodies, btScalar timeStep);  // can be called in parallel
 	virtual void createPredictiveContacts(btScalar timeStep);
