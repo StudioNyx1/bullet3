@@ -16,6 +16,14 @@ private:
 public:
 	CustomManifoldPoint(btManifoldPoint* point);
 
+	// Same contact (same positions on A and B, same normal), e.g. produced twice by
+	// two child shape pairs of compound shapes. 'swapped' = 'other' has body A and B inverted.
+	bool isSameContact(const CustomManifoldPoint& other, bool swapped) const;
+
+	// Merge a duplicate of this contact: impulses are summed (the solver splits the load
+	// between the duplicates), the deepest penetration is kept.
+	void merge(const CustomManifoldPoint& other);
+
 	btVector3 GetPositionWorldOnA() const
 	{
 		return m_positionWorldOnA;
