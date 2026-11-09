@@ -650,9 +650,9 @@ void btDiscreteDynamicsWorld::cacheCollidedManifolds()
 
 	// Bullet also creates points for bodies that are close but not touching (up to the contact
 	// breaking threshold, ~2 cm). A pair (all its manifolds, e.g. one per compound child pair)
-	// is cached only if it really touches: one point at most maxTouchingDistance apart
-	// (resting contacts have a tiny positive distance) or one point that received an impulse.
-	const btScalar maxTouchingDistance = btScalar(0.001);
+	// is cached only if it really touches: one penetrating point (depth <= 0) or one point that
+	// received an impulse (resting contacts can have a tiny positive depth, but they carry the load).
+	const btScalar maxTouchingDistance = btScalar(0);
 	const btScalar minImpulse = btScalar(1e-6);
 
 	// Touching pairs, stored as consecutive (body0, body1)
