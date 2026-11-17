@@ -662,11 +662,22 @@ void btCable::predictMotion(btScalar dt)
 			//n.m_acc = newAcceleration;
 			//n.m_f = zero;
 			
-			// Velocity Verlet (https://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet)
+			// Velocity Verlet (https://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet),
+			// kick-drift-kick form, compatible with the position based constraints.
+			// After the constraints, updateNodeData sets m_v = (m_x - m_q) / sdt: this is the half-step
+			// velocity v(n-1/2), including the constraint corrections. A closing half-kick done at the end
+			// of the step would be overwritten (forces halved and one sub-step late), and it needs a(n),
+			// only known now, so it is done at the start of the next sub-step:
+			//   v(n)     = v(n-1/2) + 0.5 * a(n) * dt   (closing half-kick of the previous sub-step)
+			//   v(n+1/2) = v(n)     + 0.5 * a(n) * dt   (opening half-kick)
+			//   v(n+1/2) *= damping                     (same place as btRigidBody::applyDamping)
+			//   x(n+1)   = x(n)     + v(n+1/2) * dt     (drift)
+			const btVector3 newAcceleration = n.m_f / mass;
+			const btVector3 halfKick = newAcceleration * (btScalar(0.5) * m_sst.sdt);
+			n.m_v += halfKick;
+			n.m_v += halfKick;
 			n.m_v *= damping;
-			n.m_x += n.m_v * m_sst.sdt + 0.5 * n.m_acc * m_sst.sdt * m_sst.sdt;
-			btVector3 newAcceleration = n.m_f / mass;	
-			n.m_v += 0.5 * (newAcceleration + n.m_acc) * m_sst.sdt;
+			n.m_x += n.m_v * m_sst.sdt;
 			n.m_acc = newAcceleration;
 			n.m_f = zero;
 		}
