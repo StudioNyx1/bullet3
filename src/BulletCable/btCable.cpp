@@ -601,7 +601,10 @@ void btCable::predictMotion(btScalar dt)
 	if (isActive())
 	{
 		NodeForces* nodeForces = ((btSoftRigidDynamicsWorld*)m_world)->m_nodeForces;		
-		const btScalar damping = 1.0 - m_cfg.kDP;
+		// Same damping as btRigidBody::applyDamping: kDP = fraction of the velocity lost per second,
+		// clamped to [0, 1] like btRigidBody::setDamping, factor (1 - kDP)^dt with the same dt as the rigid bodies.
+		const btScalar kDP = btClamped(m_cfg.kDP, btScalar(0), btScalar(1));
+		const btScalar damping = btPow(btScalar(1) - kDP, dt);
 
 		btVector3 zero = btVector3(0, 0, 0);
 
