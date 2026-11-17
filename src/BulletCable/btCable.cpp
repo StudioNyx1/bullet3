@@ -150,21 +150,32 @@ void FindLinksAtAnchor(btSoftBody::Anchor& anchor, btSoftBody::tLinkArray& links
 	btSoftBody::Node* node = anchor.m_node;
 	btSoftBody::Link* link = nullptr;
 
+	int links_count = links.size();
+
 	// Quick checks at the start to avoid looping over all links
+	// (the node can also belong to the second link, e.g. anchor on node 1)
 	link = &links[0];
 	if (link->m_n[0] == node || link->m_n[1] == node)
 	{
 		anchor.m_nodeLinks[0] = link;
+		if (links_count > 1 && (links[1].m_n[0] == node || links[1].m_n[1] == node))
+		{
+			anchor.m_nodeLinks[1] = &links[1];
+		}
 
 		return;
 	}
 
 	// Quick checks at the end to avoid looping over all links
-	int links_count = links.size();
+	// (the node can also belong to the second to last link, e.g. anchor on node N-2)
 	link = &links[links_count - 1];
 	if (link->m_n[0] == node || link->m_n[1] == node)
 	{
 		anchor.m_nodeLinks[0] = link;
+		if (links_count > 1 && (links[links_count - 2].m_n[0] == node || links[links_count - 2].m_n[1] == node))
+		{
+			anchor.m_nodeLinks[1] = &links[links_count - 2];
+		}
 
 		return;
 	}
@@ -731,7 +742,26 @@ void btCable::Grows(float dt)
 		sizeLink--;
 
 		// Calculate the new node's position
-		btVector3 dirCable = (lastNode->m_x - beforeNewNode->m_x).normalized();
+		// Guard: coincident nodes (e.g. cable created spooled) would give a NaN direction
+		const btScalar minDirLength2 = btScalar(1e-12); // 1 micrometer
+		btVector3 dirCable = lastNode->m_x - beforeNewNode->m_x;
+		if (dirCable.length2() > minDirLength2)
+		{
+			dirCable.normalize();
+		}
+		else if (lastIndexNode >= 2 && (beforeNewNode->m_x - m_nodes[lastIndexNode - 2].m_x).length2() > minDirLength2)
+		{
+			// Direction of the previous link
+			dirCable = (beforeNewNode->m_x - m_nodes[lastIndexNode - 2].m_x).normalized();
+		}
+		else if (m_gravity.length2() > minDirLength2)
+		{
+			dirCable = m_gravity.normalized();
+		}
+		else
+		{
+			dirCable = btVector3(1, 0, 0);
+		}
 		btVector3 newNodePos = beforeNewNode->m_x + dirCable * currentCableRL;
 
 		// Create the new node again
@@ -861,6 +891,15 @@ void btCable::Shrinks(float dt)
 			if (sizeNode <= 2)
 			{
 				newLinkRL = minRL;
+				WantedSpeed = 0;
+				break;
+			}
+
+			// We cannot remove an anchor: the last-1 node changes after each removal, check it again
+			if (m_nodes.at(lastIndexNode - 1).m_battach != 0)
+			{
+				newLinkRL = minRL;
+				m_growingState = 3;
 				WantedSpeed = 0;
 				break;
 			}
@@ -1333,8 +1372,25 @@ void btCable::anchorConstraint()
 		btScalar finalTension = anchor.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
-			anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
-			impulse *= (anchor.m_lastTension.length() - currentTension) / (finalTension - currentTension);
+			// Guards: normalized() of a null tension and 0/0 when the tension does not change give NaN
+			if (finalTension > SIMD_EPSILON)
+			{
+				anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
+			}
+			else
+			{
+				anchor.m_lastTension.setZero();
+			}
+
+			const btScalar tensionDelta = finalTension - currentTension;
+			if (btFabs(tensionDelta) > SIMD_EPSILON)
+			{
+				impulse *= (anchor.m_lastTension.length() - currentTension) / tensionDelta;
+			}
+			else
+			{
+				impulse.setZero();
+			}
 		}
 
 		// Account for max tension constraint when updating average tension during this frame
@@ -1387,8 +1443,25 @@ void btCable::anchorConstraintPlacement()
 		btScalar finalTension = anchor.m_lastTension.length();
 		if (m_maxTension >= 0 && finalTension >= m_maxTension)
 		{
-			anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
-			impulse *= (anchor.m_lastTension.length() - currentTension) / (finalTension - currentTension);
+			// Guards: normalized() of a null tension and 0/0 when the tension does not change give NaN
+			if (finalTension > SIMD_EPSILON)
+			{
+				anchor.m_lastTension = anchor.m_lastTension.normalized() * m_maxTension;
+			}
+			else
+			{
+				anchor.m_lastTension.setZero();
+			}
+
+			const btScalar tensionDelta = finalTension - currentTension;
+			if (btFabs(tensionDelta) > SIMD_EPSILON)
+			{
+				impulse *= (anchor.m_lastTension.length() - currentTension) / tensionDelta;
+			}
+			else
+			{
+				impulse.setZero();
+			}
 		}
 		
 		// Account for max tension constraint when updating average tension during this frame
@@ -1656,7 +1729,15 @@ void btCable::distanceConstraintPBD()
 		}
 	}
 
-	m_cableStretchRatio = (m_lengthAccumulator - m_restLengthAccumulator) / m_restLengthAccumulator;
+	// Guard: no link accumulated (all skipped) gives 0/0, and the NaN would stay in the damped ratio
+	if (m_restLengthAccumulator > SIMD_EPSILON)
+	{
+		m_cableStretchRatio = (m_lengthAccumulator - m_restLengthAccumulator) / m_restLengthAccumulator;
+	}
+	else
+	{
+		m_cableStretchRatio = 0.0;
+	}
 }
 
 void btCable::distanceConstraintXPBD()
@@ -1771,7 +1852,15 @@ void btCable::distanceConstraintXPBD()
 		m_restLengthAccumulator += l->m_rl;
 	}
 
-	m_cableStretchRatio = (m_lengthAccumulator - m_restLengthAccumulator) / m_restLengthAccumulator;
+	// Guard: no link accumulated (all skipped) gives 0/0, and the NaN would stay in the damped ratio
+	if (m_restLengthAccumulator > SIMD_EPSILON)
+	{
+		m_cableStretchRatio = (m_lengthAccumulator - m_restLengthAccumulator) / m_restLengthAccumulator;
+	}
+	else
+	{
+		m_cableStretchRatio = 0.0;
+	}
 }
 
 void btCable::LRAConstraint()
@@ -1791,13 +1880,14 @@ void btCable::LRAConstraint()
 		{
 			Link& l = m_links[i];
 			Node* b = l.m_n[1];
+			// Accumulate the rest length of every link, even the skipped ones
+			distance += l.m_rl;
 			if (!aMove && !b->computeNodeConstraint) continue;
 			if (!b->computeNodeConstraint)
 			{
 				b->computeNodeConstraint = true;
 				b->cptIteration++;
 			}
-			distance += l.m_rl;
 			if (a.m_x.distance(b->m_x) > distance)
 				b->m_x = a.m_x + (b->m_x - a.m_x).normalized() * distance;
 		}
@@ -1815,13 +1905,14 @@ void btCable::LRAConstraint()
 		{
 			Link& l = m_links[i];
 			Node* b = l.m_n[0];
+			// Accumulate the rest length of every link, even the skipped ones
+			distance += l.m_rl;
 			if (!aMove && !b->computeNodeConstraint) continue;
 			if (!b->computeNodeConstraint)
 			{
 				b->computeNodeConstraint = true;
 				b->cptIteration++;
 			}
-			distance += l.m_rl;
 			if (a.m_x.distance(b->m_x) > distance)
 				b->m_x = a.m_x + (b->m_x - a.m_x).normalized() * distance;
 		}
@@ -2383,6 +2474,12 @@ bool btCable::getUseHydroAero()
 
 void btCable::addSection(btScalar rl, int start, int end, int nbNodes)
 {
+	// No more room: the array was allocated with section_count entries
+	if (m_section == nullptr || m_sectionCurrent >= m_sectionCount)
+	{
+		return;
+	}
+
 	m_section[m_sectionCurrent].RestLength = rl;
 	m_section[m_sectionCurrent].StartNodeIndex = start;
 	m_section[m_sectionCurrent].EndNodeIndex = end;
@@ -2444,11 +2541,20 @@ void btCable::removeNodeAt(const int index)
 
 void btCable::setTotalMass(btScalar mass, bool fromfaces)
 {
+	// A null or negative mass would give an infinite / negative inverse mass
+	if (mass <= 0 || m_nodes.size() == 0)
+	{
+		return;
+	}
+
 	btScalar massNode = mass / m_nodes.size();
 	for (int i = 0; i < m_nodes.size(); ++i)
 	{
 		m_nodes[i].m_im = 1.0 / massNode;
 	}
+
+	// The link constants (m_c0) depend on the inverse masses
+	m_bUpdateRtCst = true;
 }
 
 void btCable::updateNodesMass()
@@ -2492,8 +2598,9 @@ void btCable::updateNodesMass()
 
 void btCable::setCollisionParameters(int substepSolverCollisionDelay, int substepNarrowCollisionDelay)
 {
-	m_substepDelayCollisionSolver = substepSolverCollisionDelay;
-	m_substepDelayCollisionNarrow = substepNarrowCollisionDelay;
+	// Used as modulo in solveSingleCableIteration: must be at least 1
+	m_substepDelayCollisionSolver = btMax(substepSolverCollisionDelay, 1);
+	m_substepDelayCollisionNarrow = btMax(substepNarrowCollisionDelay, 1);
 }
 
 void btCable::setCollisionMargin(float colMargin)

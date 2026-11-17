@@ -111,7 +111,9 @@ void btRigidBody::setupRigidBody(const btRigidBody::btRigidBodyConstructionInfo&
 	m_turnVelocity.setZero();
 
 	m_Children = {};
+	m_parent = nullptr;
 	m_cableCollision = nullptr;
+	m_cableCollisionObject = nullptr;
 	m_redirectionTarget = nullptr;
 	m_localTransform = btTransform::getIdentity();
 
@@ -444,45 +446,24 @@ void btRigidBody::applyDamping(btScalar timeStep)
 			}
 		}
 
+		// Per axis: compare the speed magnitude (not the signed value, otherwise any negative
+		// component is zeroed) and reduce it towards 0 along the rotation direction (dir keeps the sign).
 		btScalar angDampVel = btScalar(0.005);
-		btVector3 dir = m_angularVelocity.normalized();
-
-		btScalar angSpeedX = m_angularVelocity.getX();
-		if (angSpeedX < m_angularDamping.getX())
+		const btVector3 dir = m_angularVelocity.fuzzyZero() ? btVector3(0, 0, 0) : m_angularVelocity.normalized();
+		for (int axis = 0; axis < 3; ++axis)
 		{
-			if (angSpeedX > angDampVel)
+			const btScalar angSpeed = m_angularVelocity[axis];
+			const btScalar absAngSpeed = btFabs(angSpeed);
+			if (absAngSpeed < m_angularDamping[axis])
 			{
-				m_angularVelocity.setX(angSpeedX - dir.getX() * angDampVel);
-			}
-			else
-			{
-				m_angularVelocity.setX(btScalar(0.));
-			}
-		}
-
-		btScalar angSpeedY = m_angularVelocity.getY();
-		if (angSpeedY < m_angularDamping.getY())
-		{
-			if (angSpeedY > angDampVel)
-			{
-				m_angularVelocity.setY(angSpeedY - dir.getY() * angDampVel);
-			}
-			else
-			{
-				m_angularVelocity.setY(btScalar(0.));
-			}
-		}
-
-		btScalar angSpeedZ = m_angularVelocity.getZ();
-		if (angSpeedZ < m_angularDamping.getZ())
-		{
-			if (angSpeedZ > angDampVel)
-			{
-				m_angularVelocity.setZ(angSpeedZ - dir.getZ() * angDampVel);
-			}
-			else
-			{
-				m_angularVelocity.setZ(btScalar(0.));
+				if (absAngSpeed > angDampVel)
+				{
+					m_angularVelocity[axis] = angSpeed - dir[axis] * angDampVel;
+				}
+				else
+				{
+					m_angularVelocity[axis] = btScalar(0.);
+				}
 			}
 		}
 	}

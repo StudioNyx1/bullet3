@@ -324,7 +324,7 @@ private:
 	btScalar m_cableStretchRatioDamped = 0.0;
 	btScalar m_linkStretchRatioDamped = 0.0;
 
-	MonotonicSpline1D* spline;
+	MonotonicSpline1D* spline = nullptr; // Only allocated by setControlPoint
 
 	// Node forces members
 	bool impulseCompute = true;
@@ -433,7 +433,7 @@ public:
 	CollisionMode m_collisionMode;
 	DistanceMode m_distanceMode;
 	DistanceFunction m_distanceFunction;  // avoid a lot of "if/switch" statements
-	bool m_useAnchorConstraintPlacement;
+	bool m_useAnchorConstraintPlacement = false;
 
 	btScalar WantedDistance = 0;
 	btScalar WantedSpeed = 0;
@@ -485,7 +485,7 @@ public:
 		int NumberOfNodes;
 	};
 
-	btCable::SectionInfo* m_section;
+	btCable::SectionInfo* m_section = nullptr; // Only allocated when the cable has sections
 
 #pragma region Use methods
 public:
